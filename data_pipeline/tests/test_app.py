@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app import load_csv_preview
+from dashboard.data_loader import load_csv_preview
 
 
 def test_preview_loads_only_returned_csv_paths(tmp_path: Path) -> None:
