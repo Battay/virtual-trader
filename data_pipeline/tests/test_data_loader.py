@@ -6,7 +6,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from dashboard.data_loader import filter_market_data, load_market_dataset
+from dashboard.data_loader import (
+    filter_market_data,
+    load_dashboard_dataset,
+    load_market_dataset,
+)
 
 
 def _row(symbol: str, trading_date: str, close: float) -> dict[str, object]:
@@ -125,3 +129,43 @@ def test_filter_results_are_sorted_chronologically() -> None:
         date(2026, 7, 25),
         date(2026, 7, 27),
     ]
+
+
+def test_dashboard_prefers_master_dataset_when_it_exists(tmp_path: Path) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _write_csv(
+        raw_dir / "market_2026-07-24.csv",
+        [_row("RAW", "2026-07-24", 100.0)],
+    )
+    master_path = tmp_path / "master" / "psx_master.csv"
+    master_path.parent.mkdir()
+    _write_csv(master_path, [_row("MASTER", "2026-07-25", 200.0)])
+
+    result = load_dashboard_dataset(
+        master_csv_path=master_path,
+        raw_csv_dir=raw_dir,
+    )
+
+    assert result.source == "master"
+    assert result.data["symbol"].tolist() == ["MASTER"]
+    assert result.file_count == 1
+    assert "Using persistent master dataset" in result.message
+
+
+def test_dashboard_falls_back_to_raw_with_a_clear_message(tmp_path: Path) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _write_csv(
+        raw_dir / "market_2026-07-24.csv",
+        [_row("OGDC", "2026-07-24", 220.0)],
+    )
+
+    result = load_dashboard_dataset(
+        master_csv_path=tmp_path / "missing-master.csv",
+        raw_csv_dir=raw_dir,
+    )
+
+    assert result.source == "raw"
+    assert result.data["symbol"].tolist() == ["OGDC"]
+    assert "has not been built" in result.message

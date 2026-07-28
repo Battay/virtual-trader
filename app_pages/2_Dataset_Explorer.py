@@ -4,20 +4,21 @@ import streamlit as st
 
 from dashboard.data_loader import (
     filter_market_data,
-    load_market_dataset,
+    load_dashboard_dataset,
     summarize_dataset,
 )
 
 
 st.title("Dataset explorer")
-st.caption("Inspect and download filtered views of the generated daily CSV files.")
+st.caption("Inspect the master dataset, with a combined daily-CSV fallback.")
 
-load_result = load_market_dataset()
+load_result = load_dashboard_dataset()
+st.info(load_result.message)
 for error in load_result.errors:
     st.warning(error)
 
-if load_result.file_count == 0:
-    st.info("No generated CSV files were found. Use the Fetch data page first.")
+if load_result.data.empty:
+    st.info("No market rows are available. Use the Fetch data page first.")
     st.stop()
 
 summary = summarize_dataset(load_result)
@@ -37,10 +38,6 @@ second_metric_row[2].metric(
     summary.latest_date.isoformat() if summary.latest_date else "N/A",
     border=True,
 )
-
-if load_result.data.empty:
-    st.info("Generated CSV files exist, but they contain no rows to explore.")
-    st.stop()
 
 symbols = sorted(
     str(symbol)

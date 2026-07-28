@@ -24,6 +24,11 @@ navigation = st.navigation(
             title="Stock explorer",
             icon=":material/show_chart:",
         ),
+        st.Page(
+            "app_pages/4_Automation.py",
+            title="Automation",
+            icon=":material/schedule:",
+        ),
     ],
     position="top",
 )

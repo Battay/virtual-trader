@@ -4,10 +4,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 
-from data_pipeline.src.config import RAW_CSV_DIR
+from data_pipeline.src.config import MASTER_CSV_PATH, RAW_CSV_DIR
 
 
 MARKET_COLUMNS = (
@@ -31,6 +32,8 @@ class DatasetLoadResult:
     data: pd.DataFrame
     csv_paths: tuple[Path, ...]
     errors: tuple[str, ...]
+    source: Literal["master", "raw"] = "raw"
+    message: str = ""
 
     @property
     def file_count(self) -> int:
@@ -132,6 +135,61 @@ def load_market_dataset(csv_dir: Path = RAW_CSV_DIR) -> DatasetLoadResult:
         data=combined if combined is not None else empty_market_dataframe(),
         csv_paths=csv_paths,
         errors=errors,
+        source="raw",
+        message="Using combined daily raw CSV files.",
+    )
+
+
+def load_dashboard_dataset(
+    *,
+    master_csv_path: Path = MASTER_CSV_PATH,
+    raw_csv_dir: Path = RAW_CSV_DIR,
+) -> DatasetLoadResult:
+    """Load the master CSV when available, otherwise combine daily raw CSVs."""
+    raw_directory = Path(raw_csv_dir)
+    raw_paths = (
+        tuple(sorted(raw_directory.glob("market_*.csv")))
+        if raw_directory.is_dir()
+        else ()
+    )
+    master_path = Path(master_csv_path)
+    if master_path.is_file():
+        master_data, master_errors = _combine_csv_paths((master_path,))
+        if master_data is not None:
+            missing_columns = [
+                column for column in MARKET_COLUMNS if column not in master_data.columns
+            ]
+            if not missing_columns:
+                return DatasetLoadResult(
+                    data=master_data,
+                    csv_paths=raw_paths,
+                    errors=master_errors,
+                    source="master",
+                    message=f"Using persistent master dataset: {master_path}",
+                )
+            master_errors = (
+                *master_errors,
+                f"Master dataset is missing columns: {', '.join(missing_columns)}",
+            )
+
+        raw_result = load_market_dataset(raw_directory)
+        return DatasetLoadResult(
+            data=raw_result.data,
+            csv_paths=raw_result.csv_paths,
+            errors=(*master_errors, *raw_result.errors),
+            source="raw",
+            message=(
+                "Master dataset could not be loaded; using combined daily raw CSVs."
+            ),
+        )
+
+    raw_result = load_market_dataset(raw_directory)
+    return DatasetLoadResult(
+        data=raw_result.data,
+        csv_paths=raw_result.csv_paths,
+        errors=raw_result.errors,
+        source="raw",
+        message="Master dataset has not been built; using combined daily raw CSVs.",
     )
 
 

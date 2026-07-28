@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from dashboard.data_loader import filter_market_data, load_market_dataset
+from dashboard.data_loader import filter_market_data, load_dashboard_dataset
 
 
 def _price(value: object) -> str:
@@ -13,11 +13,12 @@ def _price(value: object) -> str:
 st.title("Stock explorer")
 st.caption("Review local historical rows and close-price movement for one symbol.")
 
-load_result = load_market_dataset()
+load_result = load_dashboard_dataset()
+st.info(load_result.message)
 for error in load_result.errors:
     st.warning(error)
 
-if load_result.file_count == 0 or load_result.data.empty:
+if load_result.data.empty:
     st.info("No local market data is available. Use the Fetch data page first.")
     st.stop()
 
