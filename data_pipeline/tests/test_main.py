@@ -10,6 +10,8 @@ import pytest
 from data_pipeline.src import main as main_module
 from data_pipeline.src.main import (
     DateProcessingResult,
+    collect_date_range,
+    collect_single_date,
     iter_calendar_dates,
     process_date,
     run_date_range,
@@ -24,6 +26,19 @@ class StubClient:
 
     def fetch_market_by_date(self, trading_date: date) -> str:
         return self.html
+
+
+VALID_EQUITY_HTML = """
+<table>
+  <tr data-type="equity">
+    <td data-value="OGDC"></td><td data-value="220.50"></td>
+    <td data-value="221.00"></td><td data-value="225.25"></td>
+    <td data-value="219.75"></td><td data-value="224.00"></td>
+    <td data-value="3.50"></td><td data-value="1.59"></td>
+    <td data-value="1,234"></td>
+  </tr>
+</table>
+"""
 
 
 def _successful_result(trading_date: date) -> DateProcessingResult:
@@ -61,16 +76,39 @@ def test_reversed_range_is_rejected_by_iterator_and_cli() -> None:
 def test_empty_trading_date_is_skipped_without_valid_csv(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    raw_dir = tmp_path / "raw"
+    html_dir = tmp_path / "raw" / "html"
+    csv_dir = tmp_path / "raw" / "csv"
     rejected_dir = tmp_path / "rejected"
-    monkeypatch.setattr(main_module, "RAW_DATA_DIR", raw_dir)
+    monkeypatch.setattr(main_module, "RAW_HTML_DIR", html_dir)
+    monkeypatch.setattr(main_module, "RAW_CSV_DIR", csv_dir)
     monkeypatch.setattr(main_module, "REJECTED_DATA_DIR", rejected_dir)
 
     result = process_date(date(2026, 7, 4), StubClient())
 
     assert result.status == "skipped"
-    assert (raw_dir / "market_2026-07-04.html").exists()
-    assert not (raw_dir / "market_2026-07-04.csv").exists()
+    assert (html_dir / "market_2026-07-04.html").exists()
+    assert not (csv_dir / "market_2026-07-04.csv").exists()
+
+
+def test_html_and_csv_are_written_to_separate_raw_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    html_dir = tmp_path / "raw" / "html"
+    csv_dir = tmp_path / "raw" / "csv"
+    monkeypatch.setattr(main_module, "RAW_HTML_DIR", html_dir)
+    monkeypatch.setattr(main_module, "RAW_CSV_DIR", csv_dir)
+    monkeypatch.setattr(main_module, "REJECTED_DATA_DIR", tmp_path / "rejected")
+
+    result = process_date(date(2026, 7, 27), StubClient(VALID_EQUITY_HTML))
+
+    html_path = html_dir / "market_2026-07-27.html"
+    csv_path = csv_dir / "market_2026-07-27.csv"
+    assert result.status == "successful"
+    assert result.output_path == csv_path
+    assert html_path.read_text(encoding="utf-8") == VALID_EQUITY_HTML
+    assert csv_path.exists()
+    assert not (html_dir / csv_path.name).exists()
+    assert not (csv_dir / html_path.name).exists()
 
 
 def test_range_logs_each_skipped_date_once(
@@ -78,7 +116,8 @@ def test_range_logs_each_skipped_date_once(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.setattr(main_module, "RAW_DATA_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main_module, "RAW_HTML_DIR", tmp_path / "raw" / "html")
+    monkeypatch.setattr(main_module, "RAW_CSV_DIR", tmp_path / "raw" / "csv")
     monkeypatch.setattr(main_module, "REJECTED_DATA_DIR", tmp_path / "rejected")
 
     with caplog.at_level(logging.INFO, logger=main_module.LOGGER.name):
@@ -125,6 +164,80 @@ def test_failed_date_does_not_stop_later_dates() -> None:
     assert summary.failed_dates == (
         (date(2026, 7, 2), "OSError: temporary file error"),
     )
+
+
+def test_programmatic_collection_returns_date_details_and_output_paths() -> None:
+    output_path = Path("data/raw/csv/market_2026-07-01.csv")
+
+    def fake_processor(
+        trading_date: date, client: Any
+    ) -> DateProcessingResult:
+        if trading_date == date(2026, 7, 2):
+            return DateProcessingResult(
+                trading_date=trading_date,
+                status="skipped",
+                parsed_rows=0,
+                valid_rows=0,
+                rejected_rows=0,
+                output_path=None,
+            )
+        if trading_date == date(2026, 7, 3):
+            raise OSError("disk unavailable")
+        return DateProcessingResult(
+            trading_date=trading_date,
+            status="successful",
+            parsed_rows=1,
+            valid_rows=1,
+            rejected_rows=0,
+            output_path=output_path,
+        )
+
+    result = collect_date_range(
+        date(2026, 7, 1),
+        date(2026, 7, 3),
+        client=StubClient(),
+        date_processor=fake_processor,
+    )
+
+    assert result.total_processed == 3
+    assert result.successful_dates == (date(2026, 7, 1),)
+    assert result.skipped_dates == (date(2026, 7, 2),)
+    assert result.failed_dates == (
+        (date(2026, 7, 3), "OSError: disk unavailable"),
+    )
+    assert result.output_csv_paths == (output_path,)
+    assert result.successful_count == 1
+    assert result.skipped_count == 1
+    assert result.failed_count == 1
+
+
+def test_programmatic_single_date_returns_structured_result() -> None:
+    trading_date = date(2026, 7, 27)
+    output_path = Path("data/raw/csv/market_2026-07-27.csv")
+
+    def fake_processor(
+        requested_date: date, client: Any
+    ) -> DateProcessingResult:
+        return DateProcessingResult(
+            trading_date=requested_date,
+            status="successful",
+            parsed_rows=1,
+            valid_rows=1,
+            rejected_rows=0,
+            output_path=output_path,
+        )
+
+    result = collect_single_date(
+        trading_date,
+        client=StubClient(),
+        date_processor=fake_processor,
+    )
+
+    assert result.start_date == trading_date
+    assert result.end_date == trading_date
+    assert result.total_processed == 1
+    assert result.successful_dates == (trading_date,)
+    assert result.output_csv_paths == (output_path,)
 
 
 def test_existing_single_date_cli_remains_supported(

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Literal, Protocol, Sequence
 
 from .client import PsxClient
-from .config import RAW_DATA_DIR, REJECTED_DATA_DIR
+from .config import RAW_CSV_DIR, RAW_HTML_DIR, REJECTED_DATA_DIR
 from .parser import parse_market_html
 from .validator import validate_records
 
@@ -53,6 +53,34 @@ class RangeProcessingResult:
     successful_dates: int
     skipped_dates: int
     failed_dates: tuple[tuple[date, str], ...]
+
+
+@dataclass(frozen=True)
+class CollectionResult:
+    """Structured result returned by programmatic collection APIs."""
+
+    start_date: date
+    end_date: date
+    total_processed: int
+    successful_dates: tuple[date, ...]
+    skipped_dates: tuple[date, ...]
+    failed_dates: tuple[tuple[date, str], ...]
+    output_csv_paths: tuple[Path, ...]
+
+    @property
+    def successful_count(self) -> int:
+        """Return the number of dates that produced valid CSV output."""
+        return len(self.successful_dates)
+
+    @property
+    def skipped_count(self) -> int:
+        """Return the number of dates with no equity rows."""
+        return len(self.skipped_dates)
+
+    @property
+    def failed_count(self) -> int:
+        """Return the number of dates that failed processing."""
+        return len(self.failed_dates)
 
 
 class MarketClient(Protocol):
@@ -105,8 +133,8 @@ def process_date(
     psx_client = client if client is not None else PsxClient()
     html = psx_client.fetch_market_by_date(trading_date)
 
-    RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    html_path = RAW_DATA_DIR / f"market_{date_text}.html"
+    RAW_HTML_DIR.mkdir(parents=True, exist_ok=True)
+    html_path = RAW_HTML_DIR / f"market_{date_text}.html"
     html_path.write_text(html, encoding="utf-8")
 
     parsed, parse_rejections = parse_market_html(html, trading_date)
@@ -124,7 +152,7 @@ def process_date(
     valid, validation_rejections = validate_records(parsed)
     valid.sort(key=lambda record: str(record["symbol"]))
 
-    csv_path = RAW_DATA_DIR / f"market_{date_text}.csv"
+    csv_path = RAW_CSV_DIR / f"market_{date_text}.csv"
     _write_csv(csv_path, valid)
 
     rejected = [*parse_rejections, *validation_rejections]
@@ -168,20 +196,21 @@ def _short_failure_reason(exc: Exception) -> str:
     return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
 
 
-def run_date_range(
+def collect_date_range(
     start_date: date,
     end_date: date,
     *,
     client: MarketClient | None = None,
     date_processor: DateProcessor = process_date,
-) -> RangeProcessingResult:
-    """Process an inclusive range, continuing after individual date failures."""
+) -> CollectionResult:
+    """Collect an inclusive range and return details without printing a summary."""
     requested_dates = iter_calendar_dates(start_date, end_date)
     psx_client = client if client is not None else PsxClient()
     total_dates = 0
-    successful_dates = 0
-    skipped_dates = 0
+    successful_dates: list[date] = []
+    skipped_dates: list[date] = []
     failures: list[tuple[date, str]] = []
+    output_csv_paths: list[Path] = []
 
     for trading_date in requested_dates:
         total_dates += 1
@@ -194,17 +223,60 @@ def run_date_range(
             continue
 
         if result.status == "skipped":
-            skipped_dates += 1
+            skipped_dates.append(trading_date)
         else:
-            successful_dates += 1
+            successful_dates.append(trading_date)
+            if result.output_path is not None:
+                output_csv_paths.append(result.output_path)
+
+    return CollectionResult(
+        start_date=start_date,
+        end_date=end_date,
+        total_processed=total_dates,
+        successful_dates=tuple(successful_dates),
+        skipped_dates=tuple(skipped_dates),
+        failed_dates=tuple(failures),
+        output_csv_paths=tuple(output_csv_paths),
+    )
+
+
+def collect_single_date(
+    trading_date: date,
+    *,
+    client: MarketClient | None = None,
+    date_processor: DateProcessor = process_date,
+) -> CollectionResult:
+    """Collect one date through the same structured programmatic API."""
+    return collect_date_range(
+        trading_date,
+        trading_date,
+        client=client,
+        date_processor=date_processor,
+    )
+
+
+def run_date_range(
+    start_date: date,
+    end_date: date,
+    *,
+    client: MarketClient | None = None,
+    date_processor: DateProcessor = process_date,
+) -> RangeProcessingResult:
+    """Process an inclusive range and print the existing CLI summary."""
+    collection = collect_date_range(
+        start_date,
+        end_date,
+        client=client,
+        date_processor=date_processor,
+    )
 
     summary = RangeProcessingResult(
         start_date=start_date,
         end_date=end_date,
-        total_dates=total_dates,
-        successful_dates=successful_dates,
-        skipped_dates=skipped_dates,
-        failed_dates=tuple(failures),
+        total_dates=collection.total_processed,
+        successful_dates=collection.successful_count,
+        skipped_dates=collection.skipped_count,
+        failed_dates=collection.failed_dates,
     )
     _print_range_summary(summary)
     return summary
