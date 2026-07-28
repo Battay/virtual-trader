@@ -6,12 +6,18 @@ __pycache__/
 .DS_Store
 
 data/raw/*
+!data/raw/html/
+!data/raw/csv/
+data/raw/html/*
+data/raw/csv/*
 data/master/*
 data/rejected/*
 data/metadata/*
 data_pipeline/logs/*
 
 !data/raw/.gitkeep
+!data/raw/html/.gitkeep
+!data/raw/csv/.gitkeep
 !data/master/.gitkeep
 !data/rejected/.gitkeep
 !data/metadata/.gitkeep
