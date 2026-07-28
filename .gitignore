@@ -22,3 +22,7 @@ data_pipeline/logs/*
 !data/rejected/.gitkeep
 !data/metadata/.gitkeep
 !data_pipeline/logs/.gitkeep
+
+.agents/
+data/raw/csv/
+data/raw/html/
