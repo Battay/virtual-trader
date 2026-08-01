@@ -5,6 +5,7 @@ from datetime import date
 import streamlit as st
 
 from dashboard.data_loader import load_csv_preview
+from dashboard.presentation import column_label, format_date
 from data_pipeline.src.main import (
     CollectionResult,
     collect_date_range,
@@ -13,7 +14,7 @@ from data_pipeline.src.main import (
 
 
 def _format_dates(dates: tuple[date, ...]) -> str:
-    return ", ".join(value.isoformat() for value in dates) if dates else "None"
+    return ", ".join(format_date(value) for value in dates) if dates else "None"
 
 
 def _skipped_reason(skipped_date: date, today: date) -> str:
@@ -37,7 +38,7 @@ def _show_collection_details(result: CollectionResult, today: date) -> None:
         st.write("Skipped:")
         for skipped_date in result.skipped_dates:
             st.write(
-                f"- {skipped_date.isoformat()}: "
+                f"- {format_date(skipped_date)}: "
                 f"{_skipped_reason(skipped_date, today)}"
             )
     else:
@@ -46,7 +47,7 @@ def _show_collection_details(result: CollectionResult, today: date) -> None:
     if result.failed_dates:
         st.write("Failed:")
         for failed_date, reason in result.failed_dates:
-            st.write(f"- {failed_date.isoformat()}: {reason}")
+            st.write(f"- {format_date(failed_date)}: {reason}")
     else:
         st.write("Failed: None")
 
@@ -64,17 +65,26 @@ def _show_collection_details(result: CollectionResult, today: date) -> None:
 
     if preview is not None:
         st.subheader("Generated data preview")
-        st.dataframe(preview, width="stretch", hide_index=True)
+        display_preview = preview.rename(
+            columns={column: column_label(column) for column in preview.columns}
+        )
+        st.dataframe(display_preview, width="stretch", hide_index=True)
     else:
         st.warning("CSV paths were returned, but none could be loaded for preview.")
 
 
-st.title("Fetch data")
+st.title("Fetch Data")
 st.caption("Download PSX historical equity data without leaving the dashboard.")
 st.session_state.setdefault("collection_result", None)
 
 today = date.today()
-mode = st.radio("Collection mode", ("Single date", "Date range"), key="fetch_mode")
+mode = st.segmented_control(
+    "Collection mode",
+    ("Single date", "Date range"),
+    default="Single date",
+    required=True,
+    key="fetch_mode",
+)
 if mode == "Single date":
     selected_date = st.date_input("Trading date", value=today, key="fetch_date")
     start_date = selected_date

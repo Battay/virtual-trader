@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from data_pipeline.src.automation import (
@@ -16,8 +17,10 @@ from data_pipeline.src.automation import (
     run_scheduled_update,
     save_automation_config,
 )
+from data_pipeline.src.company_registry import RegistryBuildResult
 from data_pipeline.src.csv_store import MasterBuildResult
 from data_pipeline.src.main import CollectionResult
+from data_pipeline.src.official_listings import ListingsRefreshResult
 from data_pipeline.src.updater import IncrementalUpdateResult
 
 
@@ -49,6 +52,40 @@ def _master_result(path: Path) -> MasterBuildResult:
         duplicate_count=0,
         source_files=2,
         errors=(),
+    )
+
+
+def _listings_result(path: Path, *, used_cache: bool = False) -> ListingsRefreshResult:
+    return ListingsRefreshResult(
+        data=pd.DataFrame([{"symbol": "OGDC"}]),
+        current_snapshot_path=path,
+        dated_snapshot_path=None,
+        row_count=1,
+        duplicate_count=0,
+        used_cache=used_cache,
+        listing_refreshed_at="2026-07-28T01:30:00+05:00",
+        message="fixture listings",
+        live_error="offline" if used_cache else None,
+    )
+
+
+def _registry_result(path: Path, *, cached: bool = False) -> RegistryBuildResult:
+    return RegistryBuildResult(
+        output_path=path,
+        total_registry_symbols=3,
+        currently_listed=2,
+        recently_traded=2,
+        listed_not_recently_traded=0,
+        new_listings=1,
+        historical_only=1,
+        suspended=0,
+        non_compliant=0,
+        delisted=0,
+        unknown=0,
+        registry_updated_at="2026-07-28T01:30:00+05:00",
+        listing_refreshed_at="2026-07-28T01:30:00+05:00",
+        cached_listings_used=cached,
+        overrides_applied=0,
     )
 
 
@@ -91,11 +128,21 @@ def test_disabled_scheduled_runner_does_nothing(tmp_path: Path) -> None:
         calls.append("builder")
         return _master_result(tmp_path / "master.csv")
 
+    def listing_refresher(**kwargs: Any) -> ListingsRefreshResult:
+        calls.append("listings")
+        return _listings_result(tmp_path / "listings.csv")
+
+    def registry_builder(**kwargs: Any) -> RegistryBuildResult:
+        calls.append("registry")
+        return _registry_result(tmp_path / "registry.csv")
+
     result = run_scheduled_update(
         config_path=config_path,
         lock_path=tmp_path / "lock",
         updater=updater,
         master_builder=builder,
+        listing_refresher=listing_refresher,
+        registry_builder=registry_builder,
     )
 
     assert result.status == "disabled"
@@ -122,22 +169,42 @@ def test_enabled_runner_calls_updater_then_master_builder(tmp_path: Path) -> Non
         calls.append(("builder", None))
         return _master_result(tmp_path / "master.csv")
 
+    def listing_refresher(**kwargs: Any) -> ListingsRefreshResult:
+        calls.append(("listings", kwargs))
+        return _listings_result(tmp_path / "listings.csv")
+
+    def registry_builder(**kwargs: Any) -> RegistryBuildResult:
+        calls.append(("registry", kwargs))
+        return _registry_result(tmp_path / "registry.csv")
+
     now = datetime(2026, 7, 27, 20, 30, tzinfo=timezone.utc)
     result = run_scheduled_update(
         config_path=config_path,
         lock_path=tmp_path / "lock",
         updater=updater,
         master_builder=builder,
+        listing_refresher=listing_refresher,
+        registry_builder=registry_builder,
         now=now,
     )
 
-    assert [name for name, _ in calls] == ["updater", "builder"]
+    assert [name for name, _ in calls] == [
+        "updater",
+        "builder",
+        "listings",
+        "registry",
+    ]
     updater_arguments = calls[0][1]
     assert isinstance(updater_arguments, dict)
     assert updater_arguments["end_date"] == date(2026, 7, 28)
     assert updater_arguments["bootstrap_start_date"] == date(2026, 7, 1)
     assert result.status == "success"
     assert result.exit_code == 0
+    assert result.market_update_succeeded is True
+    assert result.master_rebuild_succeeded is True
+    assert result.listing_refresh_succeeded is True
+    assert result.registry_rebuild_succeeded is True
+    assert result.cached_listings_used is False
     saved = load_automation_config(config_path)
     assert saved.last_status == "success"
     assert saved.last_success_at is not None
@@ -176,6 +243,12 @@ def test_scheduled_runner_treats_skipped_dates_as_success(tmp_path: Path) -> Non
         lock_path=tmp_path / "lock",
         updater=updater,
         master_builder=lambda: _master_result(tmp_path / "master.csv"),
+        listing_refresher=lambda **kwargs: _listings_result(
+            tmp_path / "listings.csv"
+        ),
+        registry_builder=lambda **kwargs: _registry_result(
+            tmp_path / "registry.csv"
+        ),
         now=datetime(2026, 7, 26, 12, 15, tzinfo=timezone.utc),
     )
 
@@ -183,6 +256,35 @@ def test_scheduled_runner_treats_skipped_dates_as_success(tmp_path: Path) -> Non
     assert result.exit_code == 0
     assert result.update_result is not None
     assert result.update_result.skipped_dates == (date(2026, 7, 26),)
+
+
+def test_cached_listing_fallback_is_recorded_as_success(tmp_path: Path) -> None:
+    config_path = tmp_path / "automation.json"
+    save_automation_config(
+        AutomationConfig(enabled=True, bootstrap_start_date=date(2026, 7, 1)),
+        config_path,
+    )
+
+    result = run_scheduled_update(
+        config_path=config_path,
+        lock_path=tmp_path / "lock",
+        updater=lambda **kwargs: _update_result(kwargs["end_date"]),
+        master_builder=lambda: _master_result(tmp_path / "master.csv"),
+        listing_refresher=lambda **kwargs: _listings_result(
+            tmp_path / "listings.csv",
+            used_cache=True,
+        ),
+        registry_builder=lambda **kwargs: _registry_result(
+            tmp_path / "registry.csv",
+            cached=True,
+        ),
+        now=datetime(2026, 7, 27, 20, 30, tzinfo=timezone.utc),
+    )
+
+    assert result.status == "success"
+    assert result.exit_code == 0
+    assert result.cached_listings_used is True
+    assert "cached listings" in result.message
 
 
 def test_overlapping_lock_is_prevented(tmp_path: Path) -> None:

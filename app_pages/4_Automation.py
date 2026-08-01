@@ -8,6 +8,11 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.data_loader import load_csv_preview
+from dashboard.presentation import (
+    format_date,
+    format_datetime,
+    humanize_enum,
+)
 from data_pipeline.src.automation import (
     AutomationRunResult,
     load_automation_config,
@@ -26,7 +31,7 @@ from data_pipeline.src.updater import discover_available_raw_dates
 
 
 def _display_value(value: object | None) -> str:
-    return str(value) if value is not None else "Never"
+    return format_datetime(value, fallback="Never")
 
 
 def _latest_master_date() -> tuple[date | None, tuple[str, ...]]:
@@ -61,12 +66,24 @@ def _show_update_result(result: AutomationRunResult) -> None:
     if update.skipped_dates:
         st.write(
             "Skipped (eligible for retry): "
-            + ", ".join(value.isoformat() for value in update.skipped_dates)
+            + ", ".join(format_date(value) for value in update.skipped_dates)
         )
     if update.failed_dates:
         st.write("Failed dates:")
         for failed_date, reason in update.failed_dates:
-            st.write(f"- {failed_date.isoformat()}: {reason}")
+            st.write(f"- {format_date(failed_date)}: {reason}")
+    st.write(
+        "Update stages: "
+        f"market={'complete' if result.market_update_succeeded else 'incomplete'}, "
+        f"master={'complete' if result.master_rebuild_succeeded else 'incomplete'}, "
+        f"listings={'complete' if result.listing_refresh_succeeded else 'incomplete'}, "
+        f"registry={'complete' if result.registry_rebuild_succeeded else 'incomplete'}"
+    )
+    if result.cached_listings_used:
+        st.warning(
+            "The registry was rebuilt with cached official listings because the "
+            "live PSX listing source was unavailable."
+        )
 
 
 def _show_master_result(result: MasterBuildResult) -> None:
@@ -80,7 +97,7 @@ def _show_master_result(result: MasterBuildResult) -> None:
         st.warning(error)
 
 
-st.title("Automation and data management")
+st.title("Automation")
 st.caption("Maintain missing daily files and the persistent master dataset.")
 flash_message = st.session_state.pop("automation_flash_message", None)
 if flash_message is not None:
@@ -111,25 +128,25 @@ status_metrics[3].metric(
 data_metrics = st.columns(3)
 data_metrics[0].metric(
     "Bootstrap start date",
-    config.bootstrap_start_date.isoformat()
+    format_date(config.bootstrap_start_date)
     if config.bootstrap_start_date
     else "Not set",
     border=True,
 )
 data_metrics[1].metric(
     "Latest raw date",
-    latest_raw_date.isoformat() if latest_raw_date else "No data",
+    format_date(latest_raw_date, fallback="No data"),
     border=True,
 )
 data_metrics[2].metric(
     "Latest master date",
-    latest_master_date.isoformat() if latest_master_date else "No data",
+    format_date(latest_master_date, fallback="No data"),
     border=True,
 )
 
 st.write(f"Last attempt: {_display_value(config.last_attempt_at)}")
 st.write(f"Last successful run: {_display_value(config.last_success_at)}")
-st.write(f"Last status: {config.last_status}")
+st.write(f"Last status: {humanize_enum(config.last_status)}")
 st.write(f"Last message: {config.last_message}")
 
 st.info(
@@ -189,7 +206,9 @@ if action_columns[0].button(
     width="stretch",
 ):
     try:
-        with st.spinner("Fetching missing dates and rebuilding the master dataset..."):
+        with st.spinner(
+            "Fetching missing dates, refreshing listings, and rebuilding datasets..."
+        ):
             update_result = run_manual_update()
         _show_update_result(update_result)
     except Exception as exc:

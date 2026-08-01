@@ -14,18 +14,23 @@ from .config import (
     AUTOMATION_CONFIG_PATH,
     AUTOMATION_LOCK_PATH,
     AUTO_UPDATE_LOG_PATH,
+    PROJECT_TIMEZONE,
 )
+from .company_registry import RegistryBuildResult, build_company_registry
 from .csv_store import MasterBuildResult, build_master_dataset
+from .official_listings import ListingsRefreshResult, refresh_official_listings
 from .updater import IncrementalUpdateResult, run_incremental_update
 
 
 LOGGER = logging.getLogger(__name__)
-KARACHI_TIMEZONE = "Asia/Karachi"
+KARACHI_TIMEZONE = PROJECT_TIMEZONE
 SCHEDULED_TIME = "17:15"
 DEFAULT_LOCK_STALE_AFTER = timedelta(hours=6)
 RunStatus = Literal["disabled", "success", "failed", "already_running"]
 Updater = Callable[..., IncrementalUpdateResult]
 MasterBuilder = Callable[..., MasterBuildResult]
+ListingRefresher = Callable[..., ListingsRefreshResult]
+RegistryBuilder = Callable[..., RegistryBuildResult]
 
 
 @dataclass(frozen=True)
@@ -60,6 +65,13 @@ class AutomationRunResult:
     exit_code: int
     update_result: IncrementalUpdateResult | None = None
     master_result: MasterBuildResult | None = None
+    listings_result: ListingsRefreshResult | None = None
+    registry_result: RegistryBuildResult | None = None
+    market_update_succeeded: bool = False
+    master_rebuild_succeeded: bool = False
+    listing_refresh_succeeded: bool = False
+    registry_rebuild_succeeded: bool = False
+    cached_listings_used: bool = False
 
 
 class UpdateAlreadyRunning(RuntimeError):
@@ -278,6 +290,8 @@ def _run_enabled_update(
     lock_path: Path,
     updater: Updater,
     master_builder: MasterBuilder,
+    listing_refresher: ListingRefresher,
+    registry_builder: RegistryBuilder,
     now: datetime | None,
 ) -> AutomationRunResult:
     attempt_time = karachi_now(now)
@@ -297,6 +311,10 @@ def _run_enabled_update(
         last_status="running",
         last_message=f"Updating through {end_date.isoformat()}",
     )
+    update_result: IncrementalUpdateResult | None = None
+    master_result: MasterBuildResult | None = None
+    listings_result: ListingsRefreshResult | None = None
+    registry_result: RegistryBuildResult | None = None
     try:
         save_automation_config(attempted_config, config_path)
         update_result = updater(
@@ -324,12 +342,23 @@ def _run_enabled_update(
                 exit_code=1,
                 update_result=update_result,
                 master_result=master_result,
+                market_update_succeeded=False,
+                master_rebuild_succeeded=True,
             )
 
+        listings_result = listing_refresher(refreshed_at=attempt_time)
+        registry_result = registry_builder(
+            listing_data=listings_result.data,
+            reference_date=end_date,
+            registry_updated_at=attempt_time,
+            cached_listings_used=listings_result.used_cache,
+        )
+        listing_mode = "cached listings" if listings_result.used_cache else "live listings"
         message = (
             f"Update succeeded: {len(update_result.successful_dates)} successful, "
             f"{len(update_result.skipped_dates)} skipped; "
-            f"master has {master_result.total_rows} rows"
+            f"master has {master_result.total_rows} rows; {listing_mode}; "
+            f"registry has {registry_result.total_registry_symbols} symbols"
         )
         final_config = replace(
             attempted_config,
@@ -345,6 +374,13 @@ def _run_enabled_update(
             exit_code=0,
             update_result=update_result,
             master_result=master_result,
+            listings_result=listings_result,
+            registry_result=registry_result,
+            market_update_succeeded=True,
+            master_rebuild_succeeded=True,
+            listing_refresh_succeeded=True,
+            registry_rebuild_succeeded=True,
+            cached_listings_used=listings_result.used_cache,
         )
     except Exception as exc:
         message = f"Automation failed: {type(exc).__name__}: {exc}"
@@ -362,6 +398,19 @@ def _run_enabled_update(
             status="failed",
             message=message,
             exit_code=1,
+            update_result=update_result,
+            master_result=master_result,
+            listings_result=listings_result,
+            registry_result=registry_result,
+            market_update_succeeded=(
+                update_result is not None and not update_result.failed_dates
+            ),
+            master_rebuild_succeeded=master_result is not None,
+            listing_refresh_succeeded=listings_result is not None,
+            registry_rebuild_succeeded=registry_result is not None,
+            cached_listings_used=(
+                listings_result.used_cache if listings_result is not None else False
+            ),
         )
     finally:
         lock.release()
@@ -373,6 +422,8 @@ def run_scheduled_update(
     lock_path: Path = AUTOMATION_LOCK_PATH,
     updater: Updater = run_incremental_update,
     master_builder: MasterBuilder = build_master_dataset,
+    listing_refresher: ListingRefresher = refresh_official_listings,
+    registry_builder: RegistryBuilder = build_company_registry,
     now: datetime | None = None,
 ) -> AutomationRunResult:
     """Run the configured scheduled update, or exit cleanly when disabled."""
@@ -390,6 +441,8 @@ def run_scheduled_update(
         lock_path=Path(lock_path),
         updater=updater,
         master_builder=master_builder,
+        listing_refresher=listing_refresher,
+        registry_builder=registry_builder,
         now=now,
     )
 
@@ -402,6 +455,8 @@ def run_manual_update(
     lock_path: Path = AUTOMATION_LOCK_PATH,
     updater: Updater = run_incremental_update,
     master_builder: MasterBuilder = build_master_dataset,
+    listing_refresher: ListingRefresher = refresh_official_listings,
+    registry_builder: RegistryBuilder = build_company_registry,
     now: datetime | None = None,
 ) -> AutomationRunResult:
     """Run one explicit update cycle regardless of the enabled setting."""
@@ -416,5 +471,7 @@ def run_manual_update(
         lock_path=Path(lock_path),
         updater=updater,
         master_builder=master_builder,
+        listing_refresher=listing_refresher,
+        registry_builder=registry_builder,
         now=now,
     )

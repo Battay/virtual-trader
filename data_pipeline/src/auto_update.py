@@ -48,6 +48,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Failed: {len(result.update_result.failed_dates)}")
     if result.master_result is not None:
         print(f"Master file: {result.master_result.output_path}")
+    print(
+        "Stages: "
+        f"market={'ok' if result.market_update_succeeded else 'not completed'}, "
+        f"master={'ok' if result.master_rebuild_succeeded else 'not completed'}, "
+        f"listings={'ok' if result.listing_refresh_succeeded else 'not completed'}, "
+        f"registry={'ok' if result.registry_rebuild_succeeded else 'not completed'}"
+    )
+    print(f"Cached listings used: {'yes' if result.cached_listings_used else 'no'}")
     return result.exit_code
 
 
