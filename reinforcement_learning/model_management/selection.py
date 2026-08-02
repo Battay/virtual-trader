@@ -100,3 +100,83 @@ def merge_symbol_selections(*selections: Collection[str]) -> tuple[str, ...]:
             }
         )
     )
+
+
+def normalize_symbol_selection(
+    symbols: Collection[object],
+    *,
+    allowed_symbols: Collection[object] | None = None,
+) -> tuple[str, ...]:
+    """Return unique non-empty symbols as strings in a stable allowed order."""
+    selected = {
+        str(symbol).strip()
+        for symbol in symbols
+        if str(symbol).strip()
+    }
+    if allowed_symbols is None:
+        return tuple(sorted(selected))
+    allowed = tuple(
+        dict.fromkeys(
+            str(symbol).strip()
+            for symbol in allowed_symbols
+            if str(symbol).strip()
+        )
+    )
+    return tuple(symbol for symbol in allowed if symbol in selected)
+
+
+def selected_symbols_from_editor(edited_table: pd.DataFrame) -> tuple[str, ...]:
+    """Extract selected symbol strings from an editable checkbox table."""
+    required = {"selected", "symbol"}
+    if edited_table.empty or not required.issubset(edited_table.columns):
+        return ()
+    checked = edited_table["selected"].fillna(False).astype(bool)
+    values = edited_table.loc[checked, "symbol"].astype(str).tolist()
+    return normalize_symbol_selection(values)
+
+
+def update_visible_symbol_selection(
+    current_selection: Collection[object],
+    visible_symbols: Collection[object],
+    selected_visible_symbols: Collection[object],
+    *,
+    all_symbols: Collection[object],
+) -> tuple[str, ...]:
+    """Apply visible editor choices while preserving selections hidden by filters."""
+    current = normalize_symbol_selection(
+        current_selection,
+        allowed_symbols=all_symbols,
+    )
+    visible = set(normalize_symbol_selection(visible_symbols))
+    hidden = tuple(symbol for symbol in current if symbol not in visible)
+    selected_visible = normalize_symbol_selection(
+        selected_visible_symbols,
+        allowed_symbols=visible_symbols,
+    )
+    return normalize_symbol_selection(
+        (*hidden, *selected_visible),
+        allowed_symbols=all_symbols,
+    )
+
+
+def bulk_select_symbols(
+    symbols: Collection[object],
+    *,
+    all_symbols: Collection[object],
+    current_selection: Collection[object] = (),
+) -> tuple[str, ...]:
+    """Add a bulk-selection result without discarding existing selections."""
+    return normalize_symbol_selection(
+        (*current_selection, *symbols),
+        allowed_symbols=all_symbols,
+    )
+
+
+def symbol_selection_counts(
+    selected_symbols: Collection[object],
+    visible_symbols: Collection[object],
+) -> tuple[int, int]:
+    """Return visible and total unique selection counts."""
+    selected = set(normalize_symbol_selection(selected_symbols))
+    visible = set(normalize_symbol_selection(visible_symbols))
+    return len(selected.intersection(visible)), len(selected)

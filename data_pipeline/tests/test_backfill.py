@@ -7,9 +7,21 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from dashboard.backfill_preview import (
+    PREVIEW_INPUTS_KEY,
+    PREVIEW_PLAN_KEY,
+    build_preview_inputs,
+    create_preview_safely,
+    preview_is_stale,
+    preview_status_message,
+    resume_is_eligible,
+    state_for_preview_range,
+    store_backfill_preview,
+)
 from data_pipeline.src import backfill as backfill_module
 from data_pipeline.src.backfill import (
     BackfillDateResult,
+    BackfillPlan,
     BackfillState,
     create_backfill_plan,
     load_backfill_state,
@@ -20,6 +32,21 @@ from data_pipeline.src.main import DateProcessingResult, OUTPUT_FIELDS
 
 
 FIXED_CLOCK = lambda: datetime(2026, 8, 1, 12, tzinfo=timezone.utc)
+
+
+def _preview_plan(*request_dates: date) -> BackfillPlan:
+    return BackfillPlan(
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 3),
+        total_calendar_dates=3,
+        existing_successful_dates=(),
+        dates_requiring_requests=request_dates,
+        weekend_dates=(),
+        unresolved_skipped_dates=(),
+        failed_dates_eligible_for_retry=(),
+        estimated_request_count=len(request_dates),
+        estimated_minimum_duration_seconds=max(0, len(request_dates) - 1),
+    )
 
 
 def _write_daily_csv(directory: Path, trading_date: date) -> Path:
@@ -87,6 +114,104 @@ def test_backfill_plan_excludes_existing_dates_and_reports_weekends(
     )
     assert plan.estimated_request_count == 2
     assert plan.estimated_minimum_duration_seconds == 2.0
+
+
+def test_preview_result_and_inputs_are_stored() -> None:
+    state: dict[str, object] = {}
+    plan = _preview_plan(date(2026, 7, 1))
+    inputs = build_preview_inputs(
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 3),
+        delay_seconds=1,
+        max_dates=10,
+        retry_failed=False,
+    )
+
+    store_backfill_preview(state, plan, inputs)
+
+    assert state[PREVIEW_PLAN_KEY] is plan
+    assert state[PREVIEW_INPUTS_KEY] == inputs
+
+
+def test_zero_request_preview_has_explicit_status_and_cannot_resume() -> None:
+    plan = _preview_plan()
+
+    assert preview_status_message(plan) == (
+        "No requests are required for this range. Existing files and "
+        "non-trading dates already cover it."
+    )
+    assert not resume_is_eligible(plan, stale=False)
+
+
+def test_non_zero_preview_exposes_request_dates_and_can_resume() -> None:
+    request_dates = (date(2026, 7, 1), date(2026, 7, 2))
+    plan = _preview_plan(*request_dates)
+
+    assert plan.dates_requiring_requests == request_dates
+    assert "2 request date(s)" in preview_status_message(plan)
+    assert resume_is_eligible(plan, stale=False)
+
+
+def test_changed_preview_inputs_are_stale_and_disable_resume() -> None:
+    plan = _preview_plan(date(2026, 7, 1))
+    stored = build_preview_inputs(
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 3),
+        delay_seconds=1,
+        max_dates=10,
+        retry_failed=False,
+    )
+    changed = {**stored, "max_dates": 25}
+
+    assert preview_is_stale(stored, changed)
+    assert not resume_is_eligible(plan, stale=True)
+
+
+def test_completed_state_for_previous_range_does_not_affect_new_preview() -> None:
+    old_state = BackfillState(
+        requested_start_date=date(2026, 7, 1),
+        requested_end_date=date(2026, 7, 10),
+        status="completed",
+    )
+
+    assert state_for_preview_range(
+        old_state,
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 10),
+    ) is None
+    assert state_for_preview_range(
+        old_state,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 10),
+    ) is old_state
+
+
+def test_planner_errors_become_safe_preview_messages() -> None:
+    def broken_planner() -> BackfillPlan:
+        raise RuntimeError("planner unavailable")
+
+    plan, error = create_preview_safely(broken_planner)
+
+    assert plan is None
+    assert error == "Could not preview the backfill plan: planner unavailable"
+
+
+def test_preview_calls_only_planner_and_never_live_processor() -> None:
+    calls: list[str] = []
+    expected = _preview_plan(date(2026, 7, 1))
+
+    def planner() -> BackfillPlan:
+        calls.append("planner")
+        return expected
+
+    def live_processor() -> None:
+        calls.append("live")
+
+    plan, error = create_preview_safely(planner)
+
+    assert live_processor is not None
+    assert plan is expected and error is None
+    assert calls == ["planner"]
 
 
 def test_backfill_requests_are_chronological_and_delay_is_mockable(

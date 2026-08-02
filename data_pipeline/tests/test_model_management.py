@@ -19,13 +19,18 @@ from reinforcement_learning.model_management.registry import (
     load_model_registry,
 )
 from reinforcement_learning.model_management.selection import (
+    bulk_select_symbols,
     filter_symbol_status,
     merge_symbol_selections,
+    normalize_symbol_selection,
     select_all_active_eligible,
     select_needing_retraining,
     select_never_trained,
     select_newly_added_eligible,
     select_visible_symbols,
+    selected_symbols_from_editor,
+    symbol_selection_counts,
+    update_visible_symbol_selection,
 )
 from reinforcement_learning.model_management.status import (
     build_symbol_status_table,
@@ -222,6 +227,70 @@ def test_multiple_and_bulk_symbol_selection_helpers() -> None:
     assert select_needing_retraining(status) == ("MCB",)
     assert select_newly_added_eligible(status) == ("786",)
     assert merge_symbol_selections(("MCB",), ("786", "MCB")) == ("786", "MCB")
+
+
+def test_editor_checkbox_selection_adds_and_unchecking_removes_symbol() -> None:
+    checked = pd.DataFrame(
+        {"selected": [True, False], "symbol": ["MCB", "OGDC"]}
+    )
+    unchecked = checked.assign(selected=[False, False])
+
+    assert selected_symbols_from_editor(checked) == ("MCB",)
+    assert selected_symbols_from_editor(unchecked) == ()
+
+
+def test_editor_selection_preserves_numeric_symbol_as_string_and_deduplicates() -> None:
+    edited = pd.DataFrame(
+        {"selected": [True, True, True], "symbol": [786, "786", "MCB"]}
+    )
+
+    assert selected_symbols_from_editor(edited) == ("786", "MCB")
+
+
+def test_bulk_select_all_visible_and_clear_selection() -> None:
+    all_symbols = ("786", "MCB", "OGDC")
+
+    selected = bulk_select_symbols(
+        ("MCB", "OGDC"),
+        all_symbols=all_symbols,
+        current_selection=("786",),
+    )
+
+    assert selected == all_symbols
+    assert normalize_symbol_selection((), allowed_symbols=all_symbols) == ()
+
+
+def test_editor_selection_survives_filtering_and_reports_both_counts() -> None:
+    all_symbols = ("786", "MCB", "OGDC")
+    updated = update_visible_symbol_selection(
+        ("786", "MCB"),
+        ("MCB",),
+        ("MCB",),
+        all_symbols=all_symbols,
+    )
+
+    assert updated == ("786", "MCB")
+    assert symbol_selection_counts(updated, ("MCB", "OGDC")) == (1, 2)
+
+
+def test_multiselect_and_editor_values_share_one_canonical_selection() -> None:
+    all_symbols = ("786", "MCB", "OGDC")
+    multiselect_selection = normalize_symbol_selection(
+        ("OGDC", "786", "OGDC"),
+        allowed_symbols=all_symbols,
+    )
+    edited = pd.DataFrame(
+        {"selected": [True, False], "symbol": ["786", "MCB"]}
+    )
+    synchronized = update_visible_symbol_selection(
+        multiselect_selection,
+        edited["symbol"],
+        selected_symbols_from_editor(edited),
+        all_symbols=all_symbols,
+    )
+
+    assert multiselect_selection == ("786", "OGDC")
+    assert synchronized == ("786", "OGDC")
 
 
 def test_model_registry_display_uses_readable_statuses() -> None:

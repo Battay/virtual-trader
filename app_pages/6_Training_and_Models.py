@@ -38,12 +38,17 @@ from reinforcement_learning.model_management.registry import (
     load_model_registry,
 )
 from reinforcement_learning.model_management.selection import (
+    bulk_select_symbols,
     filter_symbol_status,
+    normalize_symbol_selection,
     select_all_active_eligible,
     select_needing_retraining,
     select_never_trained,
     select_newly_added_eligible,
     select_visible_symbols,
+    selected_symbols_from_editor,
+    symbol_selection_counts,
+    update_visible_symbol_selection,
 )
 from reinforcement_learning.model_management.status import (
     build_model_readiness_table,
@@ -51,9 +56,47 @@ from reinforcement_learning.model_management.status import (
 )
 
 
-def _set_selected_symbols(symbols: tuple[str, ...]) -> None:
-    """Replace the page-local multi-symbol selection deterministically."""
-    st.session_state["training_selected_symbols"] = list(symbols)
+SELECTION_KEY = "training_selected_symbols"
+SELECTION_WIDGET_KEY = "training_selected_symbols_widget"
+EDITOR_REVISION_KEY = "training_symbol_editor_revision"
+
+
+def _write_selected_symbols(
+    symbols: tuple[str, ...],
+    all_symbols: tuple[str, ...],
+) -> None:
+    """Update canonical and multiselect state before widgets are rendered."""
+    normalized = normalize_symbol_selection(symbols, allowed_symbols=all_symbols)
+    st.session_state[SELECTION_KEY] = list(normalized)
+    st.session_state[SELECTION_WIDGET_KEY] = list(normalized)
+    st.session_state[EDITOR_REVISION_KEY] = (
+        int(st.session_state.get(EDITOR_REVISION_KEY, 0)) + 1
+    )
+
+
+def _add_selected_symbols(
+    symbols: tuple[str, ...],
+    all_symbols: tuple[str, ...],
+) -> None:
+    """Add a bulk group without losing selections hidden by current filters."""
+    selected = bulk_select_symbols(
+        symbols,
+        all_symbols=all_symbols,
+        current_selection=st.session_state.get(SELECTION_KEY, ()),
+    )
+    _write_selected_symbols(selected, all_symbols)
+
+
+def _sync_multiselect_selection(all_symbols: tuple[str, ...]) -> None:
+    """Make the multiselect value the canonical symbol selection."""
+    selected = normalize_symbol_selection(
+        st.session_state.get(SELECTION_WIDGET_KEY, ()),
+        allowed_symbols=all_symbols,
+    )
+    st.session_state[SELECTION_KEY] = list(selected)
+    st.session_state[EDITOR_REVISION_KEY] = (
+        int(st.session_state.get(EDITOR_REVISION_KEY, 0)) + 1
+    )
 
 
 def _load_processed_master() -> tuple[pd.DataFrame, str | None]:
@@ -288,42 +331,58 @@ visible_status = filter_symbol_status(
     security_types=selected_option_values(selected_security_types),
     newly_added_only=newly_added_only,
 )
-all_symbols = tuple(status_table["symbol"].astype("string"))
-current_selection = [
-    symbol
-    for symbol in st.session_state.get("training_selected_symbols", [])
-    if symbol in all_symbols
-]
-st.session_state["training_selected_symbols"] = current_selection
+all_symbols = tuple(dict.fromkeys(status_table["symbol"].astype(str)))
+current_selection = normalize_symbol_selection(
+    st.session_state.get(SELECTION_KEY, ()),
+    allowed_symbols=all_symbols,
+)
+st.session_state[SELECTION_KEY] = list(current_selection)
+widget_selection = normalize_symbol_selection(
+    st.session_state.get(SELECTION_WIDGET_KEY, current_selection),
+    allowed_symbols=all_symbols,
+)
+if widget_selection != current_selection or SELECTION_WIDGET_KEY not in st.session_state:
+    st.session_state[SELECTION_WIDGET_KEY] = list(current_selection)
+st.session_state.setdefault(EDITOR_REVISION_KEY, 0)
 with st.container(horizontal=True):
     st.button(
         "Select All Visible",
-        on_click=_set_selected_symbols,
-        args=(select_visible_symbols(visible_status),),
+        on_click=_add_selected_symbols,
+        args=(select_visible_symbols(visible_status), all_symbols),
+        key="training_select_all_visible",
     )
-    st.button("Clear Selection", on_click=_set_selected_symbols, args=((),))
+    st.button(
+        "Clear Selection",
+        on_click=_write_selected_symbols,
+        args=((), all_symbols),
+        key="training_clear_selection",
+    )
     st.button(
         "Select Never Trained",
-        on_click=_set_selected_symbols,
-        args=(select_never_trained(status_table),),
+        on_click=_add_selected_symbols,
+        args=(select_never_trained(status_table), all_symbols),
+        key="training_select_never_trained",
     )
     st.button(
         "Select Needs Retraining",
-        on_click=_set_selected_symbols,
-        args=(select_needing_retraining(status_table),),
+        on_click=_add_selected_symbols,
+        args=(select_needing_retraining(status_table), all_symbols),
+        key="training_select_needs_retraining",
     )
     st.button(
         "Select Newly Added",
-        on_click=_set_selected_symbols,
-        args=(select_newly_added_eligible(status_table),),
+        on_click=_add_selected_symbols,
+        args=(select_newly_added_eligible(status_table), all_symbols),
+        key="training_select_newly_added",
     )
     st.button(
         "Select All Active Eligible",
-        on_click=_set_selected_symbols,
-        args=(select_all_active_eligible(status_table),),
+        on_click=_add_selected_symbols,
+        args=(select_all_active_eligible(status_table), all_symbols),
+        key="training_select_all_active_eligible",
     )
 
-selected_symbols = st.multiselect(
+st.multiselect(
     "Selected securities",
     all_symbols,
     format_func=lambda symbol: format_symbol_company(
@@ -333,14 +392,20 @@ selected_symbols = st.multiselect(
             "company_name",
         ].iloc[0],
     ),
-    key="training_selected_symbols",
+    key=SELECTION_WIDGET_KEY,
+    on_change=_sync_multiselect_selection,
+    args=(all_symbols,),
     placeholder="Search and select one or more securities",
 )
-selected_set = set(selected_symbols)
+current_selection = normalize_symbol_selection(
+    st.session_state.get(SELECTION_KEY, ()),
+    allowed_symbols=all_symbols,
+)
+selected_set = set(current_selection)
 symbol_display = pd.DataFrame(
     {
-        "Select": visible_status["symbol"].isin(selected_set),
-        "Symbol": visible_status["symbol"],
+        "selected": visible_status["symbol"].astype(str).isin(selected_set),
+        "symbol": visible_status["symbol"].astype(str),
         "Company Name": visible_status["company_name"].map(safe_display_value),
         "Sector": visible_status["sector"].map(safe_display_value),
         "Data Start": visible_status["data_start"].map(format_date),
@@ -363,11 +428,53 @@ symbol_display = pd.DataFrame(
         "Training Status": visible_status["training_status"].map(status_label),
     }
 )
+symbol_display = symbol_display.set_index("symbol", drop=False)
+symbol_display.index.name = "symbol_identity"
+visible_selected_count, total_selected_count = symbol_selection_counts(
+    current_selection,
+    visible_status["symbol"].astype(str),
+)
 st.caption(
     f"Showing {len(visible_status):,} active securities · "
-    f"{len(selected_symbols):,} selected"
+    f"{visible_selected_count:,} visible selected · "
+    f"{total_selected_count:,} total selected"
 )
-st.dataframe(symbol_display, width="stretch", hide_index=True, height=500)
+selection_noun = "security" if total_selected_count == 1 else "securities"
+st.write(f"{total_selected_count:,} {selection_noun} selected")
+edited_table = st.data_editor(
+    symbol_display,
+    width="stretch",
+    hide_index=True,
+    height=500,
+    num_rows="fixed",
+    disabled=[column for column in symbol_display.columns if column != "selected"],
+    column_config={
+        "selected": st.column_config.CheckboxColumn(
+            "Select",
+            help="Select this security for dataset preparation or future training.",
+        ),
+        "symbol": st.column_config.TextColumn("Symbol", pinned=True),
+    },
+    key=f"training_symbol_editor_{st.session_state[EDITOR_REVISION_KEY]}",
+)
+edited_selection = selected_symbols_from_editor(edited_table)
+updated_selection = update_visible_symbol_selection(
+    current_selection,
+    visible_status["symbol"].astype(str),
+    edited_selection,
+    all_symbols=all_symbols,
+)
+if updated_selection != current_selection:
+    st.session_state[SELECTION_KEY] = list(updated_selection)
+    st.session_state[EDITOR_REVISION_KEY] += 1
+    st.rerun()
+
+selected_symbols = list(
+    normalize_symbol_selection(
+        st.session_state.get(SELECTION_KEY, ()),
+        allowed_symbols=all_symbols,
+    )
+)
 with st.container(horizontal=True):
     if st.button(
         "Prepare Selected Datasets",

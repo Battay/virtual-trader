@@ -37,6 +37,7 @@ data/processed/splits/*
 !data/processed/master/.gitkeep
 !data/processed/splits/.gitkeep
 !data/models/.gitkeep
+!data/models/model_registry.csv
 !reinforcement_learning/saved_models/symbol_models/.gitkeep
 !reinforcement_learning/saved_models/master_models/.gitkeep
 

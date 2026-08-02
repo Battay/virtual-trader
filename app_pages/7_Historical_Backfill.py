@@ -5,6 +5,19 @@ from datetime import timedelta
 import pandas as pd
 import streamlit as st
 
+from dashboard.backfill_preview import (
+    PREVIEW_ERROR_KEY,
+    PREVIEW_INPUTS_KEY,
+    PREVIEW_PLAN_KEY,
+    build_preview_inputs,
+    clear_backfill_preview,
+    create_preview_safely,
+    preview_is_stale,
+    preview_status_message,
+    resume_is_eligible,
+    state_for_preview_range,
+    store_backfill_preview,
+)
 from dashboard.presentation import format_date, format_integer, safe_display_value
 from data_pipeline.src.automation import karachi_today
 from data_pipeline.src.backfill import (
@@ -23,6 +36,8 @@ from data_pipeline.src.updater import discover_available_raw_dates
 def _plan_frame(plan: BackfillPlan) -> pd.DataFrame:
     return pd.DataFrame(
         [
+            ("Requested start date", plan.start_date.isoformat()),
+            ("Requested end date", plan.end_date.isoformat()),
             ("Total calendar dates", f"{plan.total_calendar_dates:,}"),
             (
                 "Existing successful dates",
@@ -122,7 +137,7 @@ else:
         )
     st.caption(saved_state.last_message)
 
-with st.form("backfill_controls", enter_to_submit=False):
+with st.container(border=True):
     with st.container(horizontal=True):
         selected_start = st.date_input(
             "Start date",
@@ -157,75 +172,86 @@ with st.form("backfill_controls", enter_to_submit=False):
         help="Limits this submitted batch to one live request, then saves progress.",
         key="backfill_stop_after_current",
     )
+    current_preview_inputs = build_preview_inputs(
+        start_date=selected_start,
+        end_date=selected_end,
+        delay_seconds=float(delay_seconds),
+        max_dates=int(maximum_dates),
+        retry_failed=False,
+    )
+    stored_preview_plan = st.session_state.get(PREVIEW_PLAN_KEY)
+    stored_preview_inputs = st.session_state.get(PREVIEW_INPUTS_KEY)
+    preview_stale = preview_is_stale(
+        stored_preview_inputs,
+        current_preview_inputs,
+    )
+    resume_allowed = resume_is_eligible(
+        stored_preview_plan,
+        stale=preview_stale,
+    )
     with st.container(horizontal=True):
-        preview_clicked = st.form_submit_button(
+        preview_clicked = st.button(
             "Preview Backfill Plan",
             icon=":material/preview:",
+            key="backfill_preview_plan_button",
         )
-        resume_clicked = st.form_submit_button(
+        resume_clicked = st.button(
             "Resume Backfill",
             icon=":material/play_arrow:",
             type="primary",
+            disabled=not resume_allowed,
+            key="backfill_resume_button",
         )
-        retry_clicked = st.form_submit_button(
+        retry_clicked = st.button(
             "Retry Failed Dates",
             icon=":material/replay:",
+            key="backfill_retry_failed_button",
         )
 
 date_error = selected_end < selected_start
 if date_error:
     st.error("End date cannot be earlier than start date.")
 
-plan = None
-if not date_error:
-    try:
-        plan = create_backfill_plan(
+if preview_clicked:
+    if date_error:
+        clear_backfill_preview(st.session_state)
+        st.session_state.pop(PREVIEW_ERROR_KEY, None)
+    else:
+        matching_state = state_for_preview_range(
+            saved_state,
+            start_date=selected_start,
+            end_date=selected_end,
+        )
+        preview_plan, preview_error = create_preview_safely(
+            create_backfill_plan,
             selected_start,
             selected_end,
             delay_seconds=float(delay_seconds),
-            state=(saved_state if saved_state and (
-                saved_state.requested_start_date == selected_start
-                and saved_state.requested_end_date == selected_end
-            ) else None),
+            state=matching_state,
             csv_dir=RAW_CSV_DIR,
-            retry_failed=retry_clicked,
+            retry_failed=False,
             today=today,
             available_dates=available_dates,
         )
-    except ValueError as exc:
-        st.error(str(exc))
+        if preview_error is not None:
+            clear_backfill_preview(st.session_state)
+            st.session_state[PREVIEW_ERROR_KEY] = preview_error
+        elif preview_plan is not None:
+            store_backfill_preview(
+                st.session_state,
+                preview_plan,
+                current_preview_inputs,
+            )
+            st.rerun()
 
-if plan is not None:
-    missing_count = max(
-        0,
-        plan.total_calendar_dates
-        - len(plan.existing_successful_dates)
-        - len(plan.weekend_dates),
-    )
-    with st.container(horizontal=True):
-        st.metric("Missing weekday dates", format_integer(missing_count), border=True)
-        st.metric(
-            "Estimated remaining requests",
-            format_integer(plan.estimated_request_count),
-            border=True,
-        )
-    if preview_clicked:
-        st.session_state["backfill_plan"] = plan
+preview_error = st.session_state.get(PREVIEW_ERROR_KEY)
+if preview_error:
+    st.error(str(preview_error))
 
-displayed_plan = st.session_state.get("backfill_plan")
-if displayed_plan is not None:
-    st.subheader("Backfill plan")
-    st.dataframe(_plan_frame(displayed_plan), hide_index=True, width="stretch")
-    if displayed_plan.dates_requiring_requests:
-        request_preview = ", ".join(
-            value.isoformat()
-            for value in displayed_plan.dates_requiring_requests[:20]
-        )
-        suffix = " …" if len(displayed_plan.dates_requiring_requests) > 20 else ""
-        st.caption(f"First planned request dates: {request_preview}{suffix}")
+if resume_clicked and not resume_allowed:
+    st.warning("Preview the current inputs before resuming the backfill.")
 
-if (resume_clicked or retry_clicked) and not date_error:
-    st.session_state["backfill_plan"] = plan
+if (resume_clicked and resume_allowed) or (retry_clicked and not date_error):
     progress_bar = st.progress(0.0, text="Preparing backfill batch...")
     run_status = st.status("Backfill batch running", expanded=True)
 
@@ -256,6 +282,7 @@ if (resume_clicked or retry_clicked) and not date_error:
             today=today,
         )
         st.session_state["backfill_result"] = result
+        clear_backfill_preview(st.session_state)
         final_state = result.state.status if result.state else "unknown"
         run_status.update(
             label=f"Backfill batch finished: {final_state}",
@@ -265,6 +292,36 @@ if (resume_clicked or retry_clicked) and not date_error:
     except (BackfillStateError, OSError, ValueError) as exc:
         run_status.update(label="Backfill batch failed", state="error", expanded=True)
         st.error(str(exc))
+
+displayed_plan = st.session_state.get(PREVIEW_PLAN_KEY)
+displayed_inputs = st.session_state.get(PREVIEW_INPUTS_KEY)
+if displayed_plan is not None:
+    displayed_stale = preview_is_stale(displayed_inputs, current_preview_inputs)
+    st.subheader("Backfill plan preview")
+    if displayed_stale:
+        st.warning("The controls changed after this preview. Preview again before resuming.")
+    elif displayed_plan.estimated_request_count == 0:
+        st.success(preview_status_message(displayed_plan))
+    else:
+        st.info(preview_status_message(displayed_plan))
+    st.dataframe(_plan_frame(displayed_plan), hide_index=True, width="stretch")
+    if displayed_plan.dates_requiring_requests:
+        with st.expander(
+            f"Dates requiring requests ({displayed_plan.estimated_request_count:,})",
+            icon=":material/calendar_month:",
+        ):
+            st.dataframe(
+                pd.DataFrame(
+                    {
+                        "Request date": [
+                            value.isoformat()
+                            for value in displayed_plan.dates_requiring_requests
+                        ]
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+            )
 
 latest_result = st.session_state.get("backfill_result")
 if latest_result is not None:
