@@ -1,9 +1,11 @@
 """Configuration values and filesystem paths for the PSX pipeline."""
 
+from datetime import date
 from pathlib import Path
 
 
 PSX_HISTORICAL_URL = "https://dps.psx.com.pk/historical"
+PSX_HISTORICAL_MIN_DATE = date(2016, 7, 26)
 PSX_LISTINGS_TABLE_URL_TEMPLATE = (
     "https://dps.psx.com.pk/listings-table/{board}/{segment}"
 )

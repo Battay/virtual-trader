@@ -71,18 +71,24 @@ def _date_from_daily_filename(path: Path) -> date | None:
 
 def is_valid_daily_csv(path: Path, expected_date: date) -> bool:
     """Return whether a daily CSV is non-empty, complete, and date-matching."""
+    return valid_daily_csv_row_count(path, expected_date) is not None
+
+
+def valid_daily_csv_row_count(path: Path, expected_date: date) -> int | None:
+    """Return a valid daily CSV's equity row count, or ``None`` if invalid."""
     try:
         frame = pd.read_csv(path, dtype={"symbol": "string"})
     except (OSError, UnicodeError, ValueError, pd.errors.ParserError):
-        return False
+        return None
 
     if frame.empty or not set(OUTPUT_FIELDS).issubset(frame.columns):
-        return False
+        return None
     parsed_dates = pd.to_datetime(frame["date"], errors="coerce")
-    return bool(
+    valid = bool(
         parsed_dates.notna().all()
         and (parsed_dates.dt.date == expected_date).all()
     )
+    return len(frame) if valid else None
 
 
 def discover_available_raw_dates(csv_dir: Path = RAW_CSV_DIR) -> tuple[date, ...]:

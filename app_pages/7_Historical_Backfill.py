@@ -9,17 +9,20 @@ from dashboard.backfill_preview import (
     PREVIEW_ERROR_KEY,
     PREVIEW_INPUTS_KEY,
     PREVIEW_PLAN_KEY,
+    backfill_date_bounds,
     build_preview_inputs,
     clear_backfill_preview,
+    clamp_backfill_end_date,
     create_preview_safely,
+    initial_backfill_dates,
     preview_is_stale,
     preview_status_message,
     resume_is_eligible,
     state_for_preview_range,
     store_backfill_preview,
+    summarize_backfill_batch,
 )
 from dashboard.presentation import format_date, format_integer, safe_display_value
-from data_pipeline.src.automation import karachi_today
 from data_pipeline.src.backfill import (
     BackfillPlan,
     BackfillProgress,
@@ -28,7 +31,10 @@ from data_pipeline.src.backfill import (
     load_backfill_state,
     run_backfill,
 )
-from data_pipeline.src.config import BACKFILL_STATE_PATH, RAW_CSV_DIR
+from data_pipeline.src.config import (
+    BACKFILL_STATE_PATH,
+    RAW_CSV_DIR,
+)
 from data_pipeline.src.data_products import rebuild_data_products
 from data_pipeline.src.updater import discover_available_raw_dates
 
@@ -78,6 +84,30 @@ def _reason_frame(values: tuple[tuple[object, str], ...]) -> pd.DataFrame:
     )
 
 
+def _outcome_frame(outcomes: tuple[object, ...]) -> pd.DataFrame:
+    """Return readable per-date results without hiding success details."""
+    return pd.DataFrame(
+        [
+            {
+                "Date": format_date(outcome.trading_date),
+                "Status": outcome.status.replace("_", " ").title(),
+                "Parsed rows": format_integer(outcome.parsed_rows),
+                "Valid rows": format_integer(outcome.valid_rows),
+                "Rejected rows": format_integer(outcome.rejected_rows),
+                "Attempts": format_integer(outcome.attempt_count),
+                "Response sizes": (
+                    ", ".join(f"{size:,} bytes" for size in outcome.response_sizes)
+                    if outcome.response_sizes
+                    else "—"
+                ),
+                "Output CSV": safe_display_value(outcome.output_path),
+                "Message": safe_display_value(outcome.reason),
+            }
+            for outcome in outcomes
+        ]
+    )
+
+
 st.title("Historical Data Backfill")
 st.caption(
     "Collect older PSX daily files sequentially and resume safely. No model "
@@ -88,13 +118,28 @@ st.warning(
     "such as 10 request dates before attempting a longer backfill."
 )
 
-today = karachi_today()
+historical_min_date, today = backfill_date_bounds()
 available_dates = discover_available_raw_dates(RAW_CSV_DIR)
 saved_state = load_backfill_state(BACKFILL_STATE_PATH)
 earliest_local = min(available_dates) if available_dates else None
 latest_local = max(available_dates) if available_dates else None
 default_end = earliest_local or (today - timedelta(days=1))
 default_start = default_end - timedelta(days=30)
+initial_start, initial_end = initial_backfill_dates(
+    saved_state=saved_state,
+    default_start=max(default_start, historical_min_date),
+    default_end=min(default_end, today),
+)
+st.session_state.setdefault("backfill_start_date", initial_start)
+st.session_state.setdefault("backfill_end_date", initial_end)
+
+
+def _keep_backfill_dates_valid() -> None:
+    st.session_state["backfill_end_date"] = clamp_backfill_end_date(
+        st.session_state["backfill_start_date"],
+        st.session_state["backfill_end_date"],
+        latest_allowed_date=today,
+    )
 
 saved_temporary = len(saved_state.temporary_skips) if saved_state else 0
 saved_failed = len(saved_state.failed_dates) if saved_state else 0
@@ -141,13 +186,16 @@ with st.container(border=True):
     with st.container(horizontal=True):
         selected_start = st.date_input(
             "Start date",
-            value=default_start,
+            min_value=historical_min_date,
+            max_value=today,
             format="YYYY-MM-DD",
             key="backfill_start_date",
+            on_change=_keep_backfill_dates_valid,
         )
         selected_end = st.date_input(
             "End date",
-            value=default_end,
+            min_value=selected_start,
+            max_value=today,
             format="YYYY-MM-DD",
             key="backfill_end_date",
         )
@@ -207,6 +255,11 @@ with st.container(border=True):
             icon=":material/replay:",
             key="backfill_retry_failed_button",
         )
+        retry_temporary_clicked = st.button(
+            "Retry Temporary Dates",
+            icon=":material/refresh:",
+            key="backfill_retry_temporary_button",
+        )
 
 date_error = selected_end < selected_start
 if date_error:
@@ -251,7 +304,11 @@ if preview_error:
 if resume_clicked and not resume_allowed:
     st.warning("Preview the current inputs before resuming the backfill.")
 
-if (resume_clicked and resume_allowed) or (retry_clicked and not date_error):
+if (
+    (resume_clicked and resume_allowed)
+    or (retry_clicked and not date_error)
+    or (retry_temporary_clicked and not date_error)
+):
     progress_bar = st.progress(0.0, text="Preparing backfill batch...")
     run_status = st.status("Backfill batch running", expanded=True)
 
@@ -278,15 +335,21 @@ if (resume_clicked and resume_allowed) or (retry_clicked and not date_error):
             delay_seconds=float(delay_seconds),
             max_dates=(1 if stop_after_current else int(maximum_dates)),
             retry_failed=retry_clicked,
+            retry_temporary_only=retry_temporary_clicked,
             progress_callback=show_progress,
             today=today,
         )
         st.session_state["backfill_result"] = result
+        saved_state = result.state
         clear_backfill_preview(st.session_state)
         final_state = result.state.status if result.state else "unknown"
         run_status.update(
-            label=f"Backfill batch finished: {final_state}",
-            state="complete",
+            label=(
+                result.pause_reason
+                if result.circuit_breaker_triggered
+                else f"Backfill batch finished: {final_state}"
+            ),
+            state="error" if result.circuit_breaker_triggered else "complete",
             expanded=True,
         )
     except (BackfillStateError, OSError, ValueError) as exc:
@@ -326,16 +389,39 @@ if displayed_plan is not None:
 latest_result = st.session_state.get("backfill_result")
 if latest_result is not None:
     st.subheader("Latest batch summary")
+    batch_summary = summarize_backfill_batch(latest_result)
     with st.container(horizontal=True):
-        st.metric("Requests attempted", len(latest_result.attempted_dates), border=True)
-        st.metric("Successful", latest_result.count("successful"), border=True)
-        st.metric("Non-trading", latest_result.count("non_trading"), border=True)
         st.metric(
-            "Temporarily unavailable",
-            latest_result.count("temporary_unavailable"),
+            "Requests attempted this batch",
+            batch_summary.requests_attempted,
             border=True,
         )
-        st.metric("Failed", latest_result.count("failed"), border=True)
+        st.metric(
+            "Downloads successful this batch",
+            batch_summary.downloads_successful,
+            border=True,
+        )
+        st.metric(
+            "Existing CSV dates reconciled",
+            batch_summary.existing_csv_reconciled,
+            border=True,
+        )
+        st.metric(
+            "Non-trading dates resolved",
+            batch_summary.non_trading_resolved,
+            border=True,
+        )
+        st.metric(
+            "Temporarily unavailable",
+            batch_summary.temporarily_unavailable,
+            border=True,
+        )
+        st.metric("Failed", batch_summary.failed, border=True)
+        st.metric(
+            "Total dates resolved by this operation",
+            batch_summary.total_dates_resolved,
+            border=True,
+        )
     failures = tuple(
         (outcome.trading_date, outcome.reason)
         for outcome in latest_result.outcomes
@@ -343,6 +429,12 @@ if latest_result is not None:
     )
     if failures:
         st.dataframe(_reason_frame(failures), hide_index=True, width="stretch")
+    if latest_result.outcomes:
+        st.dataframe(
+            _outcome_frame(latest_result.outcomes),
+            hide_index=True,
+            width="stretch",
+        )
 
 if saved_state and (saved_state.temporary_skips or saved_state.failed_dates):
     details = st.expander(

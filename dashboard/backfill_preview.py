@@ -1,15 +1,115 @@
 """Pure state helpers for the Streamlit historical-backfill preview."""
 
 from collections.abc import Callable, Mapping, MutableMapping
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 
-from data_pipeline.src.backfill import BackfillPlan, BackfillState
+from data_pipeline.src.backfill import BackfillPlan, BackfillRunResult, BackfillState
+from data_pipeline.src.automation import karachi_today
+from data_pipeline.src.config import PSX_HISTORICAL_MIN_DATE
 
 
 PREVIEW_PLAN_KEY = "backfill_preview_plan"
 PREVIEW_INPUTS_KEY = "backfill_preview_inputs"
 PREVIEW_ERROR_KEY = "backfill_preview_error"
+
+
+@dataclass(frozen=True)
+class BackfillBatchSummary:
+    """Mutually exclusive counts produced by the latest operation."""
+
+    requests_attempted: int
+    downloads_successful: int
+    existing_csv_reconciled: int
+    non_trading_resolved: int
+    temporarily_unavailable: int
+    failed: int
+
+    @property
+    def total_dates_resolved(self) -> int:
+        """Return the sum of the documented outcome categories."""
+        return (
+            self.downloads_successful
+            + self.existing_csv_reconciled
+            + self.non_trading_resolved
+            + self.temporarily_unavailable
+            + self.failed
+        )
+
+
+def summarize_backfill_batch(result: BackfillRunResult) -> BackfillBatchSummary:
+    """Separate live downloads from reconciliation and other outcomes."""
+    attempted = set(result.attempted_dates)
+    reconciled = {
+        outcome.trading_date
+        for outcome in result.outcomes
+        if outcome.status == "successful" and outcome.reconciled
+    }
+    downloads_successful = {
+        outcome.trading_date
+        for outcome in result.outcomes
+        if outcome.status == "successful"
+        and not outcome.reconciled
+        and outcome.trading_date in attempted
+    } - reconciled
+    non_trading = {
+        outcome.trading_date
+        for outcome in result.outcomes
+        if outcome.status == "non_trading"
+    } - reconciled - downloads_successful
+    temporary = {
+        outcome.trading_date
+        for outcome in result.outcomes
+        if outcome.status == "temporary_unavailable"
+        and outcome.trading_date in attempted
+    } - reconciled - downloads_successful - non_trading
+    failed = {
+        outcome.trading_date
+        for outcome in result.outcomes
+        if outcome.status == "failed" and outcome.trading_date in attempted
+    } - reconciled - downloads_successful - non_trading - temporary
+
+    return BackfillBatchSummary(
+        requests_attempted=len(result.attempted_dates),
+        downloads_successful=len(downloads_successful),
+        existing_csv_reconciled=len(reconciled),
+        non_trading_resolved=len(non_trading),
+        temporarily_unavailable=len(temporary),
+        failed=len(failed),
+    )
+
+
+def backfill_date_bounds(now: datetime | None = None) -> tuple[date, date]:
+    """Return the configured historical floor and current Karachi date."""
+    return PSX_HISTORICAL_MIN_DATE, karachi_today(now)
+
+
+def clamp_backfill_end_date(
+    start_date: date,
+    end_date: date,
+    *,
+    latest_allowed_date: date,
+) -> date:
+    """Preserve a valid end date and clamp only to the actual date limits."""
+    if start_date > latest_allowed_date:
+        raise ValueError("start date cannot be later than the latest allowed date")
+    return min(max(end_date, start_date), latest_allowed_date)
+
+
+def initial_backfill_dates(
+    *,
+    saved_state: BackfillState | None,
+    default_start: date,
+    default_end: date,
+) -> tuple[date, date]:
+    """Restore an exact saved range, otherwise return the supplied defaults."""
+    if saved_state is not None:
+        return (
+            saved_state.requested_start_date,
+            saved_state.requested_end_date,
+        )
+    return default_start, default_end
 
 
 def build_preview_inputs(

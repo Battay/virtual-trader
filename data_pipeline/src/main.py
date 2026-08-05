@@ -66,6 +66,7 @@ class CollectionResult:
     skipped_dates: tuple[date, ...]
     failed_dates: tuple[tuple[date, str], ...]
     output_csv_paths: tuple[Path, ...]
+    date_results: tuple[DateProcessingResult, ...] = ()
 
     @property
     def successful_count(self) -> int:
@@ -211,6 +212,7 @@ def collect_date_range(
     skipped_dates: list[date] = []
     failures: list[tuple[date, str]] = []
     output_csv_paths: list[Path] = []
+    date_results: list[DateProcessingResult] = []
 
     for trading_date in requested_dates:
         total_dates += 1
@@ -228,6 +230,7 @@ def collect_date_range(
             successful_dates.append(trading_date)
             if result.output_path is not None:
                 output_csv_paths.append(result.output_path)
+        date_results.append(result)
 
     return CollectionResult(
         start_date=start_date,
@@ -237,6 +240,7 @@ def collect_date_range(
         skipped_dates=tuple(skipped_dates),
         failed_dates=tuple(failures),
         output_csv_paths=tuple(output_csv_paths),
+        date_results=tuple(date_results),
     )
 
 
