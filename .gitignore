@@ -44,3 +44,18 @@ data/processed/splits/*
 .agents/
 data/raw/csv/
 data/raw/html/
+
+# Generated Market Intelligence data
+data/indices/raw/*
+data/indices/master/*
+data/indices/metadata/*
+
+!data/indices/raw/.gitkeep
+!data/indices/master/.gitkeep
+!data/indices/metadata/.gitkeep
+
+# Jupyter temporary files
+notebooks/.ipynb_checkpoints/
+reinforcement_learning/.ipynb_checkpoints/
+notebooks/Untitled.ipynb
+reinforcement_learning/Untitled.ipynb
