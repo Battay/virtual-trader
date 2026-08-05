@@ -54,6 +54,11 @@ from reinforcement_learning.model_management.status import (
     build_model_readiness_table,
     master_model_status,
 )
+from reinforcement_learning.environments import (
+    ENVIRONMENT_VERSION,
+    SingleSymbolTradingEnv,
+)
+from reinforcement_learning.environments.validation import validate_environment
 
 
 SELECTION_KEY = "training_selected_symbols"
@@ -121,6 +126,34 @@ def _processed_symbol_fingerprint() -> tuple[tuple[str, int, int], ...]:
     return tuple(values)
 
 
+@st.cache_data(max_entries=8, show_spinner=False)
+def _validate_rl_environment(
+    path_text: str,
+    modified_ns: int,
+    size: int,
+) -> dict[str, object]:
+    """Validate one unchanged local symbol dataset only on explicit request."""
+    del modified_ns, size
+    try:
+        data = pd.read_csv(Path(path_text), dtype={"symbol": "string"})
+        result = validate_environment(SingleSymbolTradingEnv(data))
+        return {
+            "status": "Environment Ready" if result.valid else "Validation Failed",
+            "message": (
+                "Environment v1 Ready"
+                if result.valid
+                else "; ".join(result.errors)
+            ),
+            "shape": result.observation_shape,
+        }
+    except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
+        return {
+            "status": "Validation Failed",
+            "message": str(exc),
+            "shape": None,
+        }
+
+
 @st.cache_data(ttl="5m", max_entries=8, show_spinner=False)
 def _cached_model_readiness(
     market: pd.DataFrame,
@@ -144,6 +177,51 @@ st.caption(
     "Prepare leakage-safe AI datasets and track future PPO model readiness. "
     "Historical readiness is evaluated, but no model training is performed."
 )
+
+st.subheader("RL environment readiness")
+st.session_state.setdefault(
+    "rl_environment_validation",
+    {
+        "status": "Not Implemented",
+        "message": "Validate a processed single-symbol dataset to confirm readiness.",
+        "shape": None,
+    },
+)
+rl_validation = st.session_state["rl_environment_validation"]
+with st.container(horizontal=True):
+    st.metric("RL Environment", rl_validation["status"], border=True)
+    st.metric("Environment Version", ENVIRONMENT_VERSION, border=True)
+if st.button(
+    "Validate RL Environment",
+    icon=":material/fact_check:",
+    key="validate_rl_environment",
+):
+    candidates = sorted(Path(PROCESSED_SYMBOLS_DIR).glob("*.csv"))
+    if not candidates:
+        st.session_state["rl_environment_validation"] = {
+            "status": "Not Implemented",
+            "message": "No processed single-symbol dataset is available.",
+            "shape": None,
+        }
+    else:
+        candidate = candidates[0]
+        details = candidate.stat()
+        st.session_state["rl_environment_validation"] = _validate_rl_environment(
+            str(candidate),
+            details.st_mtime_ns,
+            details.st_size,
+        )
+    st.rerun()
+if rl_validation["status"] == "Environment Ready":
+    st.success(
+        f"{rl_validation['message']} · Observation shape: "
+        f"{rl_validation['shape']}"
+    )
+elif rl_validation["status"] == "Validation Failed":
+    st.error(rl_validation["message"])
+else:
+    st.info(rl_validation["message"])
+st.caption("PPO training remains disabled and arrives in Milestone 5B.")
 
 market_result = load_dashboard_dataset()
 registry_result = load_company_registry()
@@ -499,10 +577,10 @@ with st.container(horizontal=True):
     st.button(
         "Train Selected Models",
         disabled=True,
-        help="PPO environment and trainer are outside the historical-backfill milestone.",
+        help="PPO training arrives in Milestone 5B.",
         icon=":material/model_training:",
     )
-st.info("PPO environment and trainer remain intentionally unimplemented.")
+st.info("Environment v1 is implemented; PPO training remains disabled until Milestone 5B.")
 
 st.subheader("Master model")
 master_status = master_model_status(processed_master, model_registry)

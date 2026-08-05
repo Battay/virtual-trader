@@ -375,6 +375,69 @@ deterministic tuple of eligible symbols. Its defaults select currently listed,
 recently traded ordinary equities, with an optional minimum trading-day count.
 It does not alter market data or implement model training.
 
+## Gymnasium single-symbol environment v1
+
+Milestone 5A adds `single_symbol_env_v1`, a reusable long-only Gymnasium
+simulator under `reinforcement_learning/environments/`. It consumes one
+chronological processed-symbol DataFrame with raw OHLCV execution columns and
+an explicitly configured list of feature columns that must be scaled outside
+the environment using training-only preprocessing artifacts.
+
+The timing contract prevents look-ahead: the observation at row `t` contains
+only row-`t` features and portfolio state, the action executes at row `t+1`
+open, and holdings are valued at row `t+1` close before reward is calculated.
+The last transition terminates without trading beyond available data.
+
+Actions are `Hold`, `Buy`, and `Sell`. Buy uses available cash for the maximum
+whole-share position; Sell liquidates the complete position. There is no short
+selling, margin, leverage, or fractional trading. Portfolio value is always
+`cash + shares × current close`. Cost basis includes buy commission; realized
+P&L uses net sell proceeds. Commission defaults to 0.10% and slippage to 0.05%
+as configurable development assumptions, not an exact PSX broker fee schedule.
+
+Reward v1 is:
+
+```text
+log(next portfolio value / previous portfolio value)
+- transaction-cost weight × transaction cost / previous portfolio value
+- drawdown weight × positive drawdown increase
+- invalid-action penalty
+```
+
+Transaction-cost penalty weight defaults to zero because costs already reduce
+portfolio value; drawdown weight defaults to `0.1`, and the invalid-action
+penalty defaults to `0.0001`. Every component is returned in `info` and can be
+disabled for ablation work.
+
+The flat `float32` observation contains configured, externally preprocessed
+market/technical features plus cash ratio, position-value ratio, position
+indicator, unrealized-return ratio, and current drawdown. Symbol and date never
+become numeric inputs. Invalid or non-finite observations are rejected.
+
+Deterministic Always Hold, Buy and Hold, and fixed-seed Random baselines live
+under `reinforcement_learning/evaluation/`. Evaluation reports return,
+drawdown, trades, costs, daily returns, volatility, and a zero-risk-free-rate
+252-day Sharpe estimate when enough transitions exist. Baselines are not AI
+models.
+
+Validate environment v1:
+
+```bash
+python -m reinforcement_learning.environments.validation data/processed/symbols/MCB.csv
+```
+
+Explore the design without training PPO:
+
+```bash
+jupyter lab notebooks/04_rl_environment_design.ipynb
+```
+
+The notebook reports local readiness and uses an explicitly labelled fixture
+when no symbol meets the 252-row gate. Fixture results validate mechanics only
+and are not suitable for research conclusions. PPO training, exact broker
+fees, liquidity/market impact, corporate actions, and multi-symbol allocation
+remain future work.
+
 ## Current limitations
 
 - The official listings tables expose listed and non-compliant segments, but
