@@ -1,5 +1,54 @@
 # PSX Virtual Trader
 
+## Official market indices and market intelligence
+
+Milestone 4A keeps indices separate from equity rows and uses only the official
+PSX end-of-day route:
+
+```text
+GET https://dps.psx.com.pk/timeseries/eod/{index_code}
+```
+
+Supported codes are `KSE100`, `KSE30`, `KMI30`, and `ALLSHR`. PSX calls its
+headline benchmark KSE-100; `PSX100` is not used internally. Each JSON
+observation is `[unix_timestamp, index_value, volume, open_or_reference]`.
+Timestamps are retained and converted to trading dates in `Asia/Karachi`; PSX
+does not provide high/low fields and they are not fabricated.
+
+Refresh all series or selected series with:
+
+```bash
+python -m market_intelligence.refresh_indices --all
+python -m market_intelligence.refresh_indices --index KSE100 --index ALLSHR
+```
+
+Untouched responses are stored under `data/indices/raw/`, normalized per-index
+CSVs under `data/indices/master/`, and the combined business-keyed dataset at
+`data/indices/master/psx_indices_master.csv`. The source returns its complete
+retained series without caller-defined date parameters; approximately five
+years were observed during source investigation, but retention is not a
+documented guarantee.
+
+The Market Overview calculates breadth from valid securities on the latest
+local equity date. It can also restrict breadth to currently listed ordinary
+equities when a registry is supplied. The transparent Market Health Score uses
+weighted index trends (50 points), advance/decline ratio (15), advancing share
+(10), volume participation (10), moving-average position (10), and a volatility
+penalty (5). Available components are normalized when inputs are missing. It is
+a descriptive market-condition indicator, not investment advice.
+
+AI datasets can attach same-date market context without changing the equity
+master: index levels/returns, KSE-100 five-day return and volatility, breadth,
+and market-health fields. Joins never use future observations; forward filling
+defaults to zero days and is explicitly bounded when enabled. Dataset build
+metadata records whether context was available. Models are not retrained
+automatically.
+
+PSX warns that dissemination and commercial use of market data, including
+index levels, may require a licence. This project treats the source as
+educational/research data; deployments should confirm rights with PSX Market
+Data before redistributing it.
+
 PSX Virtual Trader is a university FYP project for collecting and exploring
 Pakistan Stock Exchange market data. The current system provides a
 requests/BeautifulSoup data pipeline, persistent daily and master CSV data,

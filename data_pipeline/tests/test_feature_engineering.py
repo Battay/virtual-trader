@@ -81,7 +81,7 @@ def test_numeric_looking_symbols_remain_strings_and_version_is_deterministic() -
     assert featured["symbol"].dtype.name == "string"
     assert featured["symbol"].unique().tolist() == ["786"]
     assert featured["feature_version"].unique().tolist() == [FEATURE_VERSION]
-    assert FEATURE_VERSION.startswith("psx-3a-")
+    assert FEATURE_VERSION.startswith("psx-4a-")
 
 
 def test_empty_data_is_supported_but_missing_required_columns_fail_clearly() -> None:

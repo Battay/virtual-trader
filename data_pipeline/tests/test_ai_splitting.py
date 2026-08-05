@@ -9,6 +9,7 @@ import pandas as pd
 from feature_engineering.preprocessing import fit_training_scaler
 from feature_engineering.schemas import AI_DATASET_COLUMNS, FEATURE_COLUMNS, FEATURE_VERSION
 from feature_engineering.splitting import chronological_split, persist_split_artifacts
+from market_intelligence.feature_joiner import MARKET_CONTEXT_COLUMNS
 
 
 def _processed(symbols: tuple[str, ...], dates: int = 20) -> pd.DataFrame:
@@ -27,6 +28,8 @@ def _processed(symbols: tuple[str, ...], dates: int = 20) -> pd.DataFrame:
                 "feature_version": FEATURE_VERSION,
             }
             for feature_index, column in enumerate(FEATURE_COLUMNS):
+                row[column] = float(date_index + feature_index + symbol_index)
+            for feature_index, column in enumerate(MARKET_CONTEXT_COLUMNS):
                 row[column] = float(date_index + feature_index + symbol_index)
             rows.append(row)
     return pd.DataFrame(rows).loc[:, AI_DATASET_COLUMNS]

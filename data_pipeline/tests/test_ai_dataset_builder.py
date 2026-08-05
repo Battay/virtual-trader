@@ -12,6 +12,7 @@ from feature_engineering.dataset_builder import (
 )
 from feature_engineering.schemas import AI_DATASET_COLUMNS, FEATURE_VERSION
 from feature_engineering.storage import atomic_write_dataframe
+from market_intelligence.feature_joiner import MARKET_CONTEXT_COLUMNS
 
 
 def _market(symbol: str, rows: int = 70, base: float = 100.0) -> pd.DataFrame:
@@ -77,6 +78,7 @@ def test_symbol_dataset_generation_uses_shared_features_and_eligibility(
     metrics = build_symbol_datasets(
         market_data=_all_market(),
         registry=_registry(),
+        include_market_context=False,
         minimum_usable_rows=10,
         output_dir=tmp_path,
     )
@@ -89,7 +91,8 @@ def test_symbol_dataset_generation_uses_shared_features_and_eligibility(
     assert tuple(output.columns) == AI_DATASET_COLUMNS
     assert output["symbol"].unique().tolist() == ["786"]
     assert output["feature_version"].unique().tolist() == [FEATURE_VERSION]
-    assert not output.isna().any(axis=None)
+    assert not output.drop(columns=list(MARKET_CONTEXT_COLUMNS)).isna().any(axis=None)
+    assert output.loc[:, MARKET_CONTEXT_COLUMNS].isna().all(axis=None)
 
 
 def test_master_dataset_includes_active_and_historical_but_excludes_unknown(
@@ -100,6 +103,7 @@ def test_master_dataset_includes_active_and_historical_but_excludes_unknown(
     metrics = build_master_ai_dataset(
         market_data=_all_market(),
         registry=_registry(),
+        include_market_context=False,
         output_path=path,
     )
 
@@ -121,6 +125,7 @@ def test_insufficient_history_is_skipped_without_fake_symbol_files(
     metrics = build_symbol_datasets(
         market_data=_market("786", rows=60),
         registry=_registry().iloc[[0]],
+        include_market_context=False,
         minimum_usable_rows=20,
         output_dir=tmp_path,
     )

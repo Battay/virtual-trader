@@ -22,6 +22,7 @@ from data_pipeline.src.csv_store import MasterBuildResult
 from data_pipeline.src.main import CollectionResult
 from data_pipeline.src.official_listings import ListingsRefreshResult
 from data_pipeline.src.updater import IncrementalUpdateResult
+from market_intelligence.refresh_indices import IndexRefreshResult
 
 
 def _update_result(end_date: date) -> IncrementalUpdateResult:
@@ -89,6 +90,15 @@ def _registry_result(path: Path, *, cached: bool = False) -> RegistryBuildResult
     )
 
 
+def _index_result(path: Path) -> IndexRefreshResult:
+    return IndexRefreshResult(
+        requested_indices=("KSE100",), successful_indices=("KSE100",),
+        failed_indices=(), observations_parsed=2,
+        earliest_date=date(2026, 7, 27), latest_date=date(2026, 7, 28),
+        output_paths=(path,), combined_master_path=path, cached_data_used=False,
+    )
+
+
 def test_metadata_save_and_load_is_atomic(tmp_path: Path) -> None:
     path = tmp_path / "metadata" / "automation.json"
     config = AutomationConfig(
@@ -140,6 +150,7 @@ def test_disabled_scheduled_runner_does_nothing(tmp_path: Path) -> None:
         config_path=config_path,
         lock_path=tmp_path / "lock",
         updater=updater,
+        index_refresher=lambda: _index_result(tmp_path / "indices.csv"),
         master_builder=builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,
@@ -182,6 +193,7 @@ def test_enabled_runner_calls_updater_then_master_builder(tmp_path: Path) -> Non
         config_path=config_path,
         lock_path=tmp_path / "lock",
         updater=updater,
+        index_refresher=lambda: _index_result(tmp_path / "indices.csv"),
         master_builder=builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,
@@ -242,6 +254,7 @@ def test_scheduled_runner_treats_skipped_dates_as_success(tmp_path: Path) -> Non
         config_path=config_path,
         lock_path=tmp_path / "lock",
         updater=updater,
+        index_refresher=lambda: _index_result(tmp_path / "indices.csv"),
         master_builder=lambda: _master_result(tmp_path / "master.csv"),
         listing_refresher=lambda **kwargs: _listings_result(
             tmp_path / "listings.csv"
@@ -269,6 +282,7 @@ def test_cached_listing_fallback_is_recorded_as_success(tmp_path: Path) -> None:
         config_path=config_path,
         lock_path=tmp_path / "lock",
         updater=lambda **kwargs: _update_result(kwargs["end_date"]),
+        index_refresher=lambda: _index_result(tmp_path / "indices.csv"),
         master_builder=lambda: _master_result(tmp_path / "master.csv"),
         listing_refresher=lambda **kwargs: _listings_result(
             tmp_path / "listings.csv",

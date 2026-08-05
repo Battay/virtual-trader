@@ -163,6 +163,11 @@ with st.form("automation_settings"):
         "Enable automatic daily fetch",
         value=config.enabled,
     )
+    rebuild_ai_datasets = st.checkbox(
+        "Rebuild AI datasets after a successful update",
+        value=config.rebuild_ai_datasets,
+        help="This prepares features only; it does not train or retrain models.",
+    )
     bootstrap_start_date = st.date_input(
         "Bootstrap start date",
         value=config.bootstrap_start_date,
@@ -189,6 +194,7 @@ if save_settings:
                 config,
                 enabled=enabled,
                 bootstrap_start_date=bootstrap_start_date,
+                rebuild_ai_datasets=rebuild_ai_datasets,
             )
             save_automation_config(updated_config)
             st.session_state["automation_flash_message"] = (

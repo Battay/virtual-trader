@@ -12,6 +12,7 @@ from dashboard.presentation import (
     format_date,
     format_datetime,
     format_decimal,
+    format_directional_percentage,
     format_integer,
     format_percentage,
     format_price,
@@ -71,6 +72,23 @@ def test_numeric_price_volume_and_percentage_formatting() -> None:
     assert format_volume(80_400_000) == "80.4M"
     assert format_volume(925_300) == "925.3K"
     assert format_percentage(1.234) == "+1.23%"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (1.234, "▲ +1.23%"),
+        (-1.234, "▼ -1.23%"),
+        (0, "● 0.00%"),
+        (None, MISSING_VALUE),
+        (float("nan"), MISSING_VALUE),
+    ],
+)
+def test_directional_percentage_has_non_colour_signal(
+    value: object,
+    expected: str,
+) -> None:
+    assert format_directional_percentage(value) == expected
 
 
 def test_source_formatting_preserves_urls_and_humanizes_local_tags() -> None:

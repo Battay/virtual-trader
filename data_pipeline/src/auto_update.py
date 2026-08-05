@@ -51,11 +51,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(
         "Stages: "
         f"market={'ok' if result.market_update_succeeded else 'not completed'}, "
+        f"indices={'ok' if result.index_refresh_succeeded else 'cached/partial'}, "
         f"master={'ok' if result.master_rebuild_succeeded else 'not completed'}, "
         f"listings={'ok' if result.listing_refresh_succeeded else 'not completed'}, "
         f"registry={'ok' if result.registry_rebuild_succeeded else 'not completed'}"
     )
     print(f"Cached listings used: {'yes' if result.cached_listings_used else 'no'}")
+    print(f"Cached indices used: {'yes' if result.cached_indices_used else 'no'}")
     return result.exit_code
 
 

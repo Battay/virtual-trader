@@ -20,6 +20,8 @@ from .company_registry import RegistryBuildResult, build_company_registry
 from .csv_store import MasterBuildResult, build_master_dataset
 from .official_listings import ListingsRefreshResult, refresh_official_listings
 from .updater import IncrementalUpdateResult, run_incremental_update
+from market_intelligence.refresh_indices import IndexRefreshResult, refresh_indices
+from feature_engineering.dataset_builder import build_master_ai_dataset, build_symbol_datasets
 
 
 LOGGER = logging.getLogger(__name__)
@@ -31,6 +33,7 @@ Updater = Callable[..., IncrementalUpdateResult]
 MasterBuilder = Callable[..., MasterBuildResult]
 ListingRefresher = Callable[..., ListingsRefreshResult]
 RegistryBuilder = Callable[..., RegistryBuildResult]
+IndexRefresher = Callable[..., IndexRefreshResult]
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,7 @@ class AutomationConfig:
     last_success_at: str | None = None
     last_status: str = "never_run"
     last_message: str = "Automation has not run yet"
+    rebuild_ai_datasets: bool = False
 
     def to_dict(self) -> dict[str, object]:
         values = asdict(self)
@@ -67,11 +71,15 @@ class AutomationRunResult:
     master_result: MasterBuildResult | None = None
     listings_result: ListingsRefreshResult | None = None
     registry_result: RegistryBuildResult | None = None
+    index_result: IndexRefreshResult | None = None
     market_update_succeeded: bool = False
     master_rebuild_succeeded: bool = False
     listing_refresh_succeeded: bool = False
     registry_rebuild_succeeded: bool = False
     cached_listings_used: bool = False
+    cached_indices_used: bool = False
+    index_refresh_succeeded: bool = False
+    ai_rebuild_succeeded: bool = False
 
 
 class UpdateAlreadyRunning(RuntimeError):
@@ -113,6 +121,9 @@ def _config_from_dict(values: object) -> AutomationConfig:
     enabled = values.get("enabled", False)
     if not isinstance(enabled, bool):
         raise ValueError("enabled must be a boolean")
+    rebuild_ai = values.get("rebuild_ai_datasets", False)
+    if not isinstance(rebuild_ai, bool):
+        raise ValueError("rebuild_ai_datasets must be a boolean")
 
     def optional_string(field: str) -> str | None:
         value = values.get(field)
@@ -129,6 +140,7 @@ def _config_from_dict(values: object) -> AutomationConfig:
         last_success_at=optional_string("last_success_at"),
         last_status=optional_string("last_status") or "never_run",
         last_message=optional_string("last_message") or "Automation has not run yet",
+        rebuild_ai_datasets=rebuild_ai,
     )
 
 
@@ -289,6 +301,7 @@ def _run_enabled_update(
     config_path: Path,
     lock_path: Path,
     updater: Updater,
+    index_refresher: IndexRefresher,
     master_builder: MasterBuilder,
     listing_refresher: ListingRefresher,
     registry_builder: RegistryBuilder,
@@ -315,12 +328,16 @@ def _run_enabled_update(
     master_result: MasterBuildResult | None = None
     listings_result: ListingsRefreshResult | None = None
     registry_result: RegistryBuildResult | None = None
+    index_result: IndexRefreshResult | None = None
     try:
         save_automation_config(attempted_config, config_path)
         update_result = updater(
             end_date=end_date,
             bootstrap_start_date=config.bootstrap_start_date,
         )
+        index_result = index_refresher()
+        if not index_result.has_usable_data:
+            raise RuntimeError("Official index refresh failed and no cached index data is available")
         master_result = master_builder()
 
         if update_result.failed_dates:
@@ -342,8 +359,11 @@ def _run_enabled_update(
                 exit_code=1,
                 update_result=update_result,
                 master_result=master_result,
+                index_result=index_result,
                 market_update_succeeded=False,
                 master_rebuild_succeeded=True,
+                cached_indices_used=index_result.cached_data_used,
+                index_refresh_succeeded=not bool(index_result.failed_indices),
             )
 
         listings_result = listing_refresher(refreshed_at=attempt_time)
@@ -353,6 +373,11 @@ def _run_enabled_update(
             registry_updated_at=attempt_time,
             cached_listings_used=listings_result.used_cache,
         )
+        ai_rebuilt = False
+        if config.rebuild_ai_datasets:
+            build_symbol_datasets()
+            build_master_ai_dataset()
+            ai_rebuilt = True
         listing_mode = "cached listings" if listings_result.used_cache else "live listings"
         message = (
             f"Update succeeded: {len(update_result.successful_dates)} successful, "
@@ -376,11 +401,15 @@ def _run_enabled_update(
             master_result=master_result,
             listings_result=listings_result,
             registry_result=registry_result,
+            index_result=index_result,
             market_update_succeeded=True,
             master_rebuild_succeeded=True,
             listing_refresh_succeeded=True,
             registry_rebuild_succeeded=True,
             cached_listings_used=listings_result.used_cache,
+            cached_indices_used=index_result.cached_data_used,
+            index_refresh_succeeded=not bool(index_result.failed_indices),
+            ai_rebuild_succeeded=ai_rebuilt,
         )
     except Exception as exc:
         message = f"Automation failed: {type(exc).__name__}: {exc}"
@@ -402,6 +431,7 @@ def _run_enabled_update(
             master_result=master_result,
             listings_result=listings_result,
             registry_result=registry_result,
+            index_result=index_result,
             market_update_succeeded=(
                 update_result is not None and not update_result.failed_dates
             ),
@@ -411,6 +441,8 @@ def _run_enabled_update(
             cached_listings_used=(
                 listings_result.used_cache if listings_result is not None else False
             ),
+            cached_indices_used=(index_result.cached_data_used if index_result else False),
+            index_refresh_succeeded=(bool(index_result) and not bool(index_result.failed_indices)),
         )
     finally:
         lock.release()
@@ -421,6 +453,7 @@ def run_scheduled_update(
     config_path: Path = AUTOMATION_CONFIG_PATH,
     lock_path: Path = AUTOMATION_LOCK_PATH,
     updater: Updater = run_incremental_update,
+    index_refresher: IndexRefresher = refresh_indices,
     master_builder: MasterBuilder = build_master_dataset,
     listing_refresher: ListingRefresher = refresh_official_listings,
     registry_builder: RegistryBuilder = build_company_registry,
@@ -440,6 +473,7 @@ def run_scheduled_update(
         config_path=Path(config_path),
         lock_path=Path(lock_path),
         updater=updater,
+        index_refresher=index_refresher,
         master_builder=master_builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,
@@ -454,6 +488,7 @@ def run_manual_update(
     config_path: Path = AUTOMATION_CONFIG_PATH,
     lock_path: Path = AUTOMATION_LOCK_PATH,
     updater: Updater = run_incremental_update,
+    index_refresher: IndexRefresher = refresh_indices,
     master_builder: MasterBuilder = build_master_dataset,
     listing_refresher: ListingRefresher = refresh_official_listings,
     registry_builder: RegistryBuilder = build_company_registry,
@@ -470,6 +505,7 @@ def run_manual_update(
         config_path=Path(config_path),
         lock_path=Path(lock_path),
         updater=updater,
+        index_refresher=index_refresher,
         master_builder=master_builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,

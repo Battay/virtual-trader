@@ -70,6 +70,7 @@ def test_ready_symbol_reports_chronological_partition_rows(tmp_path: Path) -> No
     build_symbol_datasets(
         market_data=market,
         registry=registry,
+        include_market_context=False,
         minimum_usable_rows=252,
         output_dir=tmp_path,
     )
@@ -127,6 +128,7 @@ def test_notebook_summary_treats_skipped_symbol_as_readiness_result(
     metrics = build_symbol_datasets(
         market_data=market,
         registry=registry,
+        include_market_context=False,
         minimum_usable_rows=252,
         output_dir=tmp_path,
     )

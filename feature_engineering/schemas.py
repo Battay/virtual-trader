@@ -6,6 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from market_intelligence.feature_joiner import MARKET_CONTEXT_COLUMNS
+
 
 RAW_REQUIRED_COLUMNS = ("symbol", "date", "open", "high", "low", "close", "volume")
 RAW_OHLCV_COLUMNS = ("open", "high", "low", "close", "volume")
@@ -44,6 +46,7 @@ AI_DATASET_COLUMNS = (
     "date",
     *FEATURE_COLUMNS,
     *METADATA_COLUMNS,
+    *MARKET_CONTEXT_COLUMNS,
     "feature_version",
 )
 DEFAULT_MASTER_SECURITY_TYPES = frozenset(
@@ -52,6 +55,7 @@ DEFAULT_MASTER_SECURITY_TYPES = frozenset(
 FEATURE_WARMUP_ROWS = 49
 
 _FEATURE_SPECIFICATION = {
+    "milestone": "4a_market_context",
     "price_returns": "one_period_backward",
     "rolling_volatility_window": 20,
     "sma_windows": [20, 50],
@@ -65,7 +69,7 @@ _FEATURE_SPECIFICATION = {
     "volume_ma_window": 20,
     "warmup_rows": FEATURE_WARMUP_ROWS,
 }
-FEATURE_VERSION = "psx-3a-" + hashlib.sha256(
+FEATURE_VERSION = "psx-4a-" + hashlib.sha256(
     json.dumps(_FEATURE_SPECIFICATION, sort_keys=True).encode("utf-8")
 ).hexdigest()[:12]
 
@@ -84,6 +88,7 @@ class DatasetBuildMetrics:
     latest_date: date | None
     feature_version: str
     output_paths: tuple[Path, ...]
+    market_context_included: bool = False
 
     def to_dict(self) -> dict[str, object]:
         """Return JSON-compatible metrics for CLI and dashboard output."""

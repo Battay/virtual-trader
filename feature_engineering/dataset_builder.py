@@ -15,7 +15,9 @@ from data_pipeline.src.config import (
     MASTER_CSV_PATH,
     PROCESSED_MASTER_PATH,
     PROCESSED_SYMBOLS_DIR,
+    INDICES_MASTER_PATH,
 )
+from market_intelligence.feature_joiner import join_market_context
 
 from .indicators import calculate_features
 from .preprocessing import (
@@ -52,6 +54,9 @@ def load_ai_sources(
 def _prepare_feature_rows(
     market_data: pd.DataFrame,
     registry: pd.DataFrame,
+    *,
+    index_data: pd.DataFrame | None = None,
+    max_market_forward_fill_days: int = 0,
 ) -> tuple[pd.DataFrame, dict[str, tuple[str, ...]]]:
     validate_required_market_columns(market_data)
     quality_errors = fatal_quality_errors_by_symbol(market_data)
@@ -63,8 +68,13 @@ def _prepare_feature_rows(
         & (clean["symbol"] != "")
         & ~clean["symbol"].isin(fatal_symbols)
     ]
-    featured = calculate_features(clean)
-    return attach_registry_metadata(featured, registry), quality_errors
+    featured = attach_registry_metadata(calculate_features(clean), registry)
+    context_in = index_data if index_data is not None else pd.DataFrame()
+    return join_market_context(
+        featured,
+        context_in,
+        max_forward_fill_days=max_market_forward_fill_days,
+    ), quality_errors
 
 
 def _usable_rows(featured: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
@@ -88,6 +98,7 @@ def _metrics(
     warmup_rows: int,
     missing_rows: int,
     output_paths: Sequence[Path],
+    market_context_included: bool = False,
 ) -> DatasetBuildMetrics:
     dates = pd.to_datetime(output.get("date"), errors="coerce").dropna()
     return DatasetBuildMetrics(
@@ -101,6 +112,7 @@ def _metrics(
         latest_date=dates.max().date() if not dates.empty else None,
         feature_version=FEATURE_VERSION,
         output_paths=tuple(Path(path) for path in output_paths),
+        market_context_included=market_context_included,
     )
 
 
@@ -111,6 +123,9 @@ def build_symbol_datasets(
     symbols: Collection[str] | None = None,
     minimum_usable_rows: int = AI_MINIMUM_USABLE_ROWS,
     output_dir: Path = PROCESSED_SYMBOLS_DIR,
+    index_data: pd.DataFrame | None = None,
+    include_market_context: bool = True,
+    max_market_forward_fill_days: int = 0,
 ) -> DatasetBuildMetrics:
     """Build eligible active ordinary-equity datasets from one implementation."""
     if minimum_usable_rows < 1:
@@ -130,7 +145,13 @@ def build_symbol_datasets(
     if requested is not None:
         source = source.loc[source["symbol"].isin(requested)]
 
-    featured, quality_errors = _prepare_feature_rows(source, registry)
+    if index_data is None and include_market_context and INDICES_MASTER_PATH.exists():
+        index_data = pd.read_csv(INDICES_MASTER_PATH)
+    context_included = bool(index_data is not None and not index_data.empty)
+    featured, quality_errors = _prepare_feature_rows(
+        source, registry, index_data=index_data if include_market_context else None,
+        max_market_forward_fill_days=max_market_forward_fill_days,
+    )
     available_symbols = set(featured["symbol"].astype("string"))
     candidates = requested if requested is not None else available_symbols
     skipped = set(quality_errors).difference({"<missing>"})
@@ -171,6 +192,7 @@ def build_symbol_datasets(
         warmup_rows=warmup_rows,
         missing_rows=missing_rows,
         output_paths=output_paths,
+        market_context_included=context_included,
     )
 
 
@@ -180,6 +202,9 @@ def build_master_ai_dataset(
     registry: pd.DataFrame | None = None,
     supported_security_types: Collection[str] = DEFAULT_MASTER_SECURITY_TYPES,
     output_path: Path = PROCESSED_MASTER_PATH,
+    index_data: pd.DataFrame | None = None,
+    include_market_context: bool = True,
+    max_market_forward_fill_days: int = 0,
 ) -> DatasetBuildMetrics:
     """Build an all-lifecycle master feature dataset with symbol identity."""
     if market_data is None or registry is None:
@@ -187,7 +212,13 @@ def build_master_ai_dataset(
         market_data = loaded_market if market_data is None else market_data
         registry = loaded_registry if registry is None else registry
 
-    featured, quality_errors = _prepare_feature_rows(market_data, registry)
+    if index_data is None and include_market_context and INDICES_MASTER_PATH.exists():
+        index_data = pd.read_csv(INDICES_MASTER_PATH)
+    context_included = bool(index_data is not None and not index_data.empty)
+    featured, quality_errors = _prepare_feature_rows(
+        market_data, registry, index_data=index_data if include_market_context else None,
+        max_market_forward_fill_days=max_market_forward_fill_days,
+    )
     all_symbols = set(market_data["symbol"].astype("string").str.strip().dropna())
     supported = set(str(value) for value in supported_security_types)
     supported_rows = featured.loc[featured["security_type"].isin(supported)].copy()
@@ -210,6 +241,7 @@ def build_master_ai_dataset(
         warmup_rows=warmup_rows,
         missing_rows=missing_rows,
         output_paths=(Path(output_path),),
+        market_context_included=context_included,
     )
 
 

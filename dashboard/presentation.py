@@ -321,6 +321,24 @@ def format_percentage(
     return fallback if formatted == fallback else f"{formatted}%"
 
 
+def format_directional_percentage(
+    value: object,
+    *,
+    fallback: str = MISSING_VALUE,
+) -> str:
+    """Format a percentage with a non-colour directional marker and sign."""
+    number = _number(value)
+    if number is None:
+        return fallback
+    if number > 0:
+        marker = "▲"
+    elif number < 0:
+        marker = "▼"
+    else:
+        marker = "●"
+    return f"{marker} {format_percentage(number, fallback=fallback)}"
+
+
 def format_symbol_company(symbol: object, company_name: object) -> str:
     """Build a searchable security selector label without fabricating a name."""
     symbol_text = safe_display_value(symbol, fallback="")

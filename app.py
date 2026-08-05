@@ -9,10 +9,20 @@ st.session_state.setdefault("collection_result", None)
 navigation = st.navigation(
     [
         st.Page(
+            "app_pages/0_Market_Overview.py",
+            title="Market Overview",
+            icon=":material/dashboard:",
+            default=True,
+        ),
+        st.Page(
+            "app_pages/1_Market_Indices.py",
+            title="Market Indices",
+            icon=":material/monitoring:",
+        ),
+        st.Page(
             "app_pages/1_Fetch_Data.py",
             title="Fetch Data",
             icon=":material/download:",
-            default=True,
         ),
         st.Page(
             "app_pages/2_Dataset_Explorer.py",
