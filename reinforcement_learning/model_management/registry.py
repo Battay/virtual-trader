@@ -10,6 +10,7 @@ import pandas as pd
 
 from data_pipeline.src.config import MODEL_REGISTRY_PATH
 from feature_engineering.storage import atomic_write_dataframe, safe_path_component
+from reinforcement_learning.environments.config import ENVIRONMENT_VERSION
 
 from .paths import master_model_paths, symbol_model_paths
 
@@ -26,6 +27,8 @@ MODEL_REGISTRY_COLUMNS = (
     "environment_version",
     "created_at",
     "last_trained_at",
+    "complete_available_history_start",
+    "complete_available_history_end",
     "training_data_start",
     "training_data_end",
     "validation_data_start",
@@ -166,7 +169,7 @@ def create_model_record(
             "model_status": "not_trained",
             "training_status": "never_trained",
             "feature_version": feature_version,
-            "environment_version": "pending_3b",
+            "environment_version": ENVIRONMENT_VERSION,
             "created_at": timestamp.isoformat(),
             "new_data_days": 0,
             "needs_retraining": False,

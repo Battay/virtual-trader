@@ -20,6 +20,14 @@ DEFAULT_OBSERVATION_FEATURES = (
     "volume_ma_20",
 )
 
+DYNAMIC_PORTFOLIO_FEATURES = (
+    "portfolio_cash_ratio",
+    "portfolio_position_value_ratio",
+    "portfolio_position_indicator",
+    "portfolio_unrealized_return_ratio",
+    "portfolio_current_drawdown",
+)
+
 
 @dataclass(frozen=True)
 class SingleSymbolEnvConfig:

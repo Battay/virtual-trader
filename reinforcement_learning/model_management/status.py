@@ -281,7 +281,7 @@ def complete_history_training_metadata(
     complete_data: pd.DataFrame,
     split_metadata: Mapping[str, object],
 ) -> dict[str, object]:
-    """Create registry metadata whose training range covers all available history."""
+    """Keep complete-history availability distinct from split training ranges."""
     dates = pd.to_datetime(complete_data["date"], errors="coerce").dropna()
     if dates.empty:
         raise ValueError("complete training history cannot be empty")
@@ -289,8 +289,10 @@ def complete_history_training_metadata(
     validation = dict(split_metadata.get("validation", {}))
     testing = dict(split_metadata.get("testing", {}))
     return {
-        "training_data_start": dates.min().date().isoformat(),
-        "training_data_end": dates.max().date().isoformat(),
+        "complete_available_history_start": dates.min().date().isoformat(),
+        "complete_available_history_end": dates.max().date().isoformat(),
+        "training_data_start": training.get("start", ""),
+        "training_data_end": training.get("end", ""),
         "validation_data_start": validation.get("start", ""),
         "validation_data_end": validation.get("end", ""),
         "test_data_start": testing.get("start", ""),

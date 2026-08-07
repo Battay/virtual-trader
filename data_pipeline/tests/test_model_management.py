@@ -163,19 +163,27 @@ def test_sufficient_new_active_symbol_without_model_is_never_trained() -> None:
     assert status["training_status"].tolist() == ["never_trained"]
 
 
-def test_complete_history_retraining_metadata_uses_earliest_and_latest_dates() -> None:
+def test_registry_metadata_separates_complete_history_from_partitions() -> None:
     history = _market("786", rows=10)
     metadata = complete_history_training_metadata(
         history,
         {
-            "training": {"rows": 7},
+            "training": {
+                "start": "2026-01-01",
+                "end": "2026-01-07",
+                "rows": 7,
+            },
             "validation": {"start": "2026-01-08", "end": "2026-01-08", "rows": 1},
             "testing": {"start": "2026-01-09", "end": "2026-01-10", "rows": 2},
         },
     )
 
+    assert metadata["complete_available_history_start"] == "2026-01-01"
+    assert metadata["complete_available_history_end"] == "2026-01-10"
     assert metadata["training_data_start"] == "2026-01-01"
-    assert metadata["training_data_end"] == "2026-01-10"
+    assert metadata["training_data_end"] == "2026-01-07"
+    assert metadata["validation_data_start"] == "2026-01-08"
+    assert metadata["test_data_start"] == "2026-01-09"
     assert metadata["dataset_latest_date"] == "2026-01-10"
     assert metadata["training_rows"] == 7
 

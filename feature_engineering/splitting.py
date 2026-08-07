@@ -13,6 +13,11 @@ from data_pipeline.src.config import (
     PROCESSED_SPLITS_DIR,
     PROCESSED_SYMBOLS_DIR,
 )
+from reinforcement_learning.data_contract import (
+    RL_PARTITION_SCHEMA_VERSION,
+    RLPartitionArtifactResult,
+    persist_rl_partition_artifacts,
+)
 
 from .preprocessing import DataQualityError, fit_training_scaler, save_scaler_artifact
 from .schemas import FEATURE_VERSION
@@ -37,6 +42,7 @@ class SplitArtifactResult:
     metadata_path: Path
     scaler_path: Path
     metadata: dict[str, object]
+    rl_artifacts: RLPartitionArtifactResult | None
 
 
 def _validate_proportions(train: float, validation: float, test: float) -> None:
@@ -140,6 +146,8 @@ def chronological_split(
 def persist_split_artifacts(
     split: ChronologicalSplit,
     output_dir: Path,
+    *,
+    create_rl_artifacts: bool = True,
 ) -> SplitArtifactResult:
     """Persist raw/scaled partitions, scaler, and metadata atomically."""
     directory = Path(output_dir)
@@ -160,9 +168,35 @@ def persist_split_artifacts(
         "scaler_path": str(scaler_path),
         "scaler_metadata_path": str(scaler_metadata_path),
     }
+    rl_artifacts = None
+    if create_rl_artifacts:
+        rl_artifacts = persist_rl_partition_artifacts(
+            split.train,
+            split.validation,
+            split.test,
+            directory,
+            feature_version=str(split.metadata["feature_version"]),
+        )
+        metadata.update(
+            {
+                "rl_artifact_schema_version": RL_PARTITION_SCHEMA_VERSION,
+                "rl_contract_path": str(rl_artifacts.contract_path),
+                "rl_observation_scaler_path": str(rl_artifacts.scaler_path),
+                "rl_partition_paths": {
+                    name: str(path)
+                    for name, path in rl_artifacts.partition_paths.items()
+                },
+            }
+        )
     metadata_path = directory / "metadata.json"
     atomic_write_json(metadata, metadata_path)
-    return SplitArtifactResult(directory, metadata_path, scaler_path, metadata)
+    return SplitArtifactResult(
+        directory,
+        metadata_path,
+        scaler_path,
+        metadata,
+        rl_artifacts,
+    )
 
 
 def create_symbol_split(
@@ -187,7 +221,11 @@ def create_master_split(
     """Create a global-date split and scaler for the complete master AI data."""
     data = pd.read_csv(Path(processed_master_path), dtype={"symbol": "string"})
     split = chronological_split(data, scope="master")
-    return persist_split_artifacts(split, Path(splits_dir) / "master")
+    return persist_split_artifacts(
+        split,
+        Path(splits_dir) / "master",
+        create_rl_artifacts=False,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

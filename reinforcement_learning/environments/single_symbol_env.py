@@ -13,18 +13,12 @@ from gymnasium import spaces
 import numpy as np
 import pandas as pd
 
-from .config import SingleSymbolEnvConfig
+from .config import DYNAMIC_PORTFOLIO_FEATURES, SingleSymbolEnvConfig
 from .validation import prepare_single_symbol_data
 
 
 ACTION_NAMES = {0: "Hold", 1: "Buy", 2: "Sell"}
-PORTFOLIO_OBSERVATION_FEATURES = (
-    "portfolio_cash_ratio",
-    "portfolio_position_value_ratio",
-    "portfolio_position_indicator",
-    "portfolio_unrealized_return_ratio",
-    "portfolio_current_drawdown",
-)
+PORTFOLIO_OBSERVATION_FEATURES = DYNAMIC_PORTFOLIO_FEATURES
 
 
 def action_name(action: int) -> str:
