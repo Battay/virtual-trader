@@ -28,6 +28,24 @@ class ScalingResult:
     training_rows: int
 
 
+@dataclass(frozen=True)
+class AIQualityFilterResult:
+    """Non-mutating row-level OHLC filtering and per-symbol audit metadata."""
+
+    data: pd.DataFrame
+    metadata: pd.DataFrame
+
+
+QUALITY_METADATA_COLUMNS = (
+    "symbol",
+    "raw_rows",
+    "invalid_ohlc_rows_removed",
+    "usable_pre_feature_rows",
+    "quality_retention_percent",
+    "quality_removal_reason",
+)
+
+
 def validate_required_market_columns(data: pd.DataFrame) -> None:
     """Raise a clear error when required raw market columns are absent."""
     missing = sorted(set(RAW_REQUIRED_COLUMNS).difference(data.columns))
@@ -62,19 +80,64 @@ def fatal_quality_errors_by_symbol(
         )
         if dates.isna().any():
             symbol_errors.append("invalid trading date")
-        if numeric.isna().any(axis=None):
-            symbol_errors.append("missing or invalid OHLCV value")
+        if numeric["volume"].isna().any():
+            symbol_errors.append("missing or invalid volume value")
         if dates.duplicated().any():
             symbol_errors.append("duplicate trading date")
-        if (numeric["high"] < numeric["low"]).any():
-            symbol_errors.append("high is lower than low")
         if (numeric["volume"] < 0).any():
             symbol_errors.append("volume is negative")
-        if (numeric[["open", "high", "low", "close"]] <= 0).any(axis=None):
-            symbol_errors.append("price is not positive")
+        if (numeric[["open", "high", "low", "close"]] < 0).any(axis=None):
+            symbol_errors.append("price is negative")
         if symbol_errors:
             errors[str(symbol)] = tuple(symbol_errors)
     return errors
+
+
+def filter_ai_quality_rows(market_data: pd.DataFrame) -> AIQualityFilterResult:
+    """Remove invalid OHLC rows before features without changing source history.
+
+    Dates are not synthesized after removal. Downstream rolling calculations use
+    the ordered sequence of remaining official market observations.
+    """
+    validate_required_market_columns(market_data)
+    source = market_data.copy()
+    source["symbol"] = source["symbol"].astype("string").str.strip()
+    numeric = source.loc[:, RAW_OHLCV_COLUMNS].apply(pd.to_numeric, errors="coerce")
+    prices = numeric.loc[:, ["open", "high", "low", "close"]]
+    invalid = (
+        prices.isna().any(axis=1)
+        | prices.le(0).any(axis=1)
+        | numeric["volume"].isna()
+        | numeric["volume"].lt(0)
+        | numeric["high"].lt(numeric["low"])
+    )
+
+    records: list[dict[str, object]] = []
+    valid_symbols = source["symbol"].notna() & source["symbol"].ne("")
+    for symbol, indexes in source.loc[valid_symbols].groupby("symbol", sort=True).groups.items():
+        removed = int(invalid.loc[indexes].sum())
+        raw_rows = len(indexes)
+        retained = raw_rows - removed
+        records.append(
+            {
+                "symbol": str(symbol),
+                "raw_rows": raw_rows,
+                "invalid_ohlc_rows_removed": removed,
+                "usable_pre_feature_rows": retained,
+                "quality_retention_percent": (
+                    100.0 * retained / raw_rows if raw_rows else 0.0
+                ),
+                "quality_removal_reason": "invalid_ohlc_row" if removed else "",
+            }
+        )
+
+    cleaned = source.loc[~invalid].copy()
+    for column in RAW_OHLCV_COLUMNS:
+        cleaned[column] = numeric.loc[cleaned.index, column]
+    cleaned["date"] = pd.to_datetime(cleaned["date"], errors="coerce")
+    cleaned = cleaned.sort_values(["symbol", "date"], kind="stable")
+    metadata = pd.DataFrame.from_records(records, columns=QUALITY_METADATA_COLUMNS)
+    return AIQualityFilterResult(cleaned.reset_index(drop=True), metadata)
 
 
 def attach_registry_metadata(

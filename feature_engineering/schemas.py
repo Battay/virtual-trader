@@ -56,6 +56,7 @@ FEATURE_WARMUP_ROWS = 49
 
 _FEATURE_SPECIFICATION = {
     "milestone": "4a_market_context",
+    "ohlc_quality_policy": "row_filter_v1_before_features",
     "price_returns": "one_period_backward",
     "rolling_volatility_window": 20,
     "sma_windows": [20, 50],
@@ -89,6 +90,7 @@ class DatasetBuildMetrics:
     feature_version: str
     output_paths: tuple[Path, ...]
     market_context_included: bool = False
+    invalid_ohlc_rows_removed: int = 0
 
     def to_dict(self) -> dict[str, object]:
         """Return JSON-compatible metrics for CLI and dashboard output."""

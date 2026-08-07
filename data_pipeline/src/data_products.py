@@ -54,6 +54,7 @@ class DataProductsRebuildResult:
     insufficient_history_symbols: int
     split_sets: int
     errors: tuple[str, ...]
+    invalid_ohlc_rows_removed: int = 0
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-compatible summary."""
@@ -127,6 +128,7 @@ def rebuild_data_products(
     errors: list[str] = []
     master_rows = master_symbols = processed_rows = processed_symbols = 0
     ready_symbols = insufficient_symbols = split_sets = 0
+    invalid_ohlc_rows_removed = 0
 
     try:
         master_result = master_builder()
@@ -144,6 +146,9 @@ def rebuild_data_products(
     try:
         master_metrics = master_ai_builder()
         processed_rows = int(getattr(master_metrics, "output_rows", 0))
+        invalid_ohlc_rows_removed = int(
+            getattr(master_metrics, "invalid_ohlc_rows_removed", 0)
+        )
     except Exception as exc:
         errors.append(f"Master AI dataset build failed: {exc}")
 
@@ -181,6 +186,7 @@ def rebuild_data_products(
         insufficient_history_symbols=insufficient_symbols,
         split_sets=split_sets,
         errors=tuple(errors),
+        invalid_ohlc_rows_removed=invalid_ohlc_rows_removed,
     )
 
 

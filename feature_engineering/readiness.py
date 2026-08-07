@@ -12,7 +12,11 @@ from data_pipeline.src.config import AI_MINIMUM_USABLE_ROWS, PROCESSED_SYMBOLS_D
 
 from .dataset_builder import validate_ai_dataset
 from .indicators import calculate_features
-from .preprocessing import fatal_quality_errors_by_symbol, validate_required_market_columns
+from .preprocessing import (
+    fatal_quality_errors_by_symbol,
+    filter_ai_quality_rows,
+    validate_required_market_columns,
+)
 from .schemas import FEATURE_COLUMNS, DatasetBuildMetrics
 from .splitting import chronological_split
 from .storage import safe_path_component
@@ -29,10 +33,17 @@ READINESS_COLUMNS = (
     "symbol",
     "company_name",
     "raw_trading_rows",
+    "invalid_ohlc_rows_removed",
+    "usable_pre_feature_rows",
+    "quality_retention_percent",
+    "quality_removal_reason",
     "earliest_raw_date",
     "latest_raw_date",
     "warmup_rows_removed",
+    "post_warmup_rows",
     "usable_feature_rows",
+    "first_usable_date",
+    "last_usable_date",
     "minimum_usable_rows",
     "additional_rows_required",
     "train_rows",
@@ -152,10 +163,17 @@ def _empty_report() -> pd.DataFrame:
             "symbol": pd.Series(dtype="string"),
             "company_name": pd.Series(dtype="string"),
             "raw_trading_rows": pd.Series(dtype="int64"),
+            "invalid_ohlc_rows_removed": pd.Series(dtype="int64"),
+            "usable_pre_feature_rows": pd.Series(dtype="int64"),
+            "quality_retention_percent": pd.Series(dtype="float64"),
+            "quality_removal_reason": pd.Series(dtype="string"),
             "earliest_raw_date": pd.Series(dtype="object"),
             "latest_raw_date": pd.Series(dtype="object"),
             "warmup_rows_removed": pd.Series(dtype="int64"),
+            "post_warmup_rows": pd.Series(dtype="int64"),
             "usable_feature_rows": pd.Series(dtype="int64"),
+            "first_usable_date": pd.Series(dtype="object"),
+            "last_usable_date": pd.Series(dtype="object"),
             "minimum_usable_rows": pd.Series(dtype="int64"),
             "additional_rows_required": pd.Series(dtype="int64"),
             "train_rows": pd.Series(dtype="int64"),
@@ -195,11 +213,13 @@ def build_training_readiness_report(
     market["date"] = pd.to_datetime(market["date"], errors="coerce")
     fatal_errors = fatal_quality_errors_by_symbol(market)
     fatal_symbols = set(fatal_errors).difference({"<missing>"})
-    feature_source = market.loc[
-        market["symbol"].notna()
-        & (market["symbol"] != "")
-        & ~market["symbol"].isin(fatal_symbols)
-    ]
+    quality = filter_ai_quality_rows(market)
+    quality_by_symbol = (
+        quality.metadata.set_index("symbol").to_dict(orient="index")
+        if not quality.metadata.empty
+        else {}
+    )
+    feature_source = quality.data.loc[~quality.data["symbol"].isin(fatal_symbols)]
     featured = calculate_features(feature_source)
     featured_by_symbol = {
         str(symbol): group
@@ -223,12 +243,25 @@ def build_training_readiness_report(
         symbol_features = featured_by_symbol.get(symbol, pd.DataFrame())
         if symbol_features.empty:
             warmup_rows = 0
+            post_warmup_rows = 0
             usable_rows = 0
+            usable_dates = pd.Series(dtype="datetime64[ns]")
         else:
             warmup = symbol_features["is_warmup"].astype(bool)
             missing_features = symbol_features.loc[:, FEATURE_COLUMNS].isna().any(axis=1)
             warmup_rows = int(warmup.sum())
-            usable_rows = int((~warmup & ~missing_features).sum())
+            post_warmup_rows = int((~warmup).sum())
+            usable_mask = ~warmup & ~missing_features
+            usable_rows = int(usable_mask.sum())
+            usable_dates = pd.to_datetime(
+                symbol_features.loc[usable_mask, "date"], errors="coerce"
+            ).dropna()
+
+        quality_values = quality_by_symbol.get(symbol, {})
+        invalid_rows = int(quality_values.get("invalid_ohlc_rows_removed", 0))
+        pre_feature_rows = int(quality_values.get("usable_pre_feature_rows", 0))
+        retention = float(quality_values.get("quality_retention_percent", 0.0))
+        removal_reason = str(quality_values.get("quality_removal_reason", ""))
 
         security_type = str(registry_row.get("security_type", "unknown"))
         processed_path = Path(processed_symbols_dir) / (
@@ -269,6 +302,10 @@ def build_training_readiness_report(
                 "symbol": symbol,
                 "company_name": str(registry_row.get("company_name", "")),
                 "raw_trading_rows": len(raw),
+                "invalid_ohlc_rows_removed": invalid_rows,
+                "usable_pre_feature_rows": pre_feature_rows,
+                "quality_retention_percent": retention,
+                "quality_removal_reason": removal_reason,
                 "earliest_raw_date": (
                     raw_dates.min().date() if not raw_dates.empty else None
                 ),
@@ -276,7 +313,14 @@ def build_training_readiness_report(
                     raw_dates.max().date() if not raw_dates.empty else None
                 ),
                 "warmup_rows_removed": warmup_rows,
+                "post_warmup_rows": post_warmup_rows,
                 "usable_feature_rows": usable_rows,
+                "first_usable_date": (
+                    usable_dates.min().date() if not usable_dates.empty else None
+                ),
+                "last_usable_date": (
+                    usable_dates.max().date() if not usable_dates.empty else None
+                ),
                 "minimum_usable_rows": minimum_usable_rows,
                 "additional_rows_required": additional_required_rows(
                     usable_rows,

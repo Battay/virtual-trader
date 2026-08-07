@@ -489,8 +489,23 @@ symbol_display = pd.DataFrame(
         "Data Start": visible_status["data_start"].map(format_date),
         "Data End": visible_status["data_end"].map(format_date),
         "Raw Rows": visible_status["raw_trading_rows"].map(format_integer),
+        "Invalid OHLC Rows Removed": visible_status[
+            "invalid_ohlc_rows_removed"
+        ].map(format_integer),
+        "Valid Rows Before Features": visible_status[
+            "usable_pre_feature_rows"
+        ].map(format_integer),
+        "Quality Retention": visible_status["quality_retention_percent"].map(
+            lambda value: f"{float(value):.2f}%" if pd.notna(value) else "—"
+        ),
+        "Quality Note": visible_status["quality_removal_reason"].map(
+            lambda value: "Invalid OHLC rows removed" if value else "No removals"
+        ),
         "Warm-up Rows": visible_status["warmup_rows_removed"].map(format_integer),
+        "Rows After Warm-up": visible_status["post_warmup_rows"].map(format_integer),
         "Usable Rows": visible_status["usable_rows"].map(format_integer),
+        "First Usable Date": visible_status["first_usable_date"].map(format_date),
+        "Last Usable Date": visible_status["last_usable_date"].map(format_date),
         "Additional Rows": visible_status["additional_rows_required"].map(
             format_integer
         ),

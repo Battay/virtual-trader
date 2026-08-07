@@ -20,7 +20,7 @@ def test_post_backfill_products_run_in_required_order() -> None:
 
     def master_ai_builder():
         calls.append("master_ai")
-        return SimpleNamespace(output_rows=800)
+        return SimpleNamespace(output_rows=800, invalid_ohlc_rows_removed=17)
 
     def symbol_ai_builder(*, minimum_usable_rows: int):
         calls.append("symbol_ai")
@@ -63,6 +63,7 @@ def test_post_backfill_products_run_in_required_order() -> None:
     assert result.symbols_ready_for_training == 2
     assert result.insufficient_history_symbols == 1
     assert result.split_sets == 13
+    assert result.invalid_ohlc_rows_removed == 17
     assert result.errors == ()
 
 

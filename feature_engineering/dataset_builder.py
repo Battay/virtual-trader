@@ -24,6 +24,7 @@ from .preprocessing import (
     DataQualityError,
     attach_registry_metadata,
     fatal_quality_errors_by_symbol,
+    filter_ai_quality_rows,
     validate_required_market_columns,
 )
 from .schemas import (
@@ -57,7 +58,7 @@ def _prepare_feature_rows(
     *,
     index_data: pd.DataFrame | None = None,
     max_market_forward_fill_days: int = 0,
-) -> tuple[pd.DataFrame, dict[str, tuple[str, ...]]]:
+) -> tuple[pd.DataFrame, dict[str, tuple[str, ...]], pd.DataFrame]:
     validate_required_market_columns(market_data)
     quality_errors = fatal_quality_errors_by_symbol(market_data)
     fatal_symbols = set(quality_errors).difference({"<missing>"})
@@ -66,19 +67,23 @@ def _prepare_feature_rows(
     clean = clean.loc[
         clean["symbol"].notna()
         & (clean["symbol"] != "")
-        & ~clean["symbol"].isin(fatal_symbols)
     ]
-    featured = attach_registry_metadata(calculate_features(clean), registry)
+    quality = filter_ai_quality_rows(clean)
+    feature_source = quality.data.loc[~quality.data["symbol"].isin(fatal_symbols)]
+    featured = attach_registry_metadata(calculate_features(feature_source), registry)
     context_in = (
         build_index_context(index_data)
         if index_data is not None and not index_data.empty
         else pd.DataFrame()
     )
-    return join_market_context(
+    joined = join_market_context(
         featured,
         context_in,
         max_forward_fill_days=max_market_forward_fill_days,
-    ), quality_errors
+    )
+    if joined.duplicated(["symbol", "date"]).any():
+        raise DataQualityError("AI feature rows contain duplicate (symbol, date) keys")
+    return joined, quality_errors, quality.metadata
 
 
 def _usable_rows(featured: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
@@ -103,6 +108,7 @@ def _metrics(
     missing_rows: int,
     output_paths: Sequence[Path],
     market_context_included: bool = False,
+    invalid_ohlc_rows_removed: int = 0,
 ) -> DatasetBuildMetrics:
     dates = pd.to_datetime(output.get("date"), errors="coerce").dropna()
     return DatasetBuildMetrics(
@@ -117,6 +123,7 @@ def _metrics(
         feature_version=FEATURE_VERSION,
         output_paths=tuple(Path(path) for path in output_paths),
         market_context_included=market_context_included,
+        invalid_ohlc_rows_removed=invalid_ohlc_rows_removed,
     )
 
 
@@ -152,7 +159,7 @@ def build_symbol_datasets(
     if index_data is None and include_market_context and INDICES_MASTER_PATH.exists():
         index_data = pd.read_csv(INDICES_MASTER_PATH)
     context_included = bool(index_data is not None and not index_data.empty)
-    featured, quality_errors = _prepare_feature_rows(
+    featured, quality_errors, quality_metadata = _prepare_feature_rows(
         source, registry, index_data=index_data if include_market_context else None,
         max_market_forward_fill_days=max_market_forward_fill_days,
     )
@@ -197,6 +204,9 @@ def build_symbol_datasets(
         missing_rows=missing_rows,
         output_paths=output_paths,
         market_context_included=context_included,
+        invalid_ohlc_rows_removed=int(
+            quality_metadata["invalid_ohlc_rows_removed"].sum()
+        ),
     )
 
 
@@ -219,7 +229,7 @@ def build_master_ai_dataset(
     if index_data is None and include_market_context and INDICES_MASTER_PATH.exists():
         index_data = pd.read_csv(INDICES_MASTER_PATH)
     context_included = bool(index_data is not None and not index_data.empty)
-    featured, quality_errors = _prepare_feature_rows(
+    featured, quality_errors, quality_metadata = _prepare_feature_rows(
         market_data, registry, index_data=index_data if include_market_context else None,
         max_market_forward_fill_days=max_market_forward_fill_days,
     )
@@ -237,6 +247,8 @@ def build_master_ai_dataset(
     output = usable.sort_values(["date", "symbol"], kind="stable").reset_index(
         drop=True
     )
+    if output.duplicated(["symbol", "date"]).any():
+        raise DataQualityError("Master AI dataset contains duplicate (symbol, date) keys")
     atomic_write_dataframe(output, Path(output_path))
     return _metrics(
         input_rows=len(market_data),
@@ -246,6 +258,9 @@ def build_master_ai_dataset(
         missing_rows=missing_rows,
         output_paths=(Path(output_path),),
         market_context_included=context_included,
+        invalid_ohlc_rows_removed=int(
+            quality_metadata["invalid_ohlc_rows_removed"].sum()
+        ),
     )
 
 
