@@ -5,4 +5,5 @@ numpy
 pandas
 requests
 scikit-learn
+stable-baselines3==2.9.0
 streamlit
