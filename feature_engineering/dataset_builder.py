@@ -17,7 +17,7 @@ from data_pipeline.src.config import (
     PROCESSED_SYMBOLS_DIR,
     INDICES_MASTER_PATH,
 )
-from market_intelligence.feature_joiner import join_market_context
+from market_intelligence.feature_joiner import build_index_context, join_market_context
 
 from .indicators import calculate_features
 from .preprocessing import (
@@ -69,7 +69,11 @@ def _prepare_feature_rows(
         & ~clean["symbol"].isin(fatal_symbols)
     ]
     featured = attach_registry_metadata(calculate_features(clean), registry)
-    context_in = index_data if index_data is not None else pd.DataFrame()
+    context_in = (
+        build_index_context(index_data)
+        if index_data is not None and not index_data.empty
+        else pd.DataFrame()
+    )
     return join_market_context(
         featured,
         context_in,

@@ -119,6 +119,32 @@ def test_master_dataset_includes_active_and_historical_but_excludes_unknown(
     assert not output.loc[output["symbol"] == "HIST", "is_active"].any()
 
 
+def test_long_form_index_context_does_not_multiply_master_equity_rows(
+    tmp_path: Path,
+) -> None:
+    dates = pd.date_range("2025-01-01", periods=70)
+    indices = pd.DataFrame(
+        [
+            {"index_code": code, "date": trading_date, "value": value + offset}
+            for value, trading_date in enumerate(dates, start=100)
+            for offset, code in enumerate(("KSE100", "KSE30", "KMI30", "ALLSHR"))
+        ]
+    )
+    path = tmp_path / "psx_ai_master.csv"
+
+    metrics = build_master_ai_dataset(
+        market_data=_all_market(),
+        registry=_registry(),
+        index_data=indices,
+        output_path=path,
+    )
+    output = pd.read_csv(path, dtype={"symbol": "string"})
+
+    assert metrics.output_rows == 42
+    assert not output.duplicated(["symbol", "date"]).any()
+    assert output["kse100_value"].notna().all()
+
+
 def test_insufficient_history_is_skipped_without_fake_symbol_files(
     tmp_path: Path,
 ) -> None:

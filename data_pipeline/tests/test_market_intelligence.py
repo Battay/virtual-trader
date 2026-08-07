@@ -86,6 +86,47 @@ def test_metrics_breadth_health_and_feature_join_are_leakage_safe():
     assert joined.loc[1, "kse100_value"] == 103
 
 
+def test_index_context_pivots_legitimate_index_rows_without_duplicate_dates():
+    dates = pd.date_range("2025-01-01", periods=3)
+    indices = pd.DataFrame(
+        [
+            {"index_code": code, "date": trading_date, "value": value + offset}
+            for value, trading_date in enumerate(dates, start=100)
+            for offset, code in enumerate(("KSE100", "KSE30", "KMI30", "ALLSHR"))
+        ]
+    )
+
+    context = build_index_context(indices)
+
+    assert len(context) == len(dates)
+    assert context["date"].is_unique
+    assert context.loc[0, "kse100_value"] == 100
+    assert context.loc[0, "allshr_value"] == 103
+
+
+def test_index_context_rejects_duplicate_index_date_keys_with_diagnostics():
+    duplicate = pd.DataFrame(
+        {
+            "index_code": ["KSE100", "KSE100"],
+            "date": ["2025-01-02", "2025-01-02"],
+            "value": [100.0, 101.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match=r"KSE100@2025-01-02"):
+        build_index_context(duplicate)
+
+
+def test_market_context_join_rejects_duplicate_right_dates_before_merge():
+    equities = pd.DataFrame({"symbol": ["A"], "date": ["2025-01-02"]})
+    duplicate_context = pd.DataFrame(
+        {"date": ["2025-01-02", "2025-01-02"], "kse100_value": [100, 101]}
+    )
+
+    with pytest.raises(ValueError, match=r"one right-side row per date.*2025-01-02"):
+        join_market_context(equities, duplicate_context)
+
+
 def test_refresh_continues_after_partial_failure_and_preserves_cache(tmp_path: Path, monkeypatch):
     class Client:
         def fetch_index_series(self, code):

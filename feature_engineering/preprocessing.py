@@ -215,14 +215,13 @@ def fit_training_scaler(
             raise DataQualityError(f"{label} features contain missing or non-finite values")
 
     scaler = StandardScaler()
-    scaled_train = train.copy()
-    scaled_validation = validation.copy()
-    scaled_test = test.copy()
-    scaled_train.loc[:, columns] = scaler.fit_transform(train.loc[:, columns])
-    scaled_validation.loc[:, columns] = scaler.transform(
-        validation.loc[:, columns]
-    )
-    scaled_test.loc[:, columns] = scaler.transform(test.loc[:, columns])
+    float_dtypes = {column: "float64" for column in columns}
+    scaled_train = train.copy().astype(float_dtypes)
+    scaled_validation = validation.copy().astype(float_dtypes)
+    scaled_test = test.copy().astype(float_dtypes)
+    scaled_train[list(columns)] = scaler.fit_transform(train.loc[:, columns])
+    scaled_validation[list(columns)] = scaler.transform(validation.loc[:, columns])
+    scaled_test[list(columns)] = scaler.transform(test.loc[:, columns])
     return ScalingResult(
         train=scaled_train,
         validation=scaled_validation,

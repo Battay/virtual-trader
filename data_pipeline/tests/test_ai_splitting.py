@@ -88,6 +88,31 @@ def test_scaler_is_fit_only_on_training_rows_and_identity_is_not_scaled() -> Non
     assert result.validation["date"].tolist() == [3]
 
 
+def test_scaler_promotes_only_scaled_integer_features_to_float() -> None:
+    train = pd.DataFrame(
+        {"symbol": ["MCB", "MCB"], "date": [1, 2], "volume": [100, 300], "is_active": [1, 1]}
+    )
+    validation = pd.DataFrame(
+        {"symbol": ["MCB"], "date": [3], "volume": [500], "is_active": [1]}
+    )
+    test = pd.DataFrame(
+        {"symbol": ["MCB"], "date": [4], "volume": [700], "is_active": [1]}
+    )
+
+    result = fit_training_scaler(
+        train,
+        validation,
+        test,
+        feature_columns=("volume",),
+    )
+
+    assert pd.api.types.is_float_dtype(result.train["volume"])
+    assert result.validation["volume"].iloc[0] == 3.0
+    assert result.test["volume"].iloc[0] == 5.0
+    assert result.train["is_active"].dtype == train["is_active"].dtype
+    assert train["volume"].dtype == "int64"
+
+
 def test_split_artifacts_include_atomic_metadata_and_scaler(tmp_path: Path) -> None:
     split = chronological_split(_processed(("MCB",), dates=20), scope="symbol")
 
