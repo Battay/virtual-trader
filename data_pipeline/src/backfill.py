@@ -497,7 +497,10 @@ def create_backfill_plan(
         if trading_date >= current_date:
             unresolved.add(trading_date)
             continue
-        if retry_temporary_only and trading_date not in temporary:
+        if retry_temporary_only:
+            if trading_date not in temporary:
+                continue
+        elif trading_date in temporary:
             continue
         if trading_date in known_non_trading:
             continue
@@ -723,7 +726,7 @@ def _collect_with_empty_retries(
     jitter_fn: Callable[[float, float], float],
     sleep_fn: Callable[[float], None],
     attempt_html_dir: Path,
-) -> tuple[BackfillDateResult, bool]:
+) -> BackfillDateResult:
     """Retry an empty weekday with a fresh production client per attempt."""
     if max_attempts < 1:
         raise ValueError("empty response max attempts must be at least 1")
@@ -733,7 +736,6 @@ def _collect_with_empty_retries(
         raise ValueError("retry jitter seconds cannot be negative")
 
     attempts: list[BackfillAttemptRecord] = []
-    first_attempt_empty = False
     final_outcome: BackfillDateResult | None = None
     for attempt_number in range(1, max_attempts + 1):
         attempt_client = (
@@ -786,8 +788,6 @@ def _collect_with_empty_retries(
             and matching is not None
             and matching.status == "skipped"
         )
-        if attempt_number == 1:
-            first_attempt_empty = empty_weekday
         if not empty_weekday or attempt_number >= max_attempts:
             break
         delay_index = min(attempt_number - 1, len(retry_delays) - 1)
@@ -809,7 +809,7 @@ def _collect_with_empty_retries(
                 "weekday responses contained no equity rows; eligible for retry"
             ),
         )
-    return final_outcome, first_attempt_empty
+    return final_outcome
 
 
 def _short_reason(exc: BaseException) -> str:
@@ -957,7 +957,7 @@ def run_backfill(
     interrupted = False
     stopped = False
     circuit_breaker_triggered = False
-    first_attempt_empty_window: list[bool] = []
+    final_unhealthy_window: list[bool] = []
     raw_attempt_directory = Path(attempt_html_dir or main_pipeline.RAW_HTML_DIR)
 
     for index, trading_date in enumerate(scheduled):
@@ -965,7 +965,6 @@ def run_backfill(
             stopped = True
             break
         attempted.append(trading_date)
-        first_attempt_empty = False
         try:
             expected_path = Path(csv_dir) / f"market_{trading_date.isoformat()}.csv"
             if daily_csv_validator(expected_path, trading_date):
@@ -1000,7 +999,7 @@ def run_backfill(
                         valid_rows=valid_rows,
                     )
             else:
-                outcome, first_attempt_empty = _collect_with_empty_retries(
+                outcome = _collect_with_empty_retries(
                     trading_date,
                     client=client,
                     client_factory=client_factory,
@@ -1057,11 +1056,13 @@ def run_backfill(
                 write_backfill_state(state, state_path)
                 break
         if trading_date.weekday() < 5:
-            first_attempt_empty_window.append(first_attempt_empty)
-            first_attempt_empty_window = first_attempt_empty_window[-circuit_window:]
+            final_unhealthy_window.append(
+                outcome.status in {"temporary_unavailable", "failed"}
+            )
+            final_unhealthy_window = final_unhealthy_window[-circuit_window:]
             if (
-                len(first_attempt_empty_window) == circuit_window
-                and sum(first_attempt_empty_window) / circuit_window
+                len(final_unhealthy_window) == circuit_window
+                and sum(final_unhealthy_window) / circuit_window
                 >= circuit_empty_ratio
             ):
                 circuit_breaker_triggered = True

@@ -641,9 +641,76 @@ def test_every_empty_weekday_remains_retryable(
     )
 
     assert first_recent.count("temporary_unavailable") == 1
-    assert second_recent.attempted_dates == (recent,)
+    assert second_recent.attempted_dates == ()
     assert first_old.count("temporary_unavailable") == 1
-    assert second_old.attempted_dates == (old,)
+    assert second_old.attempted_dates == ()
+
+
+def test_normal_resume_skips_temporary_dates_without_consuming_batch_limit(
+    tmp_path: Path,
+) -> None:
+    existing_date = date(2016, 9, 9)
+    temporary_dates = (
+        date(2016, 9, 12),
+        date(2016, 9, 13),
+        date(2016, 9, 14),
+    )
+    pending_dates = (date(2016, 9, 15), date(2016, 9, 16))
+    preserved_failed = date(2016, 9, 19)
+    end_date = preserved_failed
+    csv_dir = tmp_path / "csv"
+    _write_daily_csv(csv_dir, existing_date)
+    state_path = tmp_path / "state.json"
+    original = BackfillState(
+        requested_start_date=existing_date,
+        requested_end_date=end_date,
+        successful_dates=(existing_date,),
+        temporary_skips=tuple(
+            (value, "exhausted empty weekday retries")
+            for value in temporary_dates
+        ),
+        failed_dates=((preserved_failed, "network unavailable"),),
+        already_downloaded_dates=(date(2016, 9, 8),),
+        non_trading_dates=(date(2016, 9, 10),),
+    )
+    write_backfill_state(original, state_path)
+
+    preview = create_backfill_plan(
+        existing_date,
+        end_date,
+        state=original,
+        csv_dir=csv_dir,
+        delay_seconds=0,
+        today=date(2026, 8, 1),
+    )
+    calls: list[date] = []
+    result = run_backfill(
+        existing_date,
+        end_date,
+        resume=True,
+        max_dates=2,
+        csv_dir=csv_dir,
+        state_path=state_path,
+        client=object(),
+        date_processor=_success_processor(csv_dir, calls),
+        delay_seconds=0,
+        today=date(2026, 8, 1),
+        clock=FIXED_CLOCK,
+    )
+
+    assert preview.dates_requiring_requests == pending_dates
+    assert preview.estimated_request_count == 2
+    assert preview.unresolved_skipped_dates == temporary_dates
+    assert calls == list(pending_dates)
+    assert result.attempted_dates == pending_dates
+    assert result.state is not None
+    assert result.state.temporary_skips == original.temporary_skips
+    assert result.state.failed_dates == original.failed_dates
+    assert set(original.successful_dates).issubset(result.state.successful_dates)
+    assert set(original.already_downloaded_dates).issubset(
+        result.state.already_downloaded_dates
+    )
+    assert set(original.non_trading_dates).issubset(result.state.non_trading_dates)
 
 
 def test_today_and_future_dates_are_temporary_without_live_requests(
@@ -1043,6 +1110,74 @@ def test_circuit_breaker_pauses_before_consuming_remaining_dates(
     assert date(2026, 7, 20) not in calls
     assert date(2026, 7, 21) not in calls
     assert result.state.successful_dates == tuple(sorted(successful))
+
+
+def test_recovered_empty_first_attempts_do_not_pause_25_date_batch(
+    tmp_path: Path,
+) -> None:
+    start_date = date(2016, 10, 3)
+    weekdays = tuple(
+        value
+        for value in iter_calendar_dates(start_date, date(2016, 11, 4))
+        if value.weekday() < 5
+    )
+    assert len(weekdays) == 25
+    csv_dir = tmp_path / "csv"
+    client_count = 0
+
+    class AlternatingClient:
+        def __init__(self, response_size: int) -> None:
+            self.response_size = response_size
+
+        def fetch_market_by_date(self, requested: date) -> str:
+            return "x" * self.response_size
+
+    def client_factory() -> AlternatingClient:
+        nonlocal client_count
+        client_count += 1
+        response_size = 903 if client_count % 2 else 350_000
+        return AlternatingClient(response_size)
+
+    def recovered_processor(
+        trading_date: date,
+        client: Any,
+    ) -> DateProcessingResult:
+        html = client.fetch_market_by_date(trading_date)
+        if len(html.encode("utf-8")) == 903:
+            return DateProcessingResult(trading_date, "skipped", 0, 0, 0, None)
+        path = _write_daily_csv(csv_dir, trading_date)
+        return DateProcessingResult(trading_date, "successful", 500, 500, 0, path)
+
+    result = run_backfill(
+        start_date,
+        weekdays[-1],
+        max_dates=25,
+        csv_dir=csv_dir,
+        state_path=tmp_path / "state.json",
+        client_factory=client_factory,
+        date_processor=recovered_processor,
+        empty_max_attempts=2,
+        empty_retry_delays=(0,),
+        retry_jitter_seconds=0,
+        attempt_html_dir=tmp_path / "html",
+        delay_seconds=0,
+        circuit_window=10,
+        circuit_empty_ratio=0.70,
+        today=date(2026, 8, 1),
+        clock=FIXED_CLOCK,
+    )
+
+    assert result.attempted_dates == weekdays
+    assert len(result.attempted_dates) == 25
+    assert all(outcome.status == "successful" for outcome in result.outcomes)
+    assert all(outcome.attempt_count == 2 for outcome in result.outcomes)
+    assert all(
+        outcome.response_sizes == (903, 350_000)
+        for outcome in result.outcomes
+    )
+    assert not result.circuit_breaker_triggered
+    assert result.pause_reason == ""
+    assert result.state is not None and result.state.status == "completed"
 
 
 def test_retry_temporary_only_processes_no_other_weekdays(tmp_path: Path) -> None:
