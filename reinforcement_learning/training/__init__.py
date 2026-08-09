@@ -8,7 +8,7 @@ from .devices import (
     TorchDeviceResolution,
     resolve_torch_device,
 )
-from .results import PPOTrainingResult
+from .results import PPOTrainingDiagnostics, PPOTrainingResult
 
 
 def __getattr__(name: str):
@@ -36,6 +36,7 @@ def __getattr__(name: str):
 __all__ = (
     "PPO_CONFIG_VERSION",
     "PPOConfig",
+    "PPOTrainingDiagnostics",
     "PPOTrainingResult",
     "PPOTrainerError",
     "ProgressHandler",

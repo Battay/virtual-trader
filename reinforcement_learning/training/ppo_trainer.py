@@ -46,7 +46,7 @@ from .devices import (
     synchronize_torch_device,
     verify_sb3_model_device,
 )
-from .results import PPOTrainingResult
+from .results import PPOTrainingDiagnostics, PPOTrainingResult
 
 
 LOGGER = logging.getLogger(__name__)
@@ -158,6 +158,7 @@ def train_single_symbol(
     resolved_output: Path | None = None
     device_resolution: TorchDeviceResolution | None = None
     actual_device: str | None = None
+    training_diagnostics: PPOTrainingDiagnostics | None = None
 
     def finish(
         status: str,
@@ -212,6 +213,9 @@ def train_single_symbol(
             error=error,
             output_directory=str(resolved_output) if resolved_output else None,
             model=trained_model,
+            training_diagnostics=(
+                training_diagnostics if status == "completed" else None
+            ),
         )
 
     try:
@@ -364,6 +368,14 @@ def train_single_symbol(
             return finish(
                 "interrupted",
                 message="Training was cancelled by the progress callback; no model was saved.",
+            )
+
+        training_diagnostics = callback.training_diagnostics
+        if training_diagnostics is not None:
+            LOGGER.info(
+                "ppo_training_diagnostics symbol=%s diagnostics=%s",
+                symbol_text,
+                json.dumps(training_diagnostics.to_dict(), sort_keys=True),
             )
 
         LOGGER.info(

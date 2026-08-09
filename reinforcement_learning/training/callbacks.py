@@ -9,6 +9,8 @@ import logging
 
 from stable_baselines3.common.callbacks import BaseCallback
 
+from .results import PPOTrainingDiagnostics
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class PPOProgressCallback(BaseCallback):
         self.interval_steps = max(1, interval_steps)
         self.handler = handler
         self.cancel_requested = False
+        self.training_diagnostics: PPOTrainingDiagnostics | None = None
         self._next_event = self.interval_steps
 
     def _event(self, phase: str) -> TrainingProgress:
@@ -85,4 +88,13 @@ class PPOProgressCallback(BaseCallback):
         return not self.cancel_requested
 
     def _on_training_end(self) -> None:
+        if not self.cancel_requested:
+            logger = getattr(self.model, "logger", None)
+            values = getattr(logger, "name_to_value", None)
+            self.training_diagnostics = (
+                PPOTrainingDiagnostics.from_sb3_logger_values(
+                    values,
+                    timesteps=int(self.num_timesteps),
+                )
+            )
         self._emit("interrupted" if self.cancel_requested else "completed")

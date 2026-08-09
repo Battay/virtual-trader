@@ -1,6 +1,7 @@
 beautifulsoup4
 gymnasium>=1.0,<2.0
 jupyterlab
+matplotlib>=3.8,<4.0
 numpy
 pandas
 requests

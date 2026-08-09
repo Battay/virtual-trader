@@ -42,6 +42,7 @@ from reinforcement_learning.training.ppo_trainer import (
     create_training_vector_environment,
     train_single_symbol,
 )
+from reinforcement_learning.training.results import PPOTrainingDiagnostics
 
 
 def _processed(rows: int = 30, symbol: str = "MCB") -> pd.DataFrame:
@@ -85,6 +86,50 @@ def _tiny_config(**overrides) -> PPOConfig:
         n_epochs=1,
         total_timesteps=16,
         **overrides,
+    )
+
+
+def test_training_diagnostics_copy_only_finite_whitelisted_sb3_values() -> None:
+    diagnostics = PPOTrainingDiagnostics.from_sb3_logger_values(
+        {
+            "train/approx_kl": np.float32(0.0125),
+            "train/clip_fraction": np.float64(0.25),
+            "train/entropy_loss": np.float64(-1.05),
+            "train/explained_variance": np.float64(0.4),
+            "train/policy_gradient_loss": np.float64(-0.02),
+            "train/value_loss": np.nan,
+            "train/learning_rate": np.float64(3e-4),
+            "train/n_updates": np.int64(20),
+            "train/unrelated_internal_value": 999,
+        },
+        timesteps=1_024,
+    )
+
+    assert diagnostics.to_dict() == {
+        "timesteps": 1_024,
+        "updates": 20,
+        "approximate_kl": pytest.approx(0.0125),
+        "clip_fraction": pytest.approx(0.25),
+        "entropy_loss": pytest.approx(-1.05),
+        "explained_variance": pytest.approx(0.4),
+        "policy_gradient_loss": pytest.approx(-0.02),
+        "value_loss": None,
+        "learning_rate": pytest.approx(3e-4),
+    }
+
+
+def test_training_diagnostics_do_not_fabricate_unavailable_values() -> None:
+    diagnostics = PPOTrainingDiagnostics.from_sb3_logger_values(
+        None,
+        timesteps=512,
+    )
+
+    assert diagnostics.timesteps == 512
+    assert diagnostics.updates is None
+    assert all(
+        value is None
+        for name, value in diagnostics.to_dict().items()
+        if name != "timesteps"
     )
 
 
@@ -353,11 +398,24 @@ def test_real_tiny_ppo_uses_canonical_train_partition_and_returns_result(
     assert result.duration_seconds >= 0
     assert result.model is not None
     assert result.model.seed == 7
+    assert result.training_diagnostics is not None
+    diagnostics = result.training_diagnostics
+    assert diagnostics.timesteps == result.actual_timesteps
+    assert diagnostics.updates == 2
+    assert diagnostics.learning_rate == pytest.approx(config.learning_rate)
+    assert diagnostics.approximate_kl is not None
+    assert diagnostics.clip_fraction is not None
+    assert 0.0 <= diagnostics.clip_fraction <= 1.0
+    assert diagnostics.entropy_loss is not None
+    assert diagnostics.explained_variance is not None
+    assert diagnostics.policy_gradient_loss is not None
+    assert diagnostics.value_loss is not None
     serialized = result.to_dict()
     assert "model" not in serialized
     assert serialized["requested_device"] == "cpu"
     assert serialized["resolved_device"] == "cpu"
     assert serialized["device"] == "cpu"
+    assert serialized["training_diagnostics"] == diagnostics.to_dict()
     assert loader_calls == [("MCB", "train", splits_dir)]
     assert save_calls == []
     assert sentinel.read_bytes() == b"do not overwrite"
@@ -625,6 +683,7 @@ def test_interruption_and_failure_never_write_models_or_registry(
 
     assert result.status == expected_status
     assert result.model is None
+    assert result.training_diagnostics is None
     assert Path(MODEL_REGISTRY_PATH).read_bytes() == registry_before
     assert _hash_files(Path(SAVED_MODELS_DIR)) == models_before
 
@@ -646,6 +705,7 @@ def test_callback_cancellation_is_interrupted_without_a_model(rl_splits) -> None
     )
     assert result.status == "interrupted"
     assert result.model is None
+    assert result.training_diagnostics is None
     assert any(event.phase == "progress" for event in events)
 
 
