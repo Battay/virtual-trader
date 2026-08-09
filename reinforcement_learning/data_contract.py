@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 import json
 from pathlib import Path
-from typing import Mapping
 
+import joblib
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from data_pipeline.src.config import PROCESSED_SPLITS_DIR
 from feature_engineering.preprocessing import fit_training_scaler, save_scaler_artifact
+from feature_engineering.schemas import FEATURE_VERSION
 from feature_engineering.storage import atomic_write_dataframe, atomic_write_json, safe_path_component
 
 from .environments.config import (
@@ -53,6 +57,34 @@ class LoadedRLPartition:
     data: pd.DataFrame
     artifact_path: Path
     contract: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class RLPartitionMetadata:
+    """Validated, metadata-only bounds for one canonical RL partition."""
+
+    name: str
+    rows: int
+    start: str
+    end: str
+
+
+@dataclass(frozen=True)
+class RLContractMetadata:
+    """Validated RL contract metadata without loading any partition rows."""
+
+    symbol: str
+    contract_path: Path
+    rl_contract_version: str
+    environment_version: str
+    feature_version: str
+    observation_features: tuple[str, ...]
+    dynamic_portfolio_features: tuple[str, ...]
+    observation_shape: tuple[int, ...]
+    scaler_fit_partition: str
+    train: RLPartitionMetadata
+    validation: RLPartitionMetadata
+    test: RLPartitionMetadata
 
 
 def scaled_observation_column(feature: str) -> str:
@@ -217,11 +249,311 @@ def _load_contract(path: Path) -> dict[str, object]:
         )
     if tuple(payload.get("observation_features", ())) != DEFAULT_OBSERVATION_FEATURES:
         raise RLDataContractError("RL artifact observation feature order is incompatible")
+    if tuple(payload.get("dynamic_portfolio_features", ())) != DYNAMIC_PORTFOLIO_FEATURES:
+        raise RLDataContractError(
+            "RL artifact dynamic portfolio feature order is incompatible"
+        )
+    if tuple(payload.get("identity_time_columns", ())) != IDENTITY_TIME_COLUMNS:
+        raise RLDataContractError("RL artifact identity/time schema is incompatible")
+    if tuple(payload.get("execution_accounting_columns", ())) != EXECUTION_ACCOUNTING_COLUMNS:
+        raise RLDataContractError(
+            "RL artifact execution/accounting schema is incompatible"
+        )
+    scaled_mapping = payload.get("scaled_observation_columns")
+    expected_scaled_mapping = {
+        feature: scaled_observation_column(feature)
+        for feature in DEFAULT_OBSERVATION_FEATURES
+    }
+    if scaled_mapping != expected_scaled_mapping:
+        raise RLDataContractError(
+            "RL artifact scaled observation column mapping is incompatible"
+        )
     if payload.get("scaler_fit_partition") != "train":
         raise RLDataContractError(
             "RL observation scaler must be fitted on the train partition"
         )
+    feature_version = payload.get("feature_version")
+    if not isinstance(feature_version, str) or not feature_version.strip():
+        raise RLDataContractError("RL artifact feature version is missing")
+    if feature_version != FEATURE_VERSION:
+        raise RLDataContractError(
+            "RL artifact feature version is stale. Rebuild chronological "
+            "split/scaler artifacts."
+        )
     return payload
+
+
+def _validated_rows(value: object, *, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise RLDataContractError(f"{label} row count must be a positive integer")
+    return value
+
+
+def _validated_iso_date(value: object, *, label: str) -> tuple[str, date]:
+    if not isinstance(value, str):
+        raise RLDataContractError(f"{label} date must be an ISO date string")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise RLDataContractError(f"{label} date is invalid: {value!r}") from exc
+    if parsed.isoformat() != value:
+        raise RLDataContractError(f"{label} date must use YYYY-MM-DD format")
+    return value, parsed
+
+
+def _validated_partition_metadata(
+    *,
+    symbol: str,
+    contract_name: str,
+    split_name: str,
+    contract_partitions: Mapping[str, object],
+    split_metadata: Mapping[str, object],
+) -> tuple[RLPartitionMetadata, date, date]:
+    contract_value = contract_partitions.get(contract_name)
+    if not isinstance(contract_value, Mapping):
+        raise RLDataContractError(
+            f"RL contract has no {contract_name!r} partition"
+        )
+    split_value = split_metadata.get(split_name)
+    if not isinstance(split_value, Mapping):
+        raise RLDataContractError(
+            f"Split metadata has no {split_name!r} partition"
+        )
+
+    contract_rows = _validated_rows(
+        contract_value.get("rows"), label=f"RL contract {contract_name}"
+    )
+    split_rows = _validated_rows(
+        split_value.get("rows"), label=f"Split metadata {split_name}"
+    )
+    contract_start, contract_start_date = _validated_iso_date(
+        contract_value.get("start"), label=f"RL contract {contract_name} start"
+    )
+    contract_end, contract_end_date = _validated_iso_date(
+        contract_value.get("end"), label=f"RL contract {contract_name} end"
+    )
+    split_start, _ = _validated_iso_date(
+        split_value.get("start"), label=f"Split metadata {split_name} start"
+    )
+    split_end, _ = _validated_iso_date(
+        split_value.get("end"), label=f"Split metadata {split_name} end"
+    )
+    if contract_start_date > contract_end_date:
+        raise RLDataContractError(
+            f"RL contract {contract_name} partition date range is reversed"
+        )
+    if (contract_rows, contract_start, contract_end) != (
+        split_rows,
+        split_start,
+        split_end,
+    ):
+        raise RLDataContractError(
+            f"RL contract and split metadata differ for {contract_name!r} partition"
+        )
+
+    symbols = split_value.get("symbols")
+    if (
+        not isinstance(symbols, Sequence)
+        or isinstance(symbols, (str, bytes))
+        or tuple(str(value) for value in symbols) != (symbol,)
+    ):
+        raise RLDataContractError(
+            f"Split metadata {split_name!r} symbols do not match {symbol!r}"
+        )
+    path_value = contract_value.get("path")
+    if not isinstance(path_value, str) or Path(path_value).name != f"{contract_name}_rl.csv":
+        raise RLDataContractError(
+            f"RL contract {contract_name!r} partition path is incompatible"
+        )
+    return (
+        RLPartitionMetadata(
+            name=contract_name,
+            rows=contract_rows,
+            start=contract_start,
+            end=contract_end,
+        ),
+        contract_start_date,
+        contract_end_date,
+    )
+
+
+def _validated_numeric_vector(
+    value: object,
+    *,
+    label: str,
+    expected_length: int,
+    positive: bool = False,
+) -> None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise RLDataContractError(f"{label} must be a numeric array")
+    try:
+        numeric = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise RLDataContractError(f"{label} must be a numeric array") from exc
+    if numeric.shape != (expected_length,) or not np.isfinite(numeric).all():
+        raise RLDataContractError(
+            f"{label} must contain {expected_length} finite values"
+        )
+    if positive and (numeric <= 0).any():
+        raise RLDataContractError(f"{label} values must be positive")
+
+
+def _load_validated_contract_metadata(
+    symbol: str,
+    *,
+    splits_dir: Path,
+) -> tuple[RLContractMetadata, dict[str, object]]:
+    symbol_text = str(symbol).strip()
+    if not symbol_text:
+        raise RLDataContractError("symbol is required to load an RL contract")
+    directory = Path(splits_dir) / "symbols" / safe_path_component(symbol_text)
+    contract_path = directory / RL_CONTRACT_FILENAME
+    contract = _load_contract(contract_path)
+    split_metadata = _load_json_object(
+        directory / "metadata.json", label="split metadata"
+    )
+    if split_metadata.get("scope") != "symbol":
+        raise RLDataContractError("RL split metadata scope must be 'symbol'")
+    if split_metadata.get("rl_artifact_schema_version") != RL_PARTITION_SCHEMA_VERSION:
+        raise RLDataContractError(
+            "Split metadata has a stale or missing RL artifact schema version. "
+            "Rebuild chronological split/scaler artifacts."
+        )
+    feature_version = str(contract["feature_version"])
+    if split_metadata.get("feature_version") != feature_version:
+        raise RLDataContractError("RL contract and split feature versions differ")
+
+    contract_partitions = contract.get("partitions")
+    if not isinstance(contract_partitions, Mapping):
+        raise RLDataContractError("RL contract partitions metadata is invalid")
+    train, train_start, train_end = _validated_partition_metadata(
+        symbol=symbol_text,
+        contract_name="train",
+        split_name="training",
+        contract_partitions=contract_partitions,
+        split_metadata=split_metadata,
+    )
+    validation, validation_start, validation_end = _validated_partition_metadata(
+        symbol=symbol_text,
+        contract_name="validation",
+        split_name="validation",
+        contract_partitions=contract_partitions,
+        split_metadata=split_metadata,
+    )
+    test, test_start, test_end = _validated_partition_metadata(
+        symbol=symbol_text,
+        contract_name="test",
+        split_name="testing",
+        contract_partitions=contract_partitions,
+        split_metadata=split_metadata,
+    )
+    if not (train_end < validation_start <= validation_end < test_start <= test_end):
+        raise RLDataContractError(
+            "RL partition metadata is not strictly chronological and non-overlapping"
+        )
+    for partition_name in PARTITION_NAMES:
+        for filename in (f"{partition_name}.csv", f"{partition_name}_rl.csv"):
+            if not (directory / filename).is_file():
+                raise RLDataContractError(
+                    f"RL {partition_name!r} partition artifact is missing: {filename}"
+                )
+
+    scaler_metadata_path = directory / RL_OBSERVATION_SCALER_FILENAME.replace(
+        ".joblib", ".json"
+    )
+    scaler_metadata = _load_json_object(
+        scaler_metadata_path,
+        label="RL observation scaler metadata",
+    )
+    if tuple(scaler_metadata.get("scaled_features", ())) != DEFAULT_OBSERVATION_FEATURES:
+        raise RLDataContractError("RL observation scaler feature order is incompatible")
+    scaler_rows = _validated_rows(
+        scaler_metadata.get("training_rows"),
+        label="RL observation scaler training",
+    )
+    if scaler_rows != train.rows:
+        raise RLDataContractError("RL observation scaler training row count is stale")
+    _validated_numeric_vector(
+        scaler_metadata.get("training_mean"),
+        label="RL observation scaler training mean",
+        expected_length=len(DEFAULT_OBSERVATION_FEATURES),
+    )
+    _validated_numeric_vector(
+        scaler_metadata.get("training_scale"),
+        label="RL observation scaler training scale",
+        expected_length=len(DEFAULT_OBSERVATION_FEATURES),
+        positive=True,
+    )
+    scaler_path = directory / RL_OBSERVATION_SCALER_FILENAME
+    if not scaler_path.is_file():
+        raise RLDataContractError("RL observation scaler artifact is missing")
+    try:
+        scaler = joblib.load(scaler_path)
+    except Exception as exc:
+        raise RLDataContractError(
+            f"RL observation scaler artifact is unreadable: {scaler_path}: {exc}"
+        ) from exc
+    if not isinstance(scaler, StandardScaler):
+        raise RLDataContractError(
+            "RL observation scaler artifact is not a StandardScaler"
+        )
+    if int(getattr(scaler, "n_features_in_", -1)) != len(
+        DEFAULT_OBSERVATION_FEATURES
+    ):
+        raise RLDataContractError(
+            "RL observation scaler artifact feature width is incompatible"
+        )
+    if tuple(str(value) for value in getattr(scaler, "feature_names_in_", ())) != (
+        DEFAULT_OBSERVATION_FEATURES
+    ):
+        raise RLDataContractError(
+            "RL observation scaler artifact feature order is incompatible"
+        )
+    if not np.allclose(
+        np.asarray(scaler.mean_, dtype=float),
+        np.asarray(scaler_metadata["training_mean"], dtype=float),
+    ) or not np.allclose(
+        np.asarray(scaler.scale_, dtype=float),
+        np.asarray(scaler_metadata["training_scale"], dtype=float),
+    ):
+        raise RLDataContractError(
+            "RL observation scaler artifact differs from its metadata"
+        )
+
+    metadata = RLContractMetadata(
+        symbol=symbol_text,
+        contract_path=contract_path.resolve(),
+        rl_contract_version=str(contract["artifact_schema_version"]),
+        environment_version=str(contract["environment_version"]),
+        feature_version=feature_version,
+        observation_features=tuple(
+            str(value) for value in contract["observation_features"]
+        ),
+        dynamic_portfolio_features=tuple(
+            str(value) for value in contract["dynamic_portfolio_features"]
+        ),
+        observation_shape=(
+            len(DEFAULT_OBSERVATION_FEATURES) + len(DYNAMIC_PORTFOLIO_FEATURES),
+        ),
+        scaler_fit_partition=str(contract["scaler_fit_partition"]),
+        train=train,
+        validation=validation,
+        test=test,
+    )
+    return metadata, contract
+
+
+def load_rl_contract_metadata(
+    symbol: str,
+    *,
+    splits_dir: Path = PROCESSED_SPLITS_DIR,
+) -> RLContractMetadata:
+    """Load and validate RL metadata without reading any partition CSV."""
+    metadata, _ = _load_validated_contract_metadata(
+        symbol,
+        splits_dir=Path(splits_dir),
+    )
+    return metadata
 
 
 def load_rl_partition(
@@ -236,42 +568,12 @@ def load_rl_partition(
             f"partition must be one of {', '.join(PARTITION_NAMES)}"
         )
     symbol_text = str(symbol).strip()
-    directory = Path(splits_dir) / "symbols" / safe_path_component(symbol_text)
-    contract = _load_contract(directory / RL_CONTRACT_FILENAME)
-    split_metadata = _load_json_object(
-        directory / "metadata.json", label="split metadata"
+    metadata, contract = _load_validated_contract_metadata(
+        symbol_text,
+        splits_dir=Path(splits_dir),
     )
-    if split_metadata.get("rl_artifact_schema_version") != RL_PARTITION_SCHEMA_VERSION:
-        raise RLDataContractError(
-            "Split metadata has a stale or missing RL artifact schema version. "
-            "Rebuild chronological split/scaler artifacts."
-        )
-    if split_metadata.get("feature_version") != contract.get("feature_version"):
-        raise RLDataContractError("RL contract and split feature versions differ")
-    scaler_metadata = _load_json_object(
-        directory / RL_OBSERVATION_SCALER_FILENAME.replace(".joblib", ".json"),
-        label="RL observation scaler metadata",
-    )
-    if tuple(scaler_metadata.get("scaled_features", ())) != DEFAULT_OBSERVATION_FEATURES:
-        raise RLDataContractError("RL observation scaler feature order is incompatible")
-    if not (directory / RL_OBSERVATION_SCALER_FILENAME).is_file():
-        raise RLDataContractError("RL observation scaler artifact is missing")
-    contract_partitions = dict(contract.get("partitions", {}))
-    partition_metadata = contract_partitions.get(partition)
-    if not isinstance(partition_metadata, dict):
-        raise RLDataContractError(f"RL contract has no {partition!r} partition")
-    train_metadata = contract_partitions.get("train")
-    if not isinstance(train_metadata, dict):
-        raise RLDataContractError("RL contract has no 'train' partition")
-    try:
-        scaler_training_rows = int(scaler_metadata.get("training_rows", -1))
-        contract_training_rows = int(train_metadata.get("rows", -2))
-    except (TypeError, ValueError) as exc:
-        raise RLDataContractError(
-            "RL observation scaler training row metadata is invalid"
-        ) from exc
-    if scaler_training_rows != contract_training_rows:
-        raise RLDataContractError("RL observation scaler training row count is stale")
+    directory = metadata.contract_path.parent
+    partition_metadata = getattr(metadata, partition)
     artifact_path = directory / f"{partition}_rl.csv"
     try:
         artifact = pd.read_csv(artifact_path, dtype={"symbol": "string"})
@@ -282,10 +584,10 @@ def load_rl_partition(
         ) from exc
     artifact = _validate_partition_identity(artifact, label=f"{partition} RL")
     raw = _validate_partition_identity(raw, label=f"{partition} raw")
-    if len(artifact) != int(partition_metadata.get("rows", -1)):
+    if len(artifact) != partition_metadata.rows:
         raise RLDataContractError(f"{partition} RL row count does not match contract")
-    expected_start = str(partition_metadata.get("start"))
-    expected_end = str(partition_metadata.get("end"))
+    expected_start = partition_metadata.start
+    expected_end = partition_metadata.end
     actual_start = artifact["date"].min().date().isoformat()
     actual_end = artifact["date"].max().date().isoformat()
     if (actual_start, actual_end) != (expected_start, expected_end):

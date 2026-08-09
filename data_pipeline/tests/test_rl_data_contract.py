@@ -14,8 +14,10 @@ from reinforcement_learning.data_contract import (
     DEFAULT_OBSERVATION_FEATURES,
     EXECUTION_ACCOUNTING_COLUMNS,
     IDENTITY_TIME_COLUMNS,
+    RLContractMetadata,
     RLDataContractError,
     RL_PARTITION_SCHEMA_VERSION,
+    load_rl_contract_metadata,
     load_rl_partition,
     scaled_observation_column,
 )
@@ -165,3 +167,124 @@ def test_stale_rl_artifact_version_fails_clearly(tmp_path: Path) -> None:
 
     with pytest.raises(RLDataContractError, match="Incompatible RL artifact schema"):
         load_rl_partition("MCB", "train", splits_dir=tmp_path)
+
+
+def test_contract_metadata_includes_sealed_test_bounds_without_reading_csv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    split, result = _persist(tmp_path)
+
+    def unexpected_csv_read(*args: object, **kwargs: object) -> None:
+        raise AssertionError(f"metadata loader attempted CSV read: {args}, {kwargs}")
+
+    monkeypatch.setattr(pd, "read_csv", unexpected_csv_read)
+    metadata = load_rl_contract_metadata("MCB", splits_dir=tmp_path)
+
+    assert isinstance(metadata, RLContractMetadata)
+    assert metadata.symbol == "MCB"
+    assert metadata.contract_path == result.rl_artifacts.contract_path.resolve()
+    assert metadata.rl_contract_version == RL_PARTITION_SCHEMA_VERSION
+    assert metadata.feature_version == FEATURE_VERSION
+    assert metadata.observation_shape == (17,)
+    assert metadata.scaler_fit_partition == "train"
+    for name, source in (
+        ("train", split.train),
+        ("validation", split.validation),
+        ("test", split.test),
+    ):
+        partition = getattr(metadata, name)
+        dates = pd.to_datetime(source["date"])
+        assert partition.name == name
+        assert partition.rows == len(source)
+        assert partition.start == dates.min().date().isoformat()
+        assert partition.end == dates.max().date().isoformat()
+
+
+def test_contract_metadata_rejects_misaligned_split_metadata(tmp_path: Path) -> None:
+    _, result = _persist(tmp_path)
+    metadata_path = result.metadata_path
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["testing"]["rows"] += 1
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(
+        RLDataContractError,
+        match="contract and split metadata differ for 'test'",
+    ):
+        load_rl_contract_metadata("MCB", splits_dir=tmp_path)
+
+
+def test_contract_metadata_rejects_a_missing_train_artifact(tmp_path: Path) -> None:
+    _, result = _persist(tmp_path)
+    result.rl_artifacts.partition_paths["train"].unlink()
+
+    with pytest.raises(
+        RLDataContractError,
+        match="'train' partition artifact is missing: train_rl.csv",
+    ):
+        load_rl_contract_metadata("MCB", splits_dir=tmp_path)
+
+
+def test_contract_metadata_rejects_stale_feature_version(tmp_path: Path) -> None:
+    _, result = _persist(tmp_path)
+    contract_path = result.rl_artifacts.contract_path
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    contract["feature_version"] = "stale_feature_version"
+    contract_path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(RLDataContractError, match="feature version is stale"):
+        load_rl_contract_metadata("MCB", splits_dir=tmp_path)
+
+
+def test_contract_metadata_rejects_corrupt_scaler_artifact(tmp_path: Path) -> None:
+    _, result = _persist(tmp_path)
+    result.rl_artifacts.scaler_path.write_bytes(b"not-a-joblib-artifact")
+
+    with pytest.raises(RLDataContractError, match="scaler artifact is unreadable"):
+        load_rl_contract_metadata("MCB", splits_dir=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "error"),
+    (
+        ("training_rows", 999, "training row count is stale"),
+        (
+            "scaled_features",
+            list(reversed(DEFAULT_OBSERVATION_FEATURES)),
+            "scaler feature order is incompatible",
+        ),
+        (
+            "training_scale",
+            [0.0] * len(DEFAULT_OBSERVATION_FEATURES),
+            "training scale values must be positive",
+        ),
+    ),
+)
+def test_contract_metadata_rejects_stale_or_invalid_scaler_metadata(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+    error: str,
+) -> None:
+    _, result = _persist(tmp_path)
+    scaler_metadata_path = result.rl_artifacts.scaler_path.with_suffix(".json")
+    scaler_metadata = json.loads(scaler_metadata_path.read_text(encoding="utf-8"))
+    scaler_metadata[field] = replacement
+    scaler_metadata_path.write_text(json.dumps(scaler_metadata), encoding="utf-8")
+
+    with pytest.raises(RLDataContractError, match=error):
+        load_rl_contract_metadata("MCB", splits_dir=tmp_path)
+
+
+def test_partition_loader_reuses_metadata_validation_and_still_loads_rows(
+    tmp_path: Path,
+) -> None:
+    split, _ = _persist(tmp_path)
+
+    loaded = load_rl_partition("MCB", "validation", splits_dir=tmp_path)
+
+    assert loaded.partition == "validation"
+    assert len(loaded.data) == len(split.validation)
+    assert loaded.data["date"].min() == split.validation["date"].min()
+    assert loaded.data["date"].max() == split.validation["date"].max()
