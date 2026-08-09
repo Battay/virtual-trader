@@ -24,7 +24,11 @@ from data_pipeline.src.config import (
     PROCESSED_SPLITS_DIR,
     SAVED_MODELS_DIR,
 )
-from reinforcement_learning.data_contract import load_rl_partition
+from reinforcement_learning.data_contract import (
+    RL_CONTRACT_FILENAME,
+    RL_OBSERVATION_SCALER_FILENAME,
+    load_rl_partition,
+)
 from reinforcement_learning.environments import SingleSymbolTradingEnv
 from reinforcement_learning.environments.config import (
     DEFAULT_OBSERVATION_FEATURES,
@@ -32,6 +36,7 @@ from reinforcement_learning.environments.config import (
     ENVIRONMENT_VERSION,
 )
 from reinforcement_learning.environments.validation import validate_environment
+from reinforcement_learning.integrity import sha256_file
 
 from .callbacks import PPOProgressCallback, ProgressHandler
 from .config import PPOConfig
@@ -125,6 +130,13 @@ def train_single_symbol(
     observation_shape: tuple[int, ...] | None = None
     feature_version = ""
     rl_contract_version = ""
+    source_rl_contract_path: str | None = None
+    source_rl_contract_sha256: str | None = None
+    source_observation_scaler_path: str | None = None
+    source_observation_scaler_sha256: str | None = None
+    source_observation_scaler_metadata_path: str | None = None
+    source_observation_scaler_metadata_sha256: str | None = None
+    observation_features: tuple[str, ...] = ()
     resolved_output: Path | None = None
 
     def finish(
@@ -142,6 +154,17 @@ def train_single_symbol(
             environment_version=ENVIRONMENT_VERSION,
             rl_contract_version=rl_contract_version,
             feature_version=feature_version,
+            source_rl_contract_path=source_rl_contract_path,
+            source_rl_contract_sha256=source_rl_contract_sha256,
+            source_observation_scaler_path=source_observation_scaler_path,
+            source_observation_scaler_sha256=source_observation_scaler_sha256,
+            source_observation_scaler_metadata_path=(
+                source_observation_scaler_metadata_path
+            ),
+            source_observation_scaler_metadata_sha256=(
+                source_observation_scaler_metadata_sha256
+            ),
+            observation_features=observation_features,
             seed=effective_config.seed,
             requested_timesteps=effective_config.total_timesteps,
             actual_timesteps=actual_timesteps,
@@ -175,6 +198,23 @@ def train_single_symbol(
             raise PPOTrainerError(
                 "Canonical loader returned a non-training partition; training aborted"
             )
+        artifact_directory = loaded.artifact_path.parent
+        contract_path = (artifact_directory / RL_CONTRACT_FILENAME).resolve()
+        scaler_path = (
+            artifact_directory / RL_OBSERVATION_SCALER_FILENAME
+        ).resolve()
+        scaler_metadata_path = scaler_path.with_suffix(".json")
+        source_rl_contract_path = str(contract_path)
+        source_rl_contract_sha256 = sha256_file(contract_path)
+        source_observation_scaler_path = str(scaler_path)
+        source_observation_scaler_sha256 = sha256_file(scaler_path)
+        source_observation_scaler_metadata_path = str(scaler_metadata_path)
+        source_observation_scaler_metadata_sha256 = sha256_file(
+            scaler_metadata_path
+        )
+        observation_features = tuple(
+            str(feature) for feature in loaded.contract.get("observation_features", ())
+        )
         training_data = loaded.data
         training_rows = len(training_data)
         training_start = training_data["date"].min().date().isoformat()

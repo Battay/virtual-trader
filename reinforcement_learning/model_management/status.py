@@ -22,6 +22,9 @@ TRAINING_STATUSES = (
     "unsupported_security_type",
     "missing_processed_dataset",
     "training_failed",
+    "candidate",
+    "experiment",
+    "superseded",
 )
 
 
@@ -43,6 +46,17 @@ def _as_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"true", "1"}
+
+
+def _model_freshness_cutoff(model: Mapping[str, object]) -> object:
+    """Use the complete-data cutoff, never the earlier training split cutoff."""
+    for field in ("dataset_latest_date", "complete_available_history_end"):
+        value = model.get(field)
+        if value is not None and not pd.isna(value) and str(value).strip():
+            return value
+    # Backward compatibility for pre-v2 in-memory records. Version-2 persisted
+    # candidates always populate complete-data freshness metadata.
+    return model.get("training_data_end")
 
 
 def build_symbol_status_table(
@@ -86,7 +100,7 @@ def build_symbol_status_table(
         usable_rows = max(0, len(dates) - FEATURE_WARMUP_ROWS)
         model = model_by_symbol.get(symbol)
         new_days = (
-            count_new_trading_dates(history, model.get("training_data_end"))
+            count_new_trading_dates(history, _model_freshness_cutoff(model))
             if model is not None
             else 0
         )
@@ -106,6 +120,12 @@ def build_symbol_status_table(
             training_status = "never_trained"
         elif str(model.get("model_status")) == "failed":
             training_status = "training_failed"
+        elif str(model.get("model_status")) == "candidate":
+            training_status = "candidate"
+        elif str(model.get("model_status")) == "experiment":
+            training_status = "experiment"
+        elif str(model.get("model_status")) == "superseded":
+            training_status = "superseded"
         elif new_days > 0:
             training_status = "retraining_recommended"
         else:
@@ -124,6 +144,19 @@ def build_symbol_status_table(
                 "eligible": eligible,
                 "model_version": (
                     model.get("model_version") if model is not None else pd.NA
+                ),
+                "model_status": (
+                    model.get("model_status") if model is not None else "not_trained"
+                ),
+                "validation_status": (
+                    model.get("validation_status")
+                    if model is not None
+                    else "not_evaluated"
+                ),
+                "promotion_status": (
+                    model.get("promotion_status")
+                    if model is not None
+                    else "not_promoted"
                 ),
                 "last_trained_at": (
                     model.get("last_trained_at") if model is not None else ""
@@ -230,7 +263,7 @@ def master_model_status(
     ]
     model = master_models.iloc[-1] if not master_models.empty else None
     new_days = (
-        count_new_trading_dates(processed_data, model.get("training_data_end"))
+        count_new_trading_dates(processed_data, _model_freshness_cutoff(model))
         if model is not None
         else 0
     )
@@ -240,6 +273,12 @@ def master_model_status(
         training_status = "never_trained"
     elif str(model.get("model_status")) == "failed":
         training_status = "training_failed"
+    elif str(model.get("model_status")) == "candidate":
+        training_status = "candidate"
+    elif str(model.get("model_status")) == "experiment":
+        training_status = "experiment"
+    elif str(model.get("model_status")) == "superseded":
+        training_status = "superseded"
     elif new_days:
         training_status = "retraining_recommended"
     else:
@@ -249,6 +288,12 @@ def master_model_status(
             model.get("model_status") if model is not None else "not_trained"
         ),
         "training_status": training_status,
+        "validation_status": (
+            model.get("validation_status") if model is not None else "not_evaluated"
+        ),
+        "promotion_status": (
+            model.get("promotion_status") if model is not None else "not_promoted"
+        ),
         "dataset_start": dates.min().date() if not dates.empty else None,
         "dataset_end": dates.max().date() if not dates.empty else None,
         "dataset_rows": len(processed_data),

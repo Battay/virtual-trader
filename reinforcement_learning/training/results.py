@@ -20,6 +20,13 @@ class PPOTrainingResult:
     environment_version: str
     rl_contract_version: str
     feature_version: str
+    source_rl_contract_path: str | None
+    source_rl_contract_sha256: str | None
+    source_observation_scaler_path: str | None
+    source_observation_scaler_sha256: str | None
+    source_observation_scaler_metadata_path: str | None
+    source_observation_scaler_metadata_sha256: str | None
+    observation_features: tuple[str, ...]
     seed: int
     requested_timesteps: int
     actual_timesteps: int
@@ -48,6 +55,19 @@ class PPOTrainingResult:
             raise ValueError("duration_seconds cannot be negative")
         if self.status != "completed" and self.model is not None:
             raise ValueError("failed or interrupted results cannot expose a model")
+        if self.status == "completed":
+            required_provenance = (
+                self.source_rl_contract_path,
+                self.source_rl_contract_sha256,
+                self.source_observation_scaler_path,
+                self.source_observation_scaler_sha256,
+                self.source_observation_scaler_metadata_path,
+                self.source_observation_scaler_metadata_sha256,
+            )
+            if not all(required_provenance) or not self.observation_features:
+                raise ValueError(
+                    "completed training results require complete RL source provenance"
+                )
 
     @property
     def succeeded(self) -> bool:

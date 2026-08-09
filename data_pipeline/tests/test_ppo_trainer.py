@@ -15,10 +15,16 @@ from feature_engineering.schemas import FEATURE_COLUMNS
 from feature_engineering.splitting import chronological_split, persist_split_artifacts
 from reinforcement_learning.data_contract import (
     EXECUTION_ACCOUNTING_COLUMNS,
+    RL_CONTRACT_FILENAME,
+    RL_OBSERVATION_SCALER_FILENAME,
     RL_PARTITION_SCHEMA_VERSION,
     load_rl_partition,
 )
-from reinforcement_learning.environments.config import ENVIRONMENT_VERSION
+from reinforcement_learning.environments.config import (
+    DEFAULT_OBSERVATION_FEATURES,
+    ENVIRONMENT_VERSION,
+)
+from reinforcement_learning.integrity import sha256_file
 from reinforcement_learning.model_management import registry as model_registry
 from reinforcement_learning.training.config import PPO_CONFIG_VERSION, PPOConfig
 from reinforcement_learning.training.ppo_trainer import (
@@ -70,6 +76,16 @@ def _tiny_config(**overrides) -> PPOConfig:
         total_timesteps=16,
         **overrides,
     )
+
+
+def test_sha256_file_reads_in_bounded_chunks(tmp_path: Path) -> None:
+    path = tmp_path / "artifact.bin"
+    payload = bytes(range(256)) * 20
+    path.write_bytes(payload)
+
+    assert sha256_file(path, chunk_size=17) == hashlib.sha256(payload).hexdigest()
+    with pytest.raises(ValueError, match="positive integer"):
+        sha256_file(path, chunk_size=0)
 
 
 def test_ppo_config_defaults_are_versioned_and_exact() -> None:
@@ -194,6 +210,20 @@ def test_real_tiny_ppo_uses_canonical_train_partition_and_returns_result(
     assert result.ppo_config_version == PPO_CONFIG_VERSION
     assert result.environment_version == ENVIRONMENT_VERSION
     assert result.rl_contract_version == RL_PARTITION_SCHEMA_VERSION
+    contract_path = (source_artifacts / RL_CONTRACT_FILENAME).resolve()
+    scaler_path = (source_artifacts / RL_OBSERVATION_SCALER_FILENAME).resolve()
+    scaler_metadata_path = scaler_path.with_suffix(".json")
+    assert result.source_rl_contract_path == str(contract_path)
+    assert result.source_rl_contract_sha256 == sha256_file(contract_path)
+    assert result.source_observation_scaler_path == str(scaler_path)
+    assert result.source_observation_scaler_sha256 == sha256_file(scaler_path)
+    assert result.source_observation_scaler_metadata_path == str(
+        scaler_metadata_path
+    )
+    assert result.source_observation_scaler_metadata_sha256 == sha256_file(
+        scaler_metadata_path
+    )
+    assert result.observation_features == DEFAULT_OBSERVATION_FEATURES
     assert result.seed == 7
     assert result.requested_timesteps == 16
     assert result.actual_timesteps == 16
@@ -223,6 +253,13 @@ def test_invalid_and_incompatible_symbols_fail_before_training(rl_splits) -> Non
     assert missing.status == "failed"
     assert missing.model is None
     assert "RL contract is missing" in str(missing.error)
+    assert missing.source_rl_contract_path is None
+    assert missing.source_rl_contract_sha256 is None
+    assert missing.source_observation_scaler_path is None
+    assert missing.source_observation_scaler_sha256 is None
+    assert missing.source_observation_scaler_metadata_path is None
+    assert missing.source_observation_scaler_metadata_sha256 is None
+    assert missing.observation_features == ()
 
     contract_path = result.rl_artifacts.contract_path
     original = contract_path.read_text(encoding="utf-8")

@@ -217,6 +217,10 @@ def _load_contract(path: Path) -> dict[str, object]:
         )
     if tuple(payload.get("observation_features", ())) != DEFAULT_OBSERVATION_FEATURES:
         raise RLDataContractError("RL artifact observation feature order is incompatible")
+    if payload.get("scaler_fit_partition") != "train":
+        raise RLDataContractError(
+            "RL observation scaler must be fitted on the train partition"
+        )
     return payload
 
 
@@ -252,9 +256,22 @@ def load_rl_partition(
         raise RLDataContractError("RL observation scaler feature order is incompatible")
     if not (directory / RL_OBSERVATION_SCALER_FILENAME).is_file():
         raise RLDataContractError("RL observation scaler artifact is missing")
-    partition_metadata = dict(contract.get("partitions", {})).get(partition)
+    contract_partitions = dict(contract.get("partitions", {}))
+    partition_metadata = contract_partitions.get(partition)
     if not isinstance(partition_metadata, dict):
         raise RLDataContractError(f"RL contract has no {partition!r} partition")
+    train_metadata = contract_partitions.get("train")
+    if not isinstance(train_metadata, dict):
+        raise RLDataContractError("RL contract has no 'train' partition")
+    try:
+        scaler_training_rows = int(scaler_metadata.get("training_rows", -1))
+        contract_training_rows = int(train_metadata.get("rows", -2))
+    except (TypeError, ValueError) as exc:
+        raise RLDataContractError(
+            "RL observation scaler training row metadata is invalid"
+        ) from exc
+    if scaler_training_rows != contract_training_rows:
+        raise RLDataContractError("RL observation scaler training row count is stale")
     artifact_path = directory / f"{partition}_rl.csv"
     try:
         artifact = pd.read_csv(artifact_path, dtype={"symbol": "string"})
@@ -273,10 +290,6 @@ def load_rl_partition(
     actual_end = artifact["date"].max().date().isoformat()
     if (actual_start, actual_end) != (expected_start, expected_end):
         raise RLDataContractError(f"{partition} RL date range does not match contract")
-    if partition == "train" and int(scaler_metadata.get("training_rows", -1)) != len(
-        artifact
-    ):
-        raise RLDataContractError("RL observation scaler training row count is stale")
     if not artifact.loc[:, list(IDENTITY_TIME_COLUMNS)].equals(
         raw.loc[:, list(IDENTITY_TIME_COLUMNS)]
     ):

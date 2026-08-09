@@ -11,13 +11,21 @@ from dashboard.presentation import format_model_registry_for_display
 from feature_engineering.schemas import FEATURE_VERSION
 from reinforcement_learning.model_management.registry import (
     MODEL_REGISTRY_COLUMNS,
+    MODEL_REGISTRY_SCHEMA_VERSION,
+    MODEL_STATUSES,
+    PROMOTION_STATUSES,
+    VALIDATION_STATUSES,
     ModelRegistryError,
+    _append_model_version_unlocked,
     append_model_version,
     create_model_record,
     empty_model_registry,
     initialize_model_registry,
     load_model_registry,
+    model_registry_lock,
+    validate_model_record,
 )
+from reinforcement_learning.model_management.paths import ppo_bundle_paths
 from reinforcement_learning.model_management.selection import (
     bulk_select_symbols,
     filter_symbol_status,
@@ -315,3 +323,185 @@ def test_model_registry_display_uses_readable_statuses() -> None:
     assert "Not Trained" in text
     assert "not_trained" not in text
     assert "Master" in text
+
+
+def test_registry_v2_schema_and_bundle_paths_are_explicit(tmp_path: Path) -> None:
+    appended = (
+        "registry_schema_version",
+        "artifact_schema_version",
+        "rl_contract_version",
+        "ppo_config_version",
+        "validation_status",
+        "promotion_status",
+        "rl_contract_path",
+        "scaler_metadata_path",
+        "metadata_path",
+        "config_path",
+        "validation_metrics_path",
+        "baseline_metrics_path",
+        "registry_record_path",
+        "manifest_path",
+        "manifest_sha256",
+        "observation_shape",
+        "observation_features",
+        "source_git_commit",
+        "source_worktree_dirty",
+    )
+    assert MODEL_REGISTRY_COLUMNS[-len(appended) :] == appended
+    assert {"candidate", "experiment", "production", "superseded"}.issubset(
+        MODEL_STATUSES
+    )
+    assert "validation_pass" in VALIDATION_STATUSES
+    assert "candidate" in PROMOTION_STATUSES
+
+    paths = ppo_bundle_paths("symbol", "786", 3, tmp_path)
+    assert paths.directory == tmp_path / "symbol_models" / "786" / "v0003"
+    assert paths.model.name == "ppo_model.zip"
+    assert paths.metadata.name == "model_metadata.json"
+    assert paths.ppo_config.name == "ppo_config.json"
+    assert paths.validation_metrics.name == "validation_metrics.json"
+    assert paths.baseline_metrics.name == "baseline_comparison_metrics.json"
+    assert paths.rl_contract.name == "rl_contract.json"
+    assert paths.scaler.name == "rl_observation_scaler.joblib"
+    assert paths.scaler_metadata.name == "rl_observation_scaler.json"
+    assert paths.registry_record.name == "registry_record.json"
+    assert paths.manifest.name == "artifact_manifest.json"
+
+    master = ppo_bundle_paths("master", "", 1, tmp_path)
+    assert master.directory == tmp_path / "master_models" / "v0001"
+
+
+@pytest.mark.parametrize("invalid_version", [0, -1, 1.5, "2.5", "bad"])
+def test_registry_rejects_non_positive_or_non_integral_versions(
+    invalid_version: object,
+) -> None:
+    record = create_model_record(
+        registry=empty_model_registry(),
+        model_scope="symbol",
+        symbol="MCB",
+        feature_version=FEATURE_VERSION,
+    )
+    record["model_version"] = invalid_version
+
+    with pytest.raises(ModelRegistryError, match="positive integers"):
+        validate_model_record(record)
+
+
+def test_registry_rejects_identity_overrides_unknown_fields_and_bad_ids() -> None:
+    with pytest.raises(ModelRegistryError, match="Identity-critical"):
+        create_model_record(
+            registry=empty_model_registry(),
+            model_scope="symbol",
+            symbol="MCB",
+            feature_version=FEATURE_VERSION,
+            values={"model_id": "spoofed"},
+        )
+
+    record = create_model_record(
+        registry=empty_model_registry(),
+        model_scope="symbol",
+        symbol="MCB",
+        feature_version=FEATURE_VERSION,
+    )
+    malformed = dict(record, model_id="ppo-symbol-MCB-v9999")
+    with pytest.raises(ModelRegistryError, match="inconsistent"):
+        validate_model_record(malformed)
+    with pytest.raises(ModelRegistryError, match="unknown fields"):
+        validate_model_record({**record, "unexpected": "unsafe"})
+
+
+def test_locked_unlocked_append_and_duplicate_model_path_safety(
+    tmp_path: Path,
+) -> None:
+    registry_path = tmp_path / "model_registry.csv"
+    initialize_model_registry(registry_path)
+    first = create_model_record(
+        registry=load_model_registry(registry_path),
+        model_scope="symbol",
+        symbol="MCB",
+        feature_version=FEATURE_VERSION,
+    )
+    with model_registry_lock(registry_path):
+        registry = _append_model_version_unlocked(first, registry_path)
+    second = create_model_record(
+        registry=registry,
+        model_scope="symbol",
+        symbol="MCB",
+        feature_version=FEATURE_VERSION,
+        values={"model_path": first["model_path"]},
+    )
+
+    with pytest.raises(ModelRegistryError, match="duplicate model paths"):
+        append_model_version(second, registry_path)
+    persisted = load_model_registry(registry_path)
+    assert persisted["model_id"].tolist() == ["ppo-symbol-MCB-v0001"]
+
+
+def test_registry_rejects_duplicate_composite_model_identity() -> None:
+    record = create_model_record(
+        registry=empty_model_registry(),
+        model_scope="symbol",
+        symbol="MCB",
+        feature_version=FEATURE_VERSION,
+    )
+    duplicated = pd.DataFrame([record, record], columns=MODEL_REGISTRY_COLUMNS)
+
+    with pytest.raises(ModelRegistryError, match="scope/symbol/version"):
+        # Exercise dataframe validation through the public version allocator.
+        create_model_record(
+            registry=duplicated,
+            model_scope="symbol",
+            symbol="MCB",
+            feature_version=FEATURE_VERSION,
+        )
+
+
+def test_registry_rejects_unknown_csv_columns_and_invalid_enums(
+    tmp_path: Path,
+) -> None:
+    record = create_model_record(
+        registry=empty_model_registry(),
+        model_scope="symbol",
+        symbol="MCB",
+        feature_version=FEATURE_VERSION,
+    )
+    path = tmp_path / "registry.csv"
+    pd.DataFrame([{**record, "unknown_column": "bad"}]).to_csv(path, index=False)
+    with pytest.raises(ModelRegistryError, match="unknown columns"):
+        load_model_registry(path)
+
+    with pytest.raises(ModelRegistryError, match="validation statuses"):
+        validate_model_record(dict(record, validation_status="made_up"))
+    with pytest.raises(ModelRegistryError, match="promotion statuses"):
+        validate_model_record(dict(record, promotion_status="made_up"))
+
+
+def test_freshness_uses_complete_dataset_cutoff_and_candidate_is_distinct() -> None:
+    market = _market("786")
+    record = create_model_record(
+        registry=empty_model_registry(),
+        model_scope="symbol",
+        symbol="786",
+        feature_version=FEATURE_VERSION,
+        values={
+            "model_status": "candidate",
+            "training_status": "candidate",
+            "validation_status": "validation_pass",
+            "promotion_status": "candidate",
+            "training_data_end": "2026-02-25",
+            "complete_available_history_end": "2026-02-28",
+            "dataset_latest_date": "2026-02-28",
+        },
+    )
+    status = build_symbol_status_table(
+        market,
+        _registry(),
+        pd.DataFrame([record], columns=MODEL_REGISTRY_COLUMNS),
+        minimum_usable_rows=1,
+    ).iloc[0]
+
+    assert status["new_data_days"] == 1
+    assert status["training_status"] == "candidate"
+    assert status["model_status"] == "candidate"
+    assert status["validation_status"] == "validation_pass"
+    assert status["promotion_status"] == "candidate"
