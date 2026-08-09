@@ -2,6 +2,12 @@
 
 from .callbacks import ProgressHandler, TrainingProgress
 from .config import PPO_CONFIG_VERSION, PPOConfig
+from .devices import (
+    SUPPORTED_TORCH_DEVICES,
+    TorchDeviceError,
+    TorchDeviceResolution,
+    resolve_torch_device,
+)
 from .results import PPOTrainingResult
 
 
@@ -33,7 +39,11 @@ __all__ = (
     "PPOTrainingResult",
     "PPOTrainerError",
     "ProgressHandler",
+    "SUPPORTED_TORCH_DEVICES",
+    "TorchDeviceError",
+    "TorchDeviceResolution",
     "TrainingProgress",
     "create_training_vector_environment",
+    "resolve_torch_device",
     "train_single_symbol",
 )

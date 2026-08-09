@@ -40,6 +40,12 @@ from reinforcement_learning.integrity import sha256_file
 
 from .callbacks import PPOProgressCallback, ProgressHandler
 from .config import PPOConfig
+from .devices import (
+    TorchDeviceResolution,
+    resolve_torch_device,
+    synchronize_torch_device,
+    verify_sb3_model_device,
+)
 from .results import PPOTrainingResult
 
 
@@ -75,11 +81,21 @@ def _validate_output_directory(output_dir: Path | None) -> Path | None:
     return resolved
 
 
-def _seed_everything(seed: int) -> None:
-    """Seed Python, NumPy, Stable-Baselines3, and PyTorch deterministically."""
+def _seed_everything(seed: int, *, resolved_device: str) -> None:
+    """Seed Python, NumPy, SB3, CPU torch, and the selected MPS backend."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    if resolved_device == "mps":
+        # Resolution is repeated deliberately so an explicit MPS request can
+        # never become an implicit CPU run between configuration and seeding.
+        resolve_torch_device("mps")
+        manual_seed = getattr(torch.mps, "manual_seed", None)
+        if not callable(manual_seed):
+            raise PPOTrainerError(
+                "This PyTorch build lacks torch.mps.manual_seed(); MPS training aborted"
+            )
+        manual_seed(seed)
     set_random_seed(seed, using_cuda=False)
 
 
@@ -108,6 +124,7 @@ def train_single_symbol(
     config: PPOConfig | None = None,
     seed: int | None = None,
     total_timesteps: int | None = None,
+    device: str | None = None,
     output_dir: Path | None = None,
     progress_callback: ProgressHandler | None = None,
     splits_dir: Path = PROCESSED_SPLITS_DIR,
@@ -117,6 +134,7 @@ def train_single_symbol(
     effective_config = (config or PPOConfig()).with_runtime_overrides(
         seed=seed,
         total_timesteps=total_timesteps,
+        device=device,
     )
     symbol_text = str(symbol).strip()
     started_at = _utc_now()
@@ -138,6 +156,8 @@ def train_single_symbol(
     source_observation_scaler_metadata_sha256: str | None = None
     observation_features: tuple[str, ...] = ()
     resolved_output: Path | None = None
+    device_resolution: TorchDeviceResolution | None = None
+    actual_device: str | None = None
 
     def finish(
         status: str,
@@ -172,7 +192,18 @@ def train_single_symbol(
             training_end=training_end,
             training_rows=training_rows,
             duration_seconds=max(0.0, time.perf_counter() - started_clock),
-            device=(str(trained_model.device) if trained_model else effective_config.device),
+            requested_device=effective_config.device,
+            resolved_device=(
+                device_resolution.resolved_device if device_resolution else None
+            ),
+            device=(
+                actual_device
+                or (
+                    device_resolution.resolved_device
+                    if device_resolution
+                    else effective_config.device
+                )
+            ),
             observation_shape=observation_shape,
             status=status,
             started_at=started_at,
@@ -191,6 +222,16 @@ def train_single_symbol(
                 f"smoke_test is capped at {MAX_SMOKE_TIMESTEPS} requested timesteps"
             )
         resolved_output = _validate_output_directory(output_dir)
+        device_resolution = resolve_torch_device(effective_config.device)
+        LOGGER.info(
+            "ppo_device_resolution symbol=%s requested_device=%s "
+            "resolved_device=%s mps_built=%s mps_available=%s",
+            symbol_text,
+            device_resolution.requested_device,
+            device_resolution.resolved_device,
+            device_resolution.mps_built,
+            device_resolution.mps_available,
+        )
 
         # This is the sole market-data load. Validation and test rows stay sealed.
         loaded = load_rl_partition(symbol_text, "train", splits_dir=Path(splits_dir))
@@ -249,7 +290,10 @@ def train_single_symbol(
             validation.errors,
         )
 
-        _seed_everything(effective_config.seed)
+        _seed_everything(
+            effective_config.seed,
+            resolved_device=device_resolution.resolved_device,
+        )
         vector_environment = create_training_vector_environment(
             training_data,
             seed=effective_config.seed,
@@ -277,7 +321,18 @@ def train_single_symbol(
             effective_config.policy,
             vector_environment,
             verbose=0,
-            **effective_config.model_kwargs(),
+            **effective_config.model_kwargs(
+                resolved_device=device_resolution.resolved_device
+            ),
+        )
+        actual_device = verify_sb3_model_device(model, device_resolution)
+        LOGGER.info(
+            "ppo_device_verified symbol=%s requested_device=%s "
+            "resolved_device=%s actual_device=%s",
+            symbol_text,
+            device_resolution.requested_device,
+            device_resolution.resolved_device,
+            actual_device,
         )
         interval_steps = max(
             effective_config.n_steps,
@@ -295,6 +350,10 @@ def train_single_symbol(
             progress_bar=False,
             reset_num_timesteps=True,
         )
+        # MPS kernels are asynchronous. Synchronizing here surfaces unsupported
+        # operations before a run can be reported as completed.
+        synchronize_torch_device(device_resolution.resolved_device)
+        actual_device = verify_sb3_model_device(model, device_resolution)
         actual_timesteps = int(model.num_timesteps)
         if callback.cancel_requested:
             LOGGER.warning(
@@ -367,6 +426,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timesteps", type=_positive_integer)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--device",
+        choices=("cpu", "mps", "auto"),
+        default="cpu",
+        help="Explicit torch device request; mps never silently falls back to CPU",
+    )
+    parser.add_argument(
         "--smoke-test",
         action="store_true",
         help=f"Label and cap a developer smoke run at {MAX_SMOKE_TIMESTEPS} steps",
@@ -402,6 +467,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.symbol,
         seed=args.seed,
         total_timesteps=timesteps,
+        device=args.device,
         output_dir=args.output_dir,
         smoke_test=args.smoke_test,
     )

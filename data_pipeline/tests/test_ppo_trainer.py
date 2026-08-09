@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from data_pipeline.src.config import MODEL_REGISTRY_PATH, SAVED_MODELS_DIR
 from feature_engineering.schemas import FEATURE_COLUMNS
@@ -27,6 +28,15 @@ from reinforcement_learning.environments.config import (
 from reinforcement_learning.integrity import sha256_file
 from reinforcement_learning.model_management import registry as model_registry
 from reinforcement_learning.training.config import PPO_CONFIG_VERSION, PPOConfig
+from reinforcement_learning.training.devices import (
+    TorchDeviceError,
+    TorchDeviceResolution,
+    resolve_torch_device,
+    synchronize_torch_device,
+    torch_devices_equivalent,
+)
+import reinforcement_learning.training.devices as training_devices
+import reinforcement_learning.training.ppo_trainer as ppo_trainer_module
 from reinforcement_learning.training.ppo_trainer import (
     MAX_SMOKE_TIMESTEPS,
     create_training_vector_environment,
@@ -125,12 +135,117 @@ def test_ppo_config_defaults_are_versioned_and_exact() -> None:
         ({"max_grad_norm": 0}, "max_grad_norm"),
         ({"seed": -1}, "seed"),
         ({"total_timesteps": 0}, "total_timesteps"),
-        ({"device": "auto"}, "CPU"),
+        ({"device": "cuda"}, "device"),
     ),
 )
 def test_ppo_config_rejects_invalid_values(overrides, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         PPOConfig(**overrides)
+
+
+@pytest.mark.parametrize("device", ("cpu", "mps", "auto"))
+def test_ppo_config_accepts_supported_device_requests(device: str) -> None:
+    config = PPOConfig(device=device)
+
+    assert config.device == device
+    if device == "auto":
+        with pytest.raises(ValueError, match="must be resolved"):
+            config.model_kwargs()
+        assert config.model_kwargs(resolved_device="cpu")["device"] == "cpu"
+    else:
+        assert config.model_kwargs()["device"] == device
+
+
+@pytest.mark.parametrize("device", (None, 7, True, "cuda", "mps:0"))
+def test_ppo_config_rejects_bad_device_types_and_unsupported_devices(device) -> None:
+    with pytest.raises(ValueError, match="auto, cpu, mps"):
+        PPOConfig(device=device)
+
+
+@pytest.mark.parametrize("mps_state", ((False, False), (True, True)))
+def test_cpu_device_resolution_is_explicit_and_accelerator_independent(
+    monkeypatch: pytest.MonkeyPatch,
+    mps_state: tuple[bool, bool],
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: mps_state)
+
+    resolution = resolve_torch_device("cpu")
+
+    assert resolution.requested_device == "cpu"
+    assert resolution.resolved_device == "cpu"
+    assert (resolution.mps_built, resolution.mps_available) == mps_state
+    assert not resolution.accelerator_selected
+
+
+def test_explicit_mps_resolves_only_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+
+    resolution = resolve_torch_device("mps")
+
+    assert resolution.requested_device == "mps"
+    assert resolution.resolved_device == "mps"
+    assert resolution.accelerator_selected
+    assert torch_devices_equivalent("mps", "mps:0")
+
+
+def test_mps_resolution_rejects_external_silent_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+    monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
+    with pytest.raises(TorchDeviceError, match="unsupported operations could be hidden"):
+        resolve_torch_device("mps")
+
+
+def test_mps_synchronization_failure_is_reported_as_device_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+    monkeypatch.setattr(
+        training_devices.torch.mps,
+        "synchronize",
+        lambda: (_ for _ in ()).throw(RuntimeError("asynchronous kernel failed")),
+    )
+
+    with pytest.raises(TorchDeviceError, match="cannot be reported as successful"):
+        synchronize_torch_device("mps")
+
+
+@pytest.mark.parametrize("mps_state", ((False, False), (True, False)))
+def test_explicit_mps_unavailable_fails_without_cpu_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    mps_state: tuple[bool, bool],
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: mps_state)
+
+    with pytest.raises(TorchDeviceError, match="CPU fallback is disabled"):
+        resolve_torch_device("mps")
+
+
+@pytest.mark.parametrize(
+    ("mps_state", "expected"),
+    (((False, False), "cpu"), ((True, False), "cpu"), ((True, True), "mps")),
+)
+def test_auto_device_resolution_routes_from_reported_mps_availability(
+    monkeypatch: pytest.MonkeyPatch,
+    mps_state: tuple[bool, bool],
+    expected: str,
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: mps_state)
+
+    resolution = resolve_torch_device("auto")
+
+    assert resolution.requested_device == "auto"
+    assert resolution.resolved_device == expected
+
+
+@pytest.mark.parametrize("requested", (None, 3, True, "cuda", "cuda:0"))
+def test_device_resolution_rejects_bad_types_and_cuda(requested) -> None:
+    with pytest.raises(TorchDeviceError, match="auto, cpu, mps"):
+        resolve_torch_device(requested)
 
 
 def test_training_vector_environment_is_seeded_and_preserves_real_prices(
@@ -232,14 +347,192 @@ def test_real_tiny_ppo_uses_canonical_train_partition_and_returns_result(
     assert result.training_end == split.train["date"].max().date().isoformat()
     assert result.observation_shape == (17,)
     assert result.device == "cpu"
+    assert result.requested_device == "cpu"
+    assert result.resolved_device == "cpu"
+    assert torch_devices_equivalent(result.model.device, result.resolved_device)
     assert result.duration_seconds >= 0
     assert result.model is not None
     assert result.model.seed == 7
-    assert "model" not in result.to_dict()
+    serialized = result.to_dict()
+    assert "model" not in serialized
+    assert serialized["requested_device"] == "cpu"
+    assert serialized["resolved_device"] == "cpu"
+    assert serialized["device"] == "cpu"
     assert loader_calls == [("MCB", "train", splits_dir)]
     assert save_calls == []
     assert sentinel.read_bytes() == b"do not overwrite"
     assert _hash_files(source_artifacts) == before
+
+
+def test_auto_resolution_is_passed_to_ppo_and_recorded_in_result(
+    rl_splits,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    splits_dir, _, _, _ = rl_splits
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, False))
+    original_ppo = ppo_trainer_module.PPO
+    constructor_devices: list[str] = []
+
+    def capture_ppo_device(*args, **kwargs):
+        constructor_devices.append(str(kwargs.get("device")))
+        return original_ppo(*args, **kwargs)
+
+    monkeypatch.setattr(ppo_trainer_module, "PPO", capture_ppo_device)
+
+    result = train_single_symbol(
+        "MCB",
+        config=_tiny_config(device="auto"),
+        splits_dir=splits_dir,
+        smoke_test=True,
+    )
+
+    assert result.succeeded
+    assert constructor_devices == ["cpu"]
+    assert result.requested_device == "auto"
+    assert result.resolved_device == "cpu"
+    assert result.device == "cpu"
+    assert result.ppo_config["device"] == "auto"
+    assert torch_devices_equivalent(result.model.device, "cpu")
+
+
+def test_trainer_explicit_mps_unavailable_never_loads_data_or_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, False))
+    loader_calls: list[object] = []
+
+    def forbidden_loader(*args, **kwargs):
+        loader_calls.append((args, kwargs))
+        raise AssertionError("unavailable explicit MPS must fail before data loading")
+
+    monkeypatch.setattr(ppo_trainer_module, "load_rl_partition", forbidden_loader)
+
+    result = train_single_symbol(
+        "MCB",
+        config=_tiny_config(device="mps"),
+        smoke_test=True,
+    )
+
+    assert result.status == "failed"
+    assert result.requested_device == "mps"
+    assert result.resolved_device is None
+    assert "CPU fallback is disabled" in str(result.error)
+    assert loader_calls == []
+
+
+def test_actual_device_mismatch_aborts_before_learning(
+    rl_splits,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    splits_dir, _, _, _ = rl_splits
+    learn_calls: list[object] = []
+
+    class MismatchedPPO:
+        device = torch.device("mps")
+        num_timesteps = 0
+
+        def __init__(self, *args, **kwargs) -> None:
+            self.policy = object()
+
+        def learn(self, *args, **kwargs):
+            learn_calls.append((args, kwargs))
+            raise AssertionError("learn must not run after a device mismatch")
+
+    monkeypatch.setattr(ppo_trainer_module, "PPO", MismatchedPPO)
+
+    result = train_single_symbol(
+        "MCB",
+        config=_tiny_config(device="cpu"),
+        splits_dir=splits_dir,
+        smoke_test=True,
+    )
+
+    assert result.status == "failed"
+    assert result.model is None
+    assert result.requested_device == "cpu"
+    assert result.resolved_device == "cpu"
+    assert "does not match the resolved device" in str(result.error)
+    assert learn_calls == []
+
+
+def test_mps_specific_seed_is_called_only_for_resolved_mps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    torch_seed_calls: list[int] = []
+    mps_seed_calls: list[int] = []
+    sb3_seed_calls: list[tuple[int, bool]] = []
+    resolution_calls: list[str] = []
+
+    monkeypatch.setattr(
+        ppo_trainer_module.torch,
+        "manual_seed",
+        lambda seed: torch_seed_calls.append(seed),
+    )
+    monkeypatch.setattr(
+        ppo_trainer_module.torch.mps,
+        "manual_seed",
+        lambda seed: mps_seed_calls.append(seed),
+    )
+    monkeypatch.setattr(
+        ppo_trainer_module,
+        "set_random_seed",
+        lambda seed, using_cuda: sb3_seed_calls.append((seed, using_cuda)),
+    )
+
+    def resolve_mps(requested: str) -> TorchDeviceResolution:
+        resolution_calls.append(requested)
+        return TorchDeviceResolution(
+            requested_device="mps",
+            resolved_device="mps",
+            mps_built=True,
+            mps_available=True,
+        )
+
+    monkeypatch.setattr(ppo_trainer_module, "resolve_torch_device", resolve_mps)
+
+    ppo_trainer_module._seed_everything(11, resolved_device="cpu")
+    assert torch_seed_calls == [11]
+    assert mps_seed_calls == []
+    assert resolution_calls == []
+
+    ppo_trainer_module._seed_everything(13, resolved_device="mps")
+    assert torch_seed_calls == [11, 13]
+    assert mps_seed_calls == [13]
+    assert resolution_calls == ["mps"]
+    assert sb3_seed_calls == [(11, False), (13, False)]
+
+
+def _real_mps_available() -> bool:
+    backend = getattr(torch.backends, "mps", None)
+    if backend is None:
+        return False
+    try:
+        return bool(backend.is_built() and backend.is_available())
+    except (AttributeError, RuntimeError):
+        return False
+
+
+@pytest.mark.skipif(not _real_mps_available(), reason="Apple MPS is unavailable")
+def test_real_tiny_mps_smoke_training_uses_mps_hardware(rl_splits) -> None:
+    splits_dir, _, _, _ = rl_splits
+
+    result = train_single_symbol(
+        "MCB",
+        config=_tiny_config(device="mps"),
+        splits_dir=splits_dir,
+        smoke_test=True,
+    )
+
+    assert result.succeeded, result.error
+    assert result.requested_device == "mps"
+    assert result.resolved_device == "mps"
+    assert torch_devices_equivalent(result.device, "mps")
+    assert result.model is not None
+    assert torch_devices_equivalent(result.model.device, "mps")
+    assert all(
+        torch_devices_equivalent(parameter.device, "mps")
+        for parameter in result.model.policy.parameters()
+    )
 
 
 def test_invalid_and_incompatible_symbols_fail_before_training(rl_splits) -> None:

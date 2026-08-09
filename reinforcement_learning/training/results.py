@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from typing import Any, Mapping
 
+from .devices import torch_devices_equivalent
+
 
 TRAINING_RESULT_STATUSES = frozenset({"completed", "interrupted", "failed"})
 
@@ -43,6 +45,8 @@ class PPOTrainingResult:
     error: str | None = None
     output_directory: str | None = None
     model: Any | None = field(default=None, repr=False, compare=False)
+    requested_device: str = "cpu"
+    resolved_device: str | None = "cpu"
 
     def __post_init__(self) -> None:
         if self.algorithm != "PPO":
@@ -53,6 +57,25 @@ class PPOTrainingResult:
             raise ValueError("training counts cannot be negative")
         if self.duration_seconds < 0:
             raise ValueError("duration_seconds cannot be negative")
+        if self.requested_device not in {"cpu", "mps", "auto"}:
+            raise ValueError("requested_device must be cpu, mps, or auto")
+        if self.resolved_device not in {None, "cpu", "mps"}:
+            raise ValueError("resolved_device must be cpu, mps, or None")
+        configured_device = self.ppo_config.get("device")
+        if configured_device is not None and configured_device != self.requested_device:
+            raise ValueError(
+                "PPO configuration device must match requested_device"
+            )
+        if (
+            self.requested_device == "cpu"
+            and self.resolved_device not in {None, "cpu"}
+        ):
+            raise ValueError("an explicit CPU request cannot resolve to MPS")
+        if (
+            self.requested_device == "mps"
+            and self.resolved_device not in {None, "mps"}
+        ):
+            raise ValueError("an explicit MPS request cannot fall back to CPU")
         if self.status != "completed" and self.model is not None:
             raise ValueError("failed or interrupted results cannot expose a model")
         if self.status == "completed":
@@ -67,6 +90,16 @@ class PPOTrainingResult:
             if not all(required_provenance) or not self.observation_features:
                 raise ValueError(
                     "completed training results require complete RL source provenance"
+                )
+            if self.resolved_device is None:
+                raise ValueError("completed training requires a resolved device")
+            if configured_device != self.requested_device:
+                raise ValueError(
+                    "completed training requires its requested device in PPO config"
+                )
+            if not torch_devices_equivalent(self.device, self.resolved_device):
+                raise ValueError(
+                    "completed training actual device must match resolved_device"
                 )
 
     @property

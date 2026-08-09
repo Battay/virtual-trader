@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, replace
 import math
 from numbers import Integral, Real
 
+from .devices import SUPPORTED_TORCH_DEVICES
+
 
 PPO_CONFIG_VERSION = "ppo_single_symbol_v1"
 
@@ -26,7 +28,7 @@ def _require_finite(name: str, value: object) -> float:
 
 @dataclass(frozen=True)
 class PPOConfig:
-    """Frozen pilot configuration with validated CPU-only PPO defaults."""
+    """Frozen pilot configuration with an explicit runtime device request."""
 
     config_version: str = PPO_CONFIG_VERSION
     policy: str = "MlpPolicy"
@@ -78,14 +80,18 @@ class PPOConfig:
             raise ValueError("ent_coef and vf_coef cannot be negative")
         if max_grad_norm <= 0:
             raise ValueError("max_grad_norm must be positive")
-        if self.device != "cpu":
-            raise ValueError("5B-1 supports deterministic CPU training only")
+        if (
+            not isinstance(self.device, str)
+            or self.device not in SUPPORTED_TORCH_DEVICES
+        ):
+            raise ValueError("device must be one of: auto, cpu, mps")
 
     def with_runtime_overrides(
         self,
         *,
         seed: int | None = None,
         total_timesteps: int | None = None,
+        device: str | None = None,
     ) -> "PPOConfig":
         """Return a validated configuration with explicit run overrides."""
         return replace(
@@ -94,14 +100,20 @@ class PPOConfig:
             total_timesteps=(
                 self.total_timesteps if total_timesteps is None else total_timesteps
             ),
+            device=self.device if device is None else device,
         )
 
     def to_dict(self) -> dict[str, object]:
         """Return the complete effective configuration as plain values."""
         return asdict(self)
 
-    def model_kwargs(self) -> dict[str, object]:
-        """Return only Stable-Baselines3 PPO constructor parameters."""
+    def model_kwargs(self, *, resolved_device: str | None = None) -> dict[str, object]:
+        """Return SB3 parameters with AUTO already resolved by the trainer."""
+        selected_device = self.device if resolved_device is None else resolved_device
+        if selected_device == "auto":
+            raise ValueError("auto device must be resolved before constructing PPO")
+        if selected_device not in {"cpu", "mps"}:
+            raise ValueError("resolved_device must be cpu or mps")
         return {
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,
@@ -114,5 +126,5 @@ class PPOConfig:
             "vf_coef": self.vf_coef,
             "max_grad_norm": self.max_grad_norm,
             "seed": self.seed,
-            "device": self.device,
+            "device": selected_device,
         }

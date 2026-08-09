@@ -47,6 +47,7 @@ from reinforcement_learning.evaluation.ppo_evaluator import policy_parameter_has
 from reinforcement_learning.evaluation.results import ValidationComparisonResult
 from reinforcement_learning.integrity import sha256_file
 from reinforcement_learning.training.config import PPO_CONFIG_VERSION
+from reinforcement_learning.training.devices import torch_devices_equivalent
 from reinforcement_learning.training.results import PPOTrainingResult
 
 from .paths import PPOArtifactBundlePaths, ppo_bundle_paths
@@ -804,6 +805,8 @@ def _build_metadata(
             "duration_seconds": training.duration_seconds,
             "seed": training.seed,
             "device": training.device,
+            "requested_device": training.requested_device,
+            "resolved_device": training.resolved_device,
             "policy_parameter_sha256": comparison.ppo_parameter_hash_after,
         },
         "validation": {
@@ -1530,6 +1533,19 @@ def verify_artifact_bundle(
         raise ArtifactCompatibilityError("PPO configuration payload is incompatible")
     if int(configuration.get("seed", -1)) != int(training_metadata.get("seed", -2)):
         raise ArtifactCompatibilityError("Persisted PPO seed metadata differs")
+    requested_device = str(training_metadata.get("requested_device", ""))
+    resolved_device = str(training_metadata.get("resolved_device", ""))
+    actual_training_device = str(training_metadata.get("device", ""))
+    if requested_device not in {"cpu", "mps", "auto"}:
+        raise ArtifactCompatibilityError("Persisted requested device is invalid")
+    if resolved_device not in {"cpu", "mps"}:
+        raise ArtifactCompatibilityError("Persisted resolved device is invalid")
+    if str(configuration.get("device", "")) != requested_device:
+        raise ArtifactCompatibilityError("Persisted PPO device request differs")
+    if not torch_devices_equivalent(actual_training_device, resolved_device):
+        raise ArtifactCompatibilityError(
+            "Persisted actual and resolved training devices differ"
+        )
     try:
         if int(normalized_record["random_seed"]) != int(training_metadata.get("seed")):
             raise ArtifactCompatibilityError("Persisted registry seed metadata differs")
