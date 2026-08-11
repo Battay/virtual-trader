@@ -1019,6 +1019,57 @@ def build_train_episode_index(manifest: Mapping[str, object]) -> dict[str, objec
     }
 
 
+def build_leave_one_out_sector_manifest(
+    target_symbol: str,
+    *,
+    standard_manifest_path: Path,
+    current_verified_path: Path,
+    generated_at: str | None = None,
+) -> dict[str, object]:
+    """Derive a deterministic target-excluded universe without loading prices."""
+
+    try:
+        standard = json.loads(Path(standard_manifest_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SectorUniverseError(f"Could not load standard sector manifest: {exc}") from exc
+    if not isinstance(standard, Mapping):
+        raise SectorUniverseError("standard sector manifest must be an object")
+    identity = standard.get("deterministic_identity")
+    if (
+        standard.get("artifact_schema_version") != SECTOR_UNIVERSE_SCHEMA_VERSION
+        or not isinstance(identity, Mapping)
+        or deterministic_universe_hash(identity) != standard.get("universe_hash")
+    ):
+        raise SectorUniverseError("standard sector manifest is stale or incompatible")
+    experiment = standard.get("experiment_mode")
+    if not isinstance(experiment, Mapping) or experiment.get("mode") != STANDARD_SECTOR_PRETRAINING:
+        raise SectorUniverseError("leave-one-out must derive from a standard universe")
+    try:
+        current = pd.read_csv(current_verified_path, dtype={"symbol": "string"})
+    except (OSError, pd.errors.ParserError) as exc:
+        raise SectorUniverseError(f"Could not load current sector evidence: {exc}") from exc
+    sector = standard.get("sector")
+    cohort = standard.get("cohort")
+    source = standard.get("source_provenance")
+    if not all(isinstance(value, Mapping) for value in (sector, cohort, source)):
+        raise SectorUniverseError("standard sector provenance is incomplete")
+    return build_sector_manifest(
+        current,
+        sector_id=str(sector["sector_id"]),
+        sector_name=str(sector["sector_name"]),
+        cohort_cutoff=str(cohort["cohort_cutoff"]),
+        listing_snapshot_date=str(cohort["listing_snapshot_date"]),
+        source_registry_sha256=str(source["company_registry_sha256"]),
+        source_registry_path=str(source["company_registry_path"]),
+        source_listing_path=str(source["official_listing_snapshot_path"]),
+        source_listing_sha256=str(source["official_listing_snapshot_sha256"]),
+        generated_at=generated_at or datetime.now(timezone.utc).isoformat(),
+        git_commit=(str(standard["git_commit"]) if standard.get("git_commit") else None),
+        mode=LEAVE_ONE_SYMBOL_OUT,
+        target_symbol=str(target_symbol).strip(),
+    )
+
+
 def build_sector_statistics(current: pd.DataFrame) -> pd.DataFrame:
     """Summarize diversity, depth, compatibility, and concentration by sector."""
 
@@ -1269,6 +1320,7 @@ __all__ = (
     "SectorUniverseBuildResult",
     "SectorUniverseError",
     "build_current_verified_universe",
+    "build_leave_one_out_sector_manifest",
     "build_sector_manifest",
     "build_sector_statistics",
     "build_train_episode_index",

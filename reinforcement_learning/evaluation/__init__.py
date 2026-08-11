@@ -36,6 +36,19 @@ def __getattr__(name: str):
         }
         return values[name]
     if name in {
+        "aggregate_sector_validation",
+        "evaluate_sector_recurrent_on_validation",
+    }:
+        from .sector_recurrent_evaluator import (
+            aggregate_sector_validation,
+            evaluate_sector_recurrent_on_validation,
+        )
+
+        return {
+            "aggregate_sector_validation": aggregate_sector_validation,
+            "evaluate_sector_recurrent_on_validation": evaluate_sector_recurrent_on_validation,
+        }[name]
+    if name in {
         "ValidationEvaluationError",
         "evaluate_ppo_validation",
         "policy_parameter_hash",
@@ -66,9 +79,11 @@ __all__ = (
     "ValidationComparisonResult",
     "ValidationEvaluationError",
     "calculate_episode_metrics",
+    "aggregate_sector_validation",
     "compare_candidate_on_validation",
     "decide_candidate_validation",
     "evaluate_ppo_validation",
+    "evaluate_sector_recurrent_on_validation",
     "policy_parameter_hash",
     "run_baseline",
 )

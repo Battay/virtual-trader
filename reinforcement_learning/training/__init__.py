@@ -9,6 +9,14 @@ from .devices import (
     resolve_torch_device,
 )
 from .results import PPOTrainingDiagnostics, PPOTrainingResult
+from .sector_recurrent_config import (
+    SECTOR_RECURRENT_TRAINER_VERSION,
+    SectorRecurrentPPOConfig,
+)
+from .sector_recurrent_results import (
+    SectorRecurrentTrainingResult,
+    SectorValidationResult,
+)
 
 
 def __getattr__(name: str):
@@ -30,6 +38,22 @@ def __getattr__(name: str):
             "train_single_symbol": train_single_symbol,
         }
         return values[name]
+    if name in {
+        "SectorRecurrentTrainerError",
+        "load_sector_training_universe",
+        "train_sector_recurrent_ppo",
+    }:
+        from .sector_recurrent_trainer import (
+            SectorRecurrentTrainerError,
+            load_sector_training_universe,
+            train_sector_recurrent_ppo,
+        )
+
+        return {
+            "SectorRecurrentTrainerError": SectorRecurrentTrainerError,
+            "load_sector_training_universe": load_sector_training_universe,
+            "train_sector_recurrent_ppo": train_sector_recurrent_ppo,
+        }[name]
     raise AttributeError(name)
 
 
@@ -44,7 +68,14 @@ __all__ = (
     "TorchDeviceError",
     "TorchDeviceResolution",
     "TrainingProgress",
+    "SECTOR_RECURRENT_TRAINER_VERSION",
+    "SectorRecurrentPPOConfig",
+    "SectorRecurrentTrainerError",
+    "SectorRecurrentTrainingResult",
+    "SectorValidationResult",
     "create_training_vector_environment",
     "resolve_torch_device",
     "train_single_symbol",
+    "load_sector_training_universe",
+    "train_sector_recurrent_ppo",
 )

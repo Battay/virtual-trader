@@ -15,10 +15,29 @@ def __getattr__(name: str):
             "action_name": action_name,
         }
         return values[name]
+    if name in {
+        "EqualSymbolEpisodeSampler",
+        "SectorEnvironmentError",
+        "SectorTrainingEnv",
+    }:
+        from .sector_training_env import (
+            EqualSymbolEpisodeSampler,
+            SectorEnvironmentError,
+            SectorTrainingEnv,
+        )
+
+        return {
+            "EqualSymbolEpisodeSampler": EqualSymbolEpisodeSampler,
+            "SectorEnvironmentError": SectorEnvironmentError,
+            "SectorTrainingEnv": SectorTrainingEnv,
+        }[name]
     raise AttributeError(name)
 
 __all__ = (
     "ENVIRONMENT_VERSION",
+    "EqualSymbolEpisodeSampler",
+    "SectorEnvironmentError",
+    "SectorTrainingEnv",
     "SingleSymbolEnvConfig",
     "SingleSymbolEnv",
     "SingleSymbolTradingEnv",
