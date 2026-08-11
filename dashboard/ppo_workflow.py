@@ -38,6 +38,10 @@ from reinforcement_learning.data_contract import (
     RL_OBSERVATION_SCALER_FILENAME,
     load_rl_contract_metadata,
 )
+from reinforcement_learning.history_policy import (
+    HistoryClass,
+    classify_usable_history,
+)
 from reinforcement_learning.integrity import sha256_file
 from reinforcement_learning.training.config import PPO_CONFIG_VERSION, PPOConfig
 
@@ -98,6 +102,36 @@ class ReadySymbolCatalog:
     ready_symbols: tuple[str, ...]
     summaries: Mapping[str, SelectedSymbolSummary]
     rejected_reasons: Mapping[str, str]
+    failure_categories: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class PPOReadinessReconciliation:
+    """Auditable feature-readiness and compatible-contract intersection."""
+
+    eligible_symbols: int
+    compatible_rl_symbols: int
+    intersection: int
+    missing_contracts: int
+    stale_contracts: int
+    incompatible_feature_versions: int
+    incompatible_contract_versions: int
+    incompatible_environment_versions: int
+    other_failures: int
+
+
+@dataclass(frozen=True)
+class SelectedSymbolTrainingProfile:
+    """Read-only current readiness and future history route for one symbol."""
+
+    symbol: str
+    company_name: str
+    sector: str
+    usable_observations: int
+    history_class: HistoryClass
+    history_class_label: str
+    current_mlp_ppo_ready: bool
+    future_training_route: str
 
 
 @dataclass(frozen=True)
@@ -163,6 +197,26 @@ def _as_ready(value: object) -> bool:
     return str(value).strip().lower() in {"true", "1"}
 
 
+def _contract_failure_category(error: Exception) -> str:
+    """Return a stable audit category without weakening the original error."""
+    detail = str(error).casefold()
+    if "missing" in detail or "no such file" in detail:
+        return "missing_contract"
+    if "feature version" in detail:
+        return "incompatible_feature_version"
+    if "schema version" in detail or "contract version" in detail:
+        return "incompatible_contract_version"
+    if "environment version" in detail:
+        return "incompatible_environment_version"
+    if (
+        "stale" in detail
+        or "row counts differ" in detail
+        or "date bounds differ" in detail
+    ):
+        return "stale_contract"
+    return "other_failure"
+
+
 def _summary(metadata: RLContractMetadata) -> SelectedSymbolSummary:
     scaler_path = metadata.contract_path.parent / RL_OBSERVATION_SCALER_FILENAME
     scaler_metadata_path = scaler_path.with_suffix(".json")
@@ -210,8 +264,8 @@ def build_ready_symbol_catalog(
         "train_rows",
         "validation_rows",
         "test_rows",
-        "first_usable_date",
-        "last_usable_date",
+        "processed_first_date",
+        "processed_last_date",
     }
     missing = sorted(required.difference(status_table.columns))
     if missing:
@@ -226,10 +280,12 @@ def build_ready_symbol_catalog(
     loader = metadata_loader or load_rl_contract_metadata
     summaries: dict[str, SelectedSymbolSummary] = {}
     rejected: dict[str, str] = {}
+    failure_categories: dict[str, str] = {}
     for row in source.sort_values("symbol", kind="stable").itertuples(index=False):
         symbol = str(row.symbol)
         if not _as_ready(row.eligible) or str(row.readiness_status) != "Ready":
             rejected[symbol] = str(row.readiness_status) or "Not Ready"
+            failure_categories[symbol] = "ineligible"
             continue
         try:
             metadata = loader(symbol, splits_dir=Path(splits_dir))
@@ -250,22 +306,73 @@ def build_ready_symbol_catalog(
                 raise ValueError(
                     "RL partition row counts differ from current processed readiness"
                 )
-            first_date = pd.Timestamp(row.first_usable_date)
-            last_date = pd.Timestamp(row.last_usable_date)
+            first_date = pd.Timestamp(row.processed_first_date)
+            last_date = pd.Timestamp(row.processed_last_date)
             if pd.isna(first_date) or pd.isna(last_date):
-                raise ValueError("Current processed readiness dates are unavailable")
+                raise ValueError("Current processed dataset bounds are unavailable")
             if (
                 first_date.date().isoformat() != summary.train_start
                 or last_date.date().isoformat() != summary.test_end
             ):
                 raise ValueError(
-                    "RL partition date bounds differ from current processed readiness"
+                    "RL partition date bounds differ from current processed dataset"
                 )
             summaries[symbol] = summary
         except Exception as exc:
             rejected[symbol] = f"RL contract unavailable: {exc}"
+            failure_categories[symbol] = _contract_failure_category(exc)
     symbols = tuple(sorted(summaries, key=str.casefold))
-    return ReadySymbolCatalog(symbols, dict(summaries), dict(rejected))
+    return ReadySymbolCatalog(
+        symbols,
+        dict(summaries),
+        dict(rejected),
+        dict(failure_categories),
+    )
+
+
+def readiness_reconciliation(
+    status_table: pd.DataFrame,
+    catalog: ReadySymbolCatalog,
+) -> PPOReadinessReconciliation:
+    """Summarize the exact eligible/compatible intersection and failures."""
+    required = {"symbol", "eligible", "readiness_status"}
+    missing = sorted(required.difference(status_table.columns))
+    if missing:
+        raise ValueError(f"readiness table is missing: {', '.join(missing)}")
+    source = status_table.loc[:, list(required)].copy(deep=True)
+    source["symbol"] = source["symbol"].astype("string").str.strip()
+    eligible = {
+        str(row.symbol)
+        for row in source.itertuples(index=False)
+        if _as_ready(row.eligible) and str(row.readiness_status) == "Ready"
+    }
+    compatible = eligible.intersection(catalog.ready_symbols)
+    failures = {
+        symbol: catalog.failure_categories.get(symbol, "other_failure")
+        for symbol in eligible.difference(compatible)
+    }
+    counts = {
+        category: sum(value == category for value in failures.values())
+        for category in (
+            "missing_contract",
+            "stale_contract",
+            "incompatible_feature_version",
+            "incompatible_contract_version",
+            "incompatible_environment_version",
+            "other_failure",
+        )
+    }
+    return PPOReadinessReconciliation(
+        eligible_symbols=len(eligible),
+        compatible_rl_symbols=len(compatible),
+        intersection=len(compatible),
+        missing_contracts=counts["missing_contract"],
+        stale_contracts=counts["stale_contract"],
+        incompatible_feature_versions=counts["incompatible_feature_version"],
+        incompatible_contract_versions=counts["incompatible_contract_version"],
+        incompatible_environment_versions=counts["incompatible_environment_version"],
+        other_failures=counts["other_failure"],
+    )
 
 
 def selected_symbol_summary(
@@ -279,6 +386,55 @@ def selected_symbol_summary(
         return summary
     reason = catalog.rejected_reasons.get(symbol_text, "Symbol is not RL-ready")
     raise ValueError(f"{symbol_text or 'Selected symbol'} is not ready: {reason}")
+
+
+def selected_symbol_training_profile(
+    status_table: pd.DataFrame,
+    catalog: ReadySymbolCatalog,
+    symbol: str,
+) -> SelectedSymbolTrainingProfile:
+    """Combine canonical MLP readiness with the separate future history policy."""
+    required = {"symbol", "company_name", "sector", "usable_rows"}
+    missing = sorted(required.difference(status_table.columns))
+    if missing:
+        raise ValueError(f"readiness table is missing: {', '.join(missing)}")
+    source = status_table.loc[:, list(required)].copy(deep=True)
+    source["symbol"] = source["symbol"].astype("string").str.strip()
+    symbol_text = str(symbol).strip()
+    matches = source.loc[source["symbol"].eq(symbol_text)]
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected one readiness record for {symbol_text!r}, found {len(matches)}"
+        )
+    row = matches.iloc[0]
+    classification = classify_usable_history(row["usable_rows"])
+    company_name = row["company_name"]
+    sector = row["sector"]
+    return SelectedSymbolTrainingProfile(
+        symbol=symbol_text,
+        company_name=("" if pd.isna(company_name) else str(company_name).strip()),
+        sector=("" if pd.isna(sector) else str(sector).strip()),
+        usable_observations=classification.usable_observations,
+        history_class=classification.history_class,
+        history_class_label=classification.label,
+        current_mlp_ppo_ready=symbol_text in catalog.ready_symbols,
+        future_training_route=classification.future_training_route,
+    )
+
+
+def future_history_class_counts(status_table: pd.DataFrame) -> dict[HistoryClass, int]:
+    """Count future classes for active ordinary equities without changing readiness."""
+    required = {"security_type", "usable_rows"}
+    missing = sorted(required.difference(status_table.columns))
+    if missing:
+        raise ValueError(f"readiness table is missing: {', '.join(missing)}")
+    source = status_table.loc[:, list(required)].copy(deep=True)
+    ordinary = source.loc[source["security_type"].eq("ordinary_equity")]
+    counts = {history_class: 0 for history_class in HistoryClass}
+    for value in ordinary["usable_rows"]:
+        classification = classify_usable_history(value)
+        counts[classification.history_class] += 1
+    return counts
 
 
 def build_workflow_identity(

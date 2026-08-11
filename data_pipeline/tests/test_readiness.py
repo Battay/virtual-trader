@@ -90,7 +90,51 @@ def test_ready_symbol_reports_chronological_partition_rows(tmp_path: Path) -> No
         39,
         40,
     )
+    processed_dates = pd.to_datetime(pd.read_csv(tmp_path / "MCB.csv")["date"])
+    assert row["processed_first_date"] == processed_dates.min().date()
+    assert row["processed_last_date"] == processed_dates.max().date()
     assert row["readiness_status"] == "Ready"
+
+
+def test_processed_bounds_remain_distinct_from_newer_live_source_dates(
+    tmp_path: Path,
+) -> None:
+    built_market = _market("MCB", 310)
+    registry = _registry("MCB")
+    build_symbol_datasets(
+        market_data=built_market,
+        registry=registry,
+        include_market_context=False,
+        minimum_usable_rows=252,
+        output_dir=tmp_path,
+    )
+    current_market = _market("MCB", 312)
+
+    report = build_training_readiness_report(
+        current_market,
+        registry,
+        minimum_usable_rows=252,
+        processed_symbols_dir=tmp_path,
+    )
+    row = report.iloc[0]
+
+    assert row["first_usable_date"] == row["processed_first_date"]
+    assert row["last_usable_date"] == current_market["date"].max().date()
+    assert row["processed_last_date"] == built_market["date"].max().date()
+    assert row["last_usable_date"] > row["processed_last_date"]
+    assert row["readiness_status"] == "Ready"
+
+    status = build_model_readiness_table(
+        current_market,
+        registry,
+        empty_model_registry(),
+        minimum_usable_rows=252,
+        processed_symbols_dir=tmp_path,
+    ).iloc[0]
+    assert status["first_usable_date"] == row["first_usable_date"]
+    assert status["last_usable_date"] == row["last_usable_date"]
+    assert status["processed_first_date"] == row["processed_first_date"]
+    assert status["processed_last_date"] == row["processed_last_date"]
 
 
 def test_missing_processed_unsupported_and_quality_statuses(tmp_path: Path) -> None:
@@ -116,6 +160,8 @@ def test_missing_processed_unsupported_and_quality_statuses(tmp_path: Path) -> N
     )
 
     assert missing.iloc[0]["readiness_status"] == "Missing Processed Dataset"
+    assert pd.isna(missing.iloc[0]["processed_first_date"])
+    assert pd.isna(missing.iloc[0]["processed_last_date"])
     assert unsupported.iloc[0]["readiness_status"] == "Unsupported Security Type"
     assert invalid.iloc[0]["readiness_status"] == "Data Quality Issue"
 

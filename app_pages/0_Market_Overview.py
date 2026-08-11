@@ -11,14 +11,21 @@ from dashboard.market_overview import (
     INDEX_VIEW_CODES,
     INDEX_VIEW_OPTIONS,
     automation_status_label,
-    filter_index_range,
-    index_health_comparison,
-    index_health_from_filtered_data,
-    index_trend_summary,
+    index_period_analyses,
     market_summary_values,
     normalized_index_performance_from_filtered,
-    single_index_performance_from_filtered,
-    single_index_period_summary,
+)
+from dashboard.index_period_presentation import (
+    DEFAULT_INDEX_PERIOD,
+    index_chart_frame,
+    index_drawdown_chart,
+    index_health_breakdown_frame,
+    index_level_chart,
+    index_period_contract_values,
+    index_period_summary_values,
+    index_rolling_volatility_chart,
+    index_source_identity,
+    resolve_index_period,
 )
 from dashboard.presentation import (
     format_date,
@@ -40,28 +47,37 @@ from market_intelligence.index_config import SUPPORTED_INDICES
 from market_intelligence.index_metrics import calculate_index_metrics
 from market_intelligence.market_breadth import calculate_market_breadth
 from market_intelligence.market_health import (
-    INDEX_HEALTH_WEIGHTS,
     MARKET_HEALTH_WEIGHTS,
-    calculate_index_health_scores,
     calculate_market_health,
+    calculate_period_index_health_scores,
 )
 
 
 @st.cache_data(ttl="5m", max_entries=10)
-def _read_csv(path: str) -> pd.DataFrame:
+def _read_csv(
+    path: str,
+    modified_at_ns: int | None,
+    size_bytes: int | None,
+) -> pd.DataFrame:
+    del modified_at_ns, size_bytes
     try:
         return pd.read_csv(path)
     except (OSError, ValueError, pd.errors.ParserError):
         return pd.DataFrame()
 
 
+def _load_csv(path) -> pd.DataFrame:
+    """Load local data with file identity included in the Streamlit cache key."""
+    return _read_csv(*index_source_identity(path))
+
+
 st.title("Market Overview")
 st.caption("Official PSX indices and descriptive local market intelligence.")
 
-indices = _read_csv(str(INDICES_MASTER_PATH))
-equities = _read_csv(str(MASTER_CSV_PATH))
-processed = _read_csv(str(PROCESSED_MASTER_PATH))
-models = _read_csv(str(MODEL_REGISTRY_PATH))
+indices = _load_csv(INDICES_MASTER_PATH)
+equities = _load_csv(MASTER_CSV_PATH)
+processed = _load_csv(PROCESSED_MASTER_PATH)
+models = _load_csv(MODEL_REGISTRY_PATH)
 metrics = (
     {
         code: calculate_index_metrics(indices, code)
@@ -76,7 +92,6 @@ breadth = (
     else calculate_market_breadth(pd.DataFrame())
 )
 health = calculate_market_health(metrics, breadth)
-index_health = calculate_index_health_scores(metrics)
 summary = market_summary_values(
     score=health.score,
     condition=health.label,
@@ -123,48 +138,12 @@ with st.expander("Overall Market Health methodology"):
     for explanation in health.explanations:
         st.caption(explanation)
 
-st.subheader("Index Health Overview")
-st.caption("Index Health is a descriptive analytical indicator, not investment advice.")
-if not metrics:
-    st.info(
-        "Index data is not available yet. Open Market Indices to refresh the "
-        "official series."
-    )
-else:
-    with st.container(horizontal=True, gap="small"):
-        for code, definition in SUPPORTED_INDICES.items():
-            metric = metrics[code]
-            index_result = index_health[code]
-            with st.container(border=True):
-                st.markdown(f"**{definition.display_name}**")
-                st.metric(
-                    "Condition",
-                    index_result.label,
-                    f"{format_decimal(index_result.score, precision=1)} / 100"
-                    if index_result.score is not None
-                    else "—",
-                    delta_color="off",
-                )
-                st.write(f"Latest value: {format_decimal(metric.latest_value)}")
-                st.write(
-                    "Daily change: "
-                    f"{format_directional_percentage(metric.latest_daily_change_percent)}"
-                )
-                st.write(
-                    "1-month return: "
-                    f"{format_directional_percentage(metric.one_month_return)}"
-                )
-                st.write(f"Trend: {index_trend_summary(metric)}")
-                st.write(
-                    "Volatility: "
-                    f"{format_percentage(metric.rolling_volatility_20, show_sign=False)} "
-                    "annualized (20-day)"
-                    if metric.rolling_volatility_20 is not None
-                    else "Volatility: Not Available"
-                )
-                st.caption(f"Observation date: {format_date(metric.latest_date)}")
-
-st.subheader("Index Performance")
+st.subheader("Index performance and period health")
+st.caption(
+    "The chart, metrics, health score, and component table below all use the "
+    "same selected-period observations. Index Health is descriptive analysis, "
+    "not investment advice."
+)
 selected_view = st.selectbox(
     "Index view",
     INDEX_VIEW_OPTIONS,
@@ -174,19 +153,30 @@ selected_view = st.selectbox(
 period = st.segmented_control(
     "Visible period",
     INDEX_RANGE_OPTIONS,
-    default="6M",
+    default=DEFAULT_INDEX_PERIOD,
     key="market_overview_index_period",
 )
 labels = {
     code: definition.display_name
     for code, definition in SUPPORTED_INDICES.items()
 }
-selected_period = period or "6M"
+selected_period = resolve_index_period(period)
 selected_code = INDEX_VIEW_CODES[selected_view]
-visible_indices = filter_index_range(indices, selected_period)
-period_index_health = index_health_from_filtered_data(
-    visible_indices,
+period_analyses = index_period_analyses(
+    indices,
+    selected_period,
     index_codes=tuple(SUPPORTED_INDICES),
+)
+period_index_health = calculate_period_index_health_scores(period_analyses)
+visible_frames = [
+    analysis.causal_frame
+    for analysis in period_analyses.values()
+    if not analysis.causal_frame.empty
+]
+visible_indices = (
+    pd.concat(visible_frames, ignore_index=True)
+    if visible_frames
+    else pd.DataFrame()
 )
 st.markdown(f"**{selected_view}**")
 if selected_code is None:
@@ -209,125 +199,219 @@ if selected_code is None:
             "Each available index starts at 100 on its first observation in the "
             "selected period."
         )
+    comparison_rows: list[dict[str, object]] = []
+    for code, label in labels.items():
+        analysis = period_analyses[code]
+        index_result = period_index_health[code]
+        contract = index_period_contract_values(analysis)
+        period_summary = index_period_summary_values(analysis, index_result)
+        comparison_rows.append(
+            {
+                "Index": label,
+                "Period": contract["Requested Period"],
+                "Start": contract["Actual Start Date"],
+                "End": contract["Actual End Date"],
+                "Observations": contract["Trading Observations"],
+                "Start Value": contract["Start Value"],
+                "End Value": contract["End Value"],
+                "Return %": period_summary["Selected-Period Return"],
+                "Volatility %": period_summary["Selected-Period Volatility"],
+                "Max Drawdown %": period_summary["Maximum Drawdown"],
+                "Health Score": period_summary["Health Score"],
+                "Condition": index_result.label,
+                "Coverage %": index_result.coverage_percentage,
+            }
+        )
     st.dataframe(
-        index_health_comparison(period_index_health, display_labels=labels),
+        pd.DataFrame(comparison_rows),
         hide_index=True,
         column_config={
             "Health Score": st.column_config.NumberColumn(format="%.1f / 100"),
-            "Observation Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+            "Start": st.column_config.DateColumn(format="YYYY-MM-DD"),
+            "End": st.column_config.DateColumn(format="YYYY-MM-DD"),
+            "Start Value": st.column_config.NumberColumn(format="%,.2f"),
+            "End Value": st.column_config.NumberColumn(format="%,.2f"),
+            "Return %": st.column_config.NumberColumn(format="%+.2f%%"),
+            "Volatility %": st.column_config.NumberColumn(format="%.2f%%"),
+            "Max Drawdown %": st.column_config.NumberColumn(format="%+.2f%%"),
+            "Coverage %": st.column_config.NumberColumn(format="%.1f%%"),
         },
+        width="stretch",
+    )
+    st.caption(
+        f"Health methodology: {next(iter(period_index_health.values())).methodology_version} · "
+        "each index is filtered independently from its own latest observation."
     )
 else:
-    performance = single_index_performance_from_filtered(
-        visible_indices,
-        index_code=selected_code,
-        display_label=selected_view,
-    )
-    period_summary = single_index_period_summary(performance)
-    metric = calculate_index_metrics(visible_indices, selected_code)
-    selected_health = period_index_health.get(selected_code)
+    analysis = period_analyses[selected_code]
+    selected_health = period_index_health[selected_code]
+    contract = index_period_contract_values(analysis)
+    period_summary = index_period_summary_values(analysis, selected_health)
+    chart_frame = index_chart_frame(analysis, display_label=selected_view)
+    latest_row = chart_frame.iloc[-1] if not chart_frame.empty else None
+
     with st.container(border=True):
-        st.markdown(f"**{selected_view} Health — {selected_period}**")
+        st.markdown(f"**{selected_view} health — {selected_period}**")
         with st.container(horizontal=True, gap="small"):
             st.metric(
-                "Index Health Score",
+                "Index health score",
                 (
                     f"{format_decimal(selected_health.score, precision=1)} / 100"
-                    if selected_health and selected_health.score is not None
+                    if selected_health.score is not None
                     else "—"
                 ),
+                border=True,
             )
             st.metric(
-                "Index Condition",
-                selected_health.label if selected_health else "Unavailable",
+                "Index condition",
+                selected_health.label,
+                border=True,
             )
             st.metric(
-                "Reference Date",
-                format_date(selected_health.reference_date if selected_health else None),
+                "Actual start",
+                format_date(contract["Actual Start Date"]),
+                border=True,
             )
             st.metric(
-                "Data Coverage",
-                (
-                    f"{format_integer(selected_health.observation_count)} trading observations"
-                    if selected_health
-                    else "—"
+                "Actual end",
+                format_date(contract["Actual End Date"]),
+                border=True,
+            )
+            st.metric(
+                "Trading observations",
+                format_integer(contract["Trading Observations"]),
+                border=True,
+            )
+            st.metric(
+                "Component coverage",
+                format_percentage(
+                    selected_health.coverage_percentage,
+                    show_sign=False,
                 ),
+                border=True,
+            )
+        if selected_health.coverage_percentage < 100:
+            unavailable = ", ".join(selected_health.unavailable_components)
+            st.warning(
+                f"{selected_period} has insufficient selected-period history for: "
+                f"{unavailable}. The score uses "
+                f"{format_decimal(selected_health.coverage_percentage, precision=1)}% "
+                "of configured components and normalizes available weight to 100."
             )
         st.caption(
-            "Index Health is a descriptive analytical indicator, not investment advice."
+            f"Methodology {selected_health.methodology_version}. The score equals "
+            "the sum of the normalized contributions shown below and remains a "
+            "descriptive analytical indicator, not investment advice."
         )
-        if selected_health:
-            if selected_health.coverage_percentage < 100:
-                unavailable = ", ".join(selected_health.unavailable_components)
-                st.warning(
-                    f"{selected_period} view has insufficient history for: "
-                    f"{unavailable}. Score uses "
-                    f"{format_decimal(selected_health.coverage_percentage, precision=1)}% "
-                    "of configured components and is normalized to 100."
-                )
+        breakdown = index_health_breakdown_frame(selected_health)
+        with st.expander("Period health component breakdown"):
             st.dataframe(
-                pd.DataFrame(
-                    {
-                        "Component": list(INDEX_HEALTH_WEIGHTS),
-                        "Weight": list(INDEX_HEALTH_WEIGHTS.values()),
-                        "Points": list(selected_health.component_scores.values()),
-                    }
-                ),
+                breakdown,
                 hide_index=True,
+                column_config={
+                    "Input": st.column_config.NumberColumn(format="%.3f"),
+                    "Configured Weight": st.column_config.NumberColumn(format="%d"),
+                    "Factor %": st.column_config.NumberColumn(format="%.2f%%"),
+                    "Raw Points": st.column_config.NumberColumn(format="%.3f"),
+                    "Normalized Contribution": st.column_config.NumberColumn(
+                        format="%.3f"
+                    ),
+                },
+                width="stretch",
             )
             for explanation in selected_health.explanations:
                 st.caption(explanation)
+
     with st.container(horizontal=True, gap="small"):
         st.metric(
-            "Latest Value",
-            format_decimal(metric.latest_value if metric else None),
+            "Selected-period return",
+            format_directional_percentage(period_summary["Selected-Period Return"]),
             border=True,
         )
         st.metric(
-            "Daily Change",
+            "Period high",
+            format_decimal(period_summary["Period High"]),
+            border=True,
+        )
+        st.metric(
+            "Period low",
+            format_decimal(period_summary["Period Low"]),
+            border=True,
+        )
+        st.metric(
+            "Latest level",
+            format_decimal(period_summary["Latest Level"]),
+            border=True,
+        )
+        st.metric(
+            "Selected-period volatility",
+            format_percentage(
+                period_summary["Selected-Period Volatility"],
+                show_sign=False,
+            ),
+            border=True,
+        )
+        st.metric(
+            "Maximum drawdown",
+            format_directional_percentage(period_summary["Maximum Drawdown"]),
+            border=True,
+        )
+        st.metric(
+            "Start value",
+            format_decimal(contract["Start Value"]),
+            border=True,
+        )
+        st.metric(
+            "End value",
+            format_decimal(contract["End Value"]),
+            border=True,
+        )
+        st.metric(
+            "Latest daily change",
             format_decimal(
-                metric.latest_daily_change if metric else None,
+                latest_row["Daily Change"] if latest_row is not None else None,
                 show_sign=True,
             ),
             border=True,
         )
         st.metric(
-            "Daily Change %",
+            "Latest daily change %",
             format_directional_percentage(
-                metric.latest_daily_change_percent if metric else None
+                latest_row["Daily Change %"] if latest_row is not None else None
             ),
             border=True,
         )
-        st.metric(
-            "Period Return",
-            format_directional_percentage(period_summary["Period Return"]),
-            border=True,
-        )
-        st.metric(
-            "Period High",
-            format_decimal(period_summary["Period High"]),
-            border=True,
-        )
-        st.metric(
-            "Period Low",
-            format_decimal(period_summary["Period Low"]),
-            border=True,
-        )
-        st.metric(
-            "Latest Observation Date",
-            format_date(metric.latest_date if metric else None),
-            border=True,
-        )
-    if performance.empty:
+
+    if chart_frame.empty:
         st.info(f"No {selected_view} history is available for this period.")
     else:
-        st.line_chart(
-            performance,
-            x="Trading Date",
-            y="Index Value",
-            x_label="Trading Date",
-            y_label="Index Value",
+        st.altair_chart(
+            index_level_chart(chart_frame),
+            width="stretch",
+            key="market_overview_index_level_chart",
         )
+        st.caption(
+            "Index level with causal MA20 and MA50. Moving averages begin only "
+            "after enough observations exist inside the selected period."
+        )
+        st.markdown("**Selected-period drawdown**")
+        st.altair_chart(
+            index_drawdown_chart(chart_frame),
+            width="stretch",
+            key="market_overview_drawdown_chart",
+        )
+        if chart_frame["Rolling Volatility 20D %"].notna().any():
+            st.markdown("**Causal rolling volatility**")
+            st.altair_chart(
+                index_rolling_volatility_chart(chart_frame),
+                width="stretch",
+                key="market_overview_volatility_chart",
+            )
+        else:
+            st.info(
+                "Rolling 20-observation volatility is unavailable for this "
+                "selected period."
+            )
 
 st.subheader("Market Breadth")
 breadth_available = breadth.reference_date is not None

@@ -6,13 +6,21 @@ import pandas as pd
 
 from market_intelligence.index_metrics import IndexMetrics
 from market_intelligence.index_metrics import calculate_index_metrics
+from market_intelligence.index_periods import (
+    INDEX_PERIOD_OPTIONS,
+    IndexPeriodAnalysis,
+    analyze_index_periods,
+    combine_index_periods,
+    filter_index_period,
+)
 from market_intelligence.market_health import (
     IndexHealth,
     calculate_index_health_scores,
+    calculate_period_index_health_scores,
 )
 
 
-INDEX_RANGE_OPTIONS = ("1M", "3M", "6M", "1Y", "Maximum")
+INDEX_RANGE_OPTIONS = INDEX_PERIOD_OPTIONS
 ALL_INDICES_LABEL = "All Indices"
 INDEX_VIEW_CODES = {
     ALL_INDICES_LABEL: None,
@@ -22,37 +30,21 @@ INDEX_VIEW_CODES = {
     "KSE All Share Index": "ALLSHR",
 }
 INDEX_VIEW_OPTIONS = tuple(INDEX_VIEW_CODES)
-_RANGE_OFFSETS = {
-    "1M": pd.DateOffset(months=1),
-    "3M": pd.DateOffset(months=3),
-    "6M": pd.DateOffset(months=6),
-    "1Y": pd.DateOffset(years=1),
-}
-
-
 def filter_index_range(data: pd.DataFrame, period: str) -> pd.DataFrame:
-    """Return a chronological copy within a local display range."""
+    """Compatibility wrapper around the canonical per-index period contract."""
     if period not in INDEX_RANGE_OPTIONS:
         raise ValueError(
             f"Unsupported index range {period!r}; expected one of "
             f"{', '.join(INDEX_RANGE_OPTIONS)}"
         )
-    filtered = data.copy(deep=True)
-    if filtered.empty or "date" not in filtered:
-        return filtered
-    filtered["date"] = pd.to_datetime(filtered["date"], errors="coerce")
-    sort_columns = ["date"]
-    if "index_code" in filtered:
-        sort_columns.append("index_code")
-    filtered = filtered.dropna(subset=["date"]).sort_values(
-        sort_columns, kind="stable"
+    if data.empty:
+        return data.copy(deep=True)
+    if "index_code" not in data:
+        raise ValueError("index range data is missing required column: index_code")
+    index_codes = tuple(
+        data["index_code"].dropna().astype(str).str.strip().str.upper().unique()
     )
-    if filtered.empty or period == "Maximum":
-        return filtered.reset_index(drop=True)
-    latest = filtered["date"].max()
-    return filtered.loc[
-        filtered["date"] >= latest - _RANGE_OFFSETS[period]
-    ].reset_index(drop=True)
+    return combine_index_periods(data, index_codes, period)
 
 
 def normalized_index_performance(
@@ -116,7 +108,7 @@ def single_index_performance(
     display_label: str,
 ) -> pd.DataFrame:
     """Return one index's chronological raw values for the selected period."""
-    filtered = filter_index_range(data, period)
+    filtered = filter_index_period(data, index_code, period)
     return single_index_performance_from_filtered(
         filtered,
         index_code=index_code,
@@ -171,6 +163,27 @@ def index_health_from_filtered_data(
         for code in index_codes
     }
     return calculate_index_health_scores(metrics, observation_counts=counts)
+
+
+def index_period_analyses(
+    data: pd.DataFrame,
+    period: str,
+    *,
+    index_codes: tuple[str, ...],
+) -> dict[str, IndexPeriodAnalysis]:
+    """Return canonical independent analyses for one requested period."""
+    return analyze_index_periods(data, index_codes, period)
+
+
+def index_health_for_period(
+    data: pd.DataFrame,
+    period: str,
+    *,
+    index_codes: tuple[str, ...],
+) -> dict[str, IndexHealth]:
+    """Calculate versioned health from each exact canonical period analysis."""
+    analyses = index_period_analyses(data, period, index_codes=index_codes)
+    return calculate_period_index_health_scores(analyses)
 
 
 def single_index_period_summary(performance: pd.DataFrame) -> dict[str, object]:

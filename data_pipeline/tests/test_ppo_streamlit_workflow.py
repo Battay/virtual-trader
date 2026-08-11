@@ -21,16 +21,19 @@ from dashboard.ppo_workflow import (
     build_ready_symbol_catalog,
     build_workflow_identity,
     claim_workflow_job,
+    future_history_class_counts,
     initialize_workflow_session,
     mark_candidate_persisted,
     persistence_availability,
     pilot_readiness_table,
     registry_history_table,
     release_workflow_job,
+    readiness_reconciliation,
     run_persistence_action,
     run_training_action,
     run_validation_action,
     selected_symbol_summary,
+    selected_symbol_training_profile,
     sync_workflow_identity,
     training_availability,
     validation_availability,
@@ -39,8 +42,10 @@ from dashboard.ppo_workflow import (
 )
 from reinforcement_learning.data_contract import (
     RLContractMetadata,
+    RLDataContractError,
     RLPartitionMetadata,
 )
+from reinforcement_learning.history_policy import HistoryClass
 from reinforcement_learning.training.config import PPO_CONFIG_VERSION
 
 
@@ -74,11 +79,16 @@ def _status_table() -> pd.DataFrame:
             "eligible": [True, True, False],
             "readiness_status": ["Ready", "Ready", "Insufficient History"],
             "company_name": ["Numeric Symbol", "MCB Bank", "Old Limited"],
+            "sector": ["Technology", "Commercial Banks", "Investment"],
+            "security_type": ["ordinary_equity"] * 3,
+            "usable_rows": [126, 2_435, 99],
             "train_rows": [1_704, 1_704, 10],
             "validation_rows": [365, 365, 2],
             "test_rows": [366, 366, 2],
             "first_usable_date": ["2016-10-06", "2016-10-06", "2026-01-01"],
             "last_usable_date": ["2026-08-05", "2026-08-05", "2026-01-20"],
+            "processed_first_date": ["2016-10-06", "2016-10-06", None],
+            "processed_last_date": ["2026-08-05", "2026-08-05", None],
         }
     )
 
@@ -211,6 +221,47 @@ def test_ready_symbol_catalog_intersects_readiness_and_valid_metadata(
     assert selected_symbol_summary(catalog, "0786").symbol == "0786"
 
 
+def test_newer_live_dates_do_not_reject_contract_aligned_to_processed_data(
+    tmp_path: Path,
+) -> None:
+    status = _status_table()
+    status.loc[status["symbol"].eq("MCB"), "last_usable_date"] = "2026-08-07"
+    catalog, _ = _catalog(tmp_path)
+
+    def loader(symbol: str, **kwargs) -> RLContractMetadata:
+        del kwargs
+        return _metadata(symbol, catalog.summaries[symbol].contract_path)
+
+    current = build_ready_symbol_catalog(
+        status,
+        splits_dir=tmp_path,
+        metadata_loader=loader,
+    )
+
+    assert "MCB" in current.ready_symbols
+
+
+def test_true_processed_date_mismatch_is_excluded_as_stale(
+    tmp_path: Path,
+) -> None:
+    catalog, _ = _catalog(tmp_path)
+    status = _status_table()
+    status.loc[status["symbol"].eq("MCB"), "processed_last_date"] = "2026-08-07"
+
+    current = build_ready_symbol_catalog(
+        status,
+        splits_dir=tmp_path,
+        metadata_loader=lambda symbol, **_: _metadata(
+            symbol,
+            catalog.summaries[symbol].contract_path,
+        ),
+    )
+
+    assert "MCB" not in current.ready_symbols
+    assert current.failure_categories["MCB"] == "stale_contract"
+    assert "processed dataset" in current.rejected_reasons["MCB"]
+
+
 def test_selected_symbol_summary_uses_metadata_only_and_keeps_test_sealed(
     tmp_path: Path,
 ) -> None:
@@ -230,6 +281,42 @@ def test_selected_symbol_summary_uses_metadata_only_and_keeps_test_sealed(
     )
     assert summary.observation_shape == (17,)
     assert len(summary.contract_sha256) == 64
+
+
+def test_selected_symbol_profile_separates_future_class_from_mlp_readiness(
+    tmp_path: Path,
+) -> None:
+    catalog, _ = _catalog(tmp_path)
+    status = _status_table()
+    status.loc[status["symbol"].eq("MCB"), "usable_rows"] = 100
+    status.loc[status["symbol"].eq("MCB"), "first_usable_date"] = "2026-01-01"
+    status.loc[status["symbol"].eq("MCB"), "last_usable_date"] = "2026-08-05"
+    original = status.copy(deep=True)
+
+    profile = selected_symbol_training_profile(status, catalog, "MCB")
+
+    pdt.assert_frame_equal(status, original)
+    assert profile.company_name == "MCB Bank"
+    assert profile.sector == "Commercial Banks"
+    assert profile.usable_observations == 100
+    assert profile.history_class is HistoryClass.COLD_START
+    assert profile.current_mlp_ppo_ready is True
+    assert "real company history" in profile.future_training_route
+
+
+def test_future_history_counts_use_usable_rows_without_rewriting_readiness() -> None:
+    status = _status_table()
+    original = status.copy(deep=True)
+
+    counts = future_history_class_counts(status)
+
+    pdt.assert_frame_equal(status, original)
+    assert counts == {
+        HistoryClass.MATURE: 2,
+        HistoryClass.COLD_START: 0,
+        HistoryClass.INSUFFICIENT: 1,
+    }
+    assert status["eligible"].tolist() == [True, True, False]
 
 
 def test_non_ready_symbol_fails_with_saved_reason(tmp_path: Path) -> None:
@@ -266,6 +353,107 @@ def test_stale_contract_counts_are_excluded_from_ready_catalog(tmp_path: Path) -
 
     assert "MCB" not in catalog.ready_symbols
     assert "row counts differ" in catalog.rejected_reasons["MCB"]
+    assert catalog.failure_categories["MCB"] == "stale_contract"
+
+
+@pytest.mark.parametrize(
+    ("message", "category"),
+    (
+        ("RL contract is missing", "missing_contract"),
+        ("RL artifact feature version is stale", "incompatible_feature_version"),
+        ("Incompatible RL artifact schema version", "incompatible_contract_version"),
+        (
+            "RL artifact environment version does not match",
+            "incompatible_environment_version",
+        ),
+        ("scaler artifact is unreadable", "other_failure"),
+    ),
+)
+def test_contract_failures_are_reconciled_by_explicit_category(
+    tmp_path: Path,
+    message: str,
+    category: str,
+) -> None:
+    status = _status_table().loc[lambda frame: frame["symbol"].eq("MCB")]
+
+    def loader(*args, **kwargs):
+        raise RLDataContractError(message)
+
+    catalog = build_ready_symbol_catalog(
+        status,
+        splits_dir=tmp_path,
+        metadata_loader=loader,
+    )
+    reconciliation = readiness_reconciliation(status, catalog)
+
+    assert catalog.ready_symbols == ()
+    assert catalog.failure_categories["MCB"] == category
+    assert reconciliation.eligible_symbols == 1
+    assert reconciliation.compatible_rl_symbols == 0
+    assert reconciliation.intersection == 0
+    assert sum(
+        (
+            reconciliation.missing_contracts,
+            reconciliation.stale_contracts,
+            reconciliation.incompatible_feature_versions,
+            reconciliation.incompatible_contract_versions,
+            reconciliation.incompatible_environment_versions,
+            reconciliation.other_failures,
+        )
+    ) == 1
+
+
+def test_production_style_454_symbol_intersection_does_not_collapse_to_zero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract_path = tmp_path / "shared" / "rl_contract.json"
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_text("{}", encoding="utf-8")
+    (contract_path.parent / "rl_observation_scaler.joblib").write_bytes(b"scaler")
+    (contract_path.parent / "rl_observation_scaler.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    for name in ("train.csv", "train_rl.csv", "validation.csv", "validation_rl.csv"):
+        (contract_path.parent / name).write_text("fixture", encoding="utf-8")
+    symbols = tuple(f"S{index:03d}" for index in range(454))
+    status = pd.DataFrame(
+        {
+            "symbol": pd.Series(symbols, dtype="string"),
+            "eligible": True,
+            "readiness_status": "Ready",
+            "train_rows": 1_704,
+            "validation_rows": 365,
+            "test_rows": 366,
+            "first_usable_date": "2016-10-06",
+            "last_usable_date": "2026-08-07",
+            "processed_first_date": "2016-10-06",
+            "processed_last_date": "2026-08-05",
+        }
+    )
+    training_calls: list[str] = []
+
+    def unexpected_training(*args, **kwargs):
+        training_calls.append("called")
+        raise AssertionError("readiness calculation attempted PPO training")
+
+    monkeypatch.setattr(
+        "dashboard.ppo_workflow.run_training_action",
+        unexpected_training,
+    )
+
+    catalog = build_ready_symbol_catalog(
+        status,
+        splits_dir=tmp_path,
+        metadata_loader=lambda symbol, **_: _metadata(symbol, contract_path),
+    )
+    reconciliation = readiness_reconciliation(status, catalog)
+
+    assert len(catalog.ready_symbols) == 454
+    assert reconciliation.eligible_symbols == 454
+    assert reconciliation.compatible_rl_symbols == 454
+    assert reconciliation.intersection == 454
+    assert not training_calls
 
 
 def test_workflow_identity_uses_requested_config_and_contract_sha(

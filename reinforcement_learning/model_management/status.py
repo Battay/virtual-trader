@@ -218,6 +218,8 @@ def build_model_readiness_table(
         "usable_feature_rows",
         "first_usable_date",
         "last_usable_date",
+        "processed_first_date",
+        "processed_last_date",
         "minimum_usable_rows",
         "additional_rows_required",
         "train_rows",

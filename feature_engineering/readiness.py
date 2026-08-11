@@ -44,6 +44,8 @@ READINESS_COLUMNS = (
     "usable_feature_rows",
     "first_usable_date",
     "last_usable_date",
+    "processed_first_date",
+    "processed_last_date",
     "minimum_usable_rows",
     "additional_rows_required",
     "train_rows",
@@ -174,6 +176,8 @@ def _empty_report() -> pd.DataFrame:
             "usable_feature_rows": pd.Series(dtype="int64"),
             "first_usable_date": pd.Series(dtype="object"),
             "last_usable_date": pd.Series(dtype="object"),
+            "processed_first_date": pd.Series(dtype="object"),
+            "processed_last_date": pd.Series(dtype="object"),
             "minimum_usable_rows": pd.Series(dtype="int64"),
             "additional_rows_required": pd.Series(dtype="int64"),
             "train_rows": pd.Series(dtype="int64"),
@@ -268,6 +272,7 @@ def build_training_readiness_report(
             f"{safe_path_component(symbol)}.csv"
         )
         train_rows = validation_rows = test_rows = 0
+        processed_first_date = processed_last_date = None
         if symbol in fatal_symbols:
             status = "Data Quality Issue"
         elif security_type != "ordinary_equity":
@@ -293,6 +298,12 @@ def build_training_readiness_report(
                 train_rows = len(split.train)
                 validation_rows = len(split.validation)
                 test_rows = len(split.test)
+                train_dates = pd.to_datetime(split.train["date"], errors="coerce")
+                test_dates = pd.to_datetime(split.test["date"], errors="coerce")
+                if train_dates.isna().any() or test_dates.isna().any():
+                    raise ValueError("processed symbol dataset contains an invalid date")
+                processed_first_date = train_dates.min().date()
+                processed_last_date = test_dates.max().date()
                 status = "Ready"
             except (OSError, UnicodeError, ValueError, pd.errors.ParserError):
                 status = "Data Quality Issue"
@@ -321,6 +332,8 @@ def build_training_readiness_report(
                 "last_usable_date": (
                     usable_dates.max().date() if not usable_dates.empty else None
                 ),
+                "processed_first_date": processed_first_date,
+                "processed_last_date": processed_last_date,
                 "minimum_usable_rows": minimum_usable_rows,
                 "additional_rows_required": additional_required_rows(
                     usable_rows,
