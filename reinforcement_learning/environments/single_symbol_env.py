@@ -13,20 +13,23 @@ from gymnasium import spaces
 import numpy as np
 import pandas as pd
 
+from .action_validity import (
+    ACTION_NAMES,
+    ActionOutcome,
+    action_mask,
+    action_name,
+    evaluate_action_validity,
+    finalize_action_outcome,
+    portfolio_state_from_shares,
+    require_supported_action_mode,
+    valid_actions,
+)
 from .config import DYNAMIC_PORTFOLIO_FEATURES, SingleSymbolEnvConfig
+from .reward import RewardComponents, calculate_reward_components
 from .validation import prepare_single_symbol_data
 
 
-ACTION_NAMES = {0: "Hold", 1: "Buy", 2: "Sell"}
 PORTFOLIO_OBSERVATION_FEATURES = DYNAMIC_PORTFOLIO_FEATURES
-
-
-def action_name(action: int) -> str:
-    """Return the readable name for a supported discrete action."""
-    try:
-        return ACTION_NAMES[int(action)]
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError(f"Unsupported action {action!r}; expected 0, 1, or 2") from exc
 
 
 class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
@@ -45,6 +48,7 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
         if render_mode not in {None, "ansi", "human"}:
             raise ValueError("render_mode must be None, 'ansi', or 'human'")
         self.config = config or SingleSymbolEnvConfig()
+        require_supported_action_mode(self.config.invalid_action_mode)
         self.render_mode = render_mode
         self._data = prepare_single_symbol_data(
             data,
@@ -104,13 +108,8 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
             execution_price=None,
             shares_traded=0,
             transaction_cost=0.0,
-            reward_components={
-                "portfolio_growth": 0.0,
-                "transaction_cost_penalty": 0.0,
-                "drawdown_penalty": 0.0,
-                "invalid_action_penalty": 0.0,
-            },
-            invalid_action_reason=None,
+            reward_components=RewardComponents.zero(),
+            action_outcome=None,
         )
 
     def step(
@@ -122,6 +121,8 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
         if not self.action_space.contains(action):
             raise ValueError(f"Action must be one of {tuple(ACTION_NAMES)}")
         action = int(action)
+        state_before_action = portfolio_state_from_shares(self.shares_held)
+        validity = evaluate_action_validity(action, state_before_action)
         previous_value = self.total_portfolio_value
         previous_drawdown = self.current_drawdown
         observation_index = self.current_step
@@ -134,16 +135,16 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
         shares_traded = 0
         commission = 0.0
         slippage_cost = 0.0
-        invalid_reason: str | None = None
+        execution_failure_reason: str | None = None
 
-        if action == 1:
+        if action == 1 and validity.state_valid:
             execution_price = raw_open * (1 + self.config.slippage_rate)
             affordable = math.floor(
                 self.cash
                 / (execution_price * (1 + self.config.commission_rate))
             )
             if affordable < 1:
-                invalid_reason = "Insufficient cash to buy one whole share"
+                execution_failure_reason = "Insufficient cash to buy one whole share"
             else:
                 shares_traded = affordable
                 transaction_value = shares_traded * execution_price
@@ -157,24 +158,27 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
                     existing_cost + total_outflow
                 ) / self.shares_held
                 self.number_of_trades += 1
-        elif action == 2:
+        elif action == 2 and validity.state_valid:
             execution_price = raw_open * (1 - self.config.slippage_rate)
-            if self.shares_held == 0:
-                invalid_reason = "No shares are held to sell"
-            else:
-                quantity = self.shares_held
-                shares_traded = -quantity
-                transaction_value = quantity * execution_price
-                commission = transaction_value * self.config.commission_rate
-                slippage_cost = quantity * (raw_open - execution_price)
-                net_proceeds = transaction_value - commission
-                self.cash += net_proceeds
-                self.realized_profit_loss += (
-                    net_proceeds - self.average_entry_price * quantity
-                )
-                self.shares_held = 0
-                self.average_entry_price = 0.0
-                self.number_of_trades += 1
+            quantity = self.shares_held
+            shares_traded = -quantity
+            transaction_value = quantity * execution_price
+            commission = transaction_value * self.config.commission_rate
+            slippage_cost = quantity * (raw_open - execution_price)
+            net_proceeds = transaction_value - commission
+            self.cash += net_proceeds
+            self.realized_profit_loss += (
+                net_proceeds - self.average_entry_price * quantity
+            )
+            self.shares_held = 0
+            self.average_entry_price = 0.0
+            self.number_of_trades += 1
+
+        action_outcome = finalize_action_outcome(
+            validity,
+            execution_failure_reason=execution_failure_reason,
+            trade_executed=shares_traded != 0,
+        )
 
         transaction_cost = commission + slippage_cost
         self.total_transaction_costs += transaction_cost
@@ -199,26 +203,16 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
         )
         if previous_value <= 0 or self.total_portfolio_value <= 0:
             raise RuntimeError("Portfolio value must remain positive")
-        portfolio_growth = math.log(self.total_portfolio_value / previous_value)
-        cost_penalty = (
-            self.config.transaction_cost_penalty_weight
-            * transaction_cost
-            / previous_value
+        reward_components = calculate_reward_components(
+            config=self.config.reward_config,
+            previous_portfolio_value=previous_value,
+            current_portfolio_value=self.total_portfolio_value,
+            transaction_cost=transaction_cost,
+            previous_drawdown=previous_drawdown,
+            current_drawdown=self.current_drawdown,
+            action_invalid=not action_outcome.action_valid,
         )
-        drawdown_penalty = self.config.drawdown_penalty_weight * max(
-            0.0,
-            self.current_drawdown - previous_drawdown,
-        )
-        invalid_penalty = (
-            self.config.invalid_action_penalty if invalid_reason else 0.0
-        )
-        reward_components = {
-            "portfolio_growth": portfolio_growth,
-            "transaction_cost_penalty": -cost_penalty,
-            "drawdown_penalty": -drawdown_penalty,
-            "invalid_action_penalty": -invalid_penalty,
-        }
-        reward = float(sum(reward_components.values()))
+        reward = reward_components.total_reward
         if not math.isfinite(reward):
             raise RuntimeError("Reward must remain finite")
         self._episode_steps += 1
@@ -236,7 +230,7 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
             shares_traded=shares_traded,
             transaction_cost=transaction_cost,
             reward_components=reward_components,
-            invalid_action_reason=invalid_reason,
+            action_outcome=action_outcome,
         )
         self._history.append(
             {
@@ -245,6 +239,17 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
                 "execution_date": next_row["date"],
                 "action": action,
                 "action_name": action_name(action),
+                "action_valid": action_outcome.action_valid,
+                "action_executed": action_outcome.action_executed,
+                "trade_executed": action_outcome.trade_executed,
+                "invalid_action_reason": (
+                    action_outcome.invalid_reason
+                    or action_outcome.execution_failure_reason
+                ),
+                "semantic_invalid_action_reason": action_outcome.invalid_reason,
+                "execution_failure_reason": (
+                    action_outcome.execution_failure_reason
+                ),
                 "execution_price": execution_price,
                 "shares_traded": shares_traded,
                 "transaction_cost": transaction_cost,
@@ -255,6 +260,7 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
                 "unrealized_profit_loss": self.unrealized_profit_loss,
                 "drawdown": self.current_drawdown,
                 "reward": reward,
+                "reward_breakdown": reward_components.to_dict(),
             }
         )
         if self.render_mode == "human":
@@ -301,8 +307,8 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
         execution_price: float | None,
         shares_traded: int,
         transaction_cost: float,
-        reward_components: dict[str, float],
-        invalid_action_reason: str | None,
+        reward_components: RewardComponents,
+        action_outcome: ActionOutcome | None,
     ) -> dict[str, object]:
         info: dict[str, object] = {
             "environment_version": self.config.environment_version,
@@ -327,10 +333,32 @@ class SingleSymbolTradingEnv(gym.Env[np.ndarray, int]):
             "realized_profit_loss": self.realized_profit_loss,
             "unrealized_profit_loss": self.unrealized_profit_loss,
             "drawdown": self.current_drawdown,
-            "reward_components": reward_components,
+            "reward_components": reward_components.to_legacy_dict(),
+            "reward_breakdown": reward_components.to_dict(),
+            "reward_version": reward_components.reward_version,
+            "action_validity_version": self.config.action_validity_version,
+            "invalid_action_mode": self.config.invalid_action_mode,
         }
-        if invalid_action_reason:
-            info["invalid_action_reason"] = invalid_action_reason
+        if action_outcome is None:
+            state = portfolio_state_from_shares(self.shares_held)
+            info.update(
+                {
+                    "selected_action": None,
+                    "selected_action_name": None,
+                    "portfolio_state_before_action": state.value,
+                    "action_state_valid": None,
+                    "action_valid": None,
+                    "action_executed": None,
+                    "trade_executed": False,
+                    "invalid_action_reason": None,
+                    "semantic_invalid_action_reason": None,
+                    "execution_failure_reason": None,
+                    "valid_action_ids": valid_actions(state),
+                    "valid_action_mask": action_mask(state),
+                }
+            )
+        else:
+            info.update(action_outcome.as_dict())
         return info
 
     def get_history(self) -> pd.DataFrame:

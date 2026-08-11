@@ -39,6 +39,9 @@ from reinforcement_learning.training.sector_recurrent_results import (
     SectorSymbolValidationResult,
     SectorValidationResult,
 )
+from reinforcement_learning.training.sector_methodology_diagnostics import (
+    detect_action_collapse,
+)
 from reinforcement_learning.training.sector_recurrent_trainer import (
     COMMERCIAL_BANKS_MANIFEST_PATH,
     _read_manifest,
@@ -215,26 +218,66 @@ def aggregate_sector_validation(
     total_actions = Counter({"Hold": 0, "Buy": 0, "Sell": 0})
     zero_trade_symbols: list[str] = []
     patterns: dict[str, list[str]] = {}
+    pattern_by_symbol: dict[str, str] = {}
+    trades_by_symbol: dict[str, int] = {}
+    exposure_by_symbol: dict[str, float] = {}
     exposure = []
+    invalid_action_count = 0
+    observed_action_count = 0
     for result in symbol_results:
         total_actions.update(result.action_counts)
-        if int(result.ppo.metrics["number_of_trades"]) == 0:
+        trade_count = int(result.ppo.metrics["number_of_trades"])
+        trades_by_symbol[result.symbol] = trade_count
+        if trade_count == 0:
             zero_trade_symbols.append(result.symbol)
-        exposure.append(float(result.ppo.metrics["exposure_percentage"] or 0.0))
+        symbol_exposure = float(
+            result.ppo.metrics["exposure_percentage"] or 0.0
+        )
+        exposure_by_symbol[result.symbol] = symbol_exposure
+        exposure.append(symbol_exposure)
         patterns.setdefault(result.action_pattern_digest, []).append(result.symbol)
+        pattern_by_symbol[result.symbol] = result.action_pattern_digest
+        history = result.ppo.history
+        if "action_valid" in history:
+            validity = history["action_valid"].astype(bool)
+            invalid_action_count += int((~validity).sum())
+            observed_action_count += len(validity)
     action_total = sum(total_actions.values())
     action_percentages = {
         name: (100.0 * count / action_total if action_total else 0.0)
         for name, count in total_actions.items()
     }
     identical_groups = [symbols for symbols in patterns.values() if len(symbols) > 1]
+    fixed_collapse = detect_action_collapse(
+        selected_action_counts={
+            "hold": int(total_actions["Hold"]),
+            "buy": int(total_actions["Buy"]),
+            "sell": int(total_actions["Sell"]),
+        },
+        invalid_action_rate=(
+            invalid_action_count / observed_action_count
+            if observed_action_count
+            else 0.0
+        ),
+        per_symbol_exposure_percentages=exposure_by_symbol,
+        per_symbol_trade_counts=trades_by_symbol,
+        per_symbol_action_digests=pattern_by_symbol,
+    )
     warnings: list[str] = []
     dominant_action = max(action_percentages, key=action_percentages.get) if action_total else None
+    if dominant_action and action_percentages[dominant_action] > 80.0:
+        warnings.append(
+            f"possible_action_collapse: {dominant_action} exceeds 80% of actions"
+        )
     if dominant_action and action_percentages[dominant_action] >= 90.0:
         warnings.append(f"possible policy collapse: {dominant_action} is at least 90% of actions")
+    if observed_action_count and invalid_action_count / observed_action_count > 0.80:
+        warnings.append(
+            "possible_invalid_action_attractor: more than 80% of selections are invalid"
+        )
     if evaluated and len(zero_trade_symbols) == evaluated:
         warnings.append("possible policy collapse: every symbol has zero executed trades")
-    if exposure and float(np.median(exposure)) <= 5.0:
+    if exposure and float(np.median(exposure)) < 5.0:
         warnings.append("possible policy collapse: median exposure is at most 5%")
     if identical_groups:
         warnings.append("identical action sequences observed for equal-length validation episodes")
@@ -245,6 +288,13 @@ def aggregate_sector_validation(
         "zero_trade_symbols": zero_trade_symbols,
         "median_exposure_percentage": float(np.median(exposure)) if exposure else None,
         "identical_action_pattern_groups": identical_groups,
+        "invalid_action_count": invalid_action_count,
+        "invalid_action_rate": (
+            invalid_action_count / observed_action_count
+            if observed_action_count
+            else 0.0
+        ),
+        "predeclared_warning_diagnostics": fixed_collapse,
         "warnings": warnings,
         "obvious_policy_collapse_flag": bool(warnings),
     }

@@ -9,6 +9,12 @@ from .devices import (
     resolve_torch_device,
 )
 from .results import PPOTrainingDiagnostics, PPOTrainingResult
+from .sector_balanced_config import (
+    BALANCED_SECTOR_CONFIG_VERSION,
+    BALANCED_SECTOR_TRAINER_VERSION,
+    BalancedSectorRecurrentPPOConfig,
+)
+from .sector_balanced_results import BalancedSectorTrainingResult
 from .sector_recurrent_config import (
     SECTOR_RECURRENT_TRAINER_VERSION,
     SectorRecurrentPPOConfig,
@@ -54,6 +60,21 @@ def __getattr__(name: str):
             "load_sector_training_universe": load_sector_training_universe,
             "train_sector_recurrent_ppo": train_sector_recurrent_ppo,
         }[name]
+    if name in {
+        "BalancedSectorTrainerError",
+        "train_balanced_sector_recurrent_ppo",
+    }:
+        from .sector_balanced_trainer import (
+            BalancedSectorTrainerError,
+            train_balanced_sector_recurrent_ppo,
+        )
+
+        return {
+            "BalancedSectorTrainerError": BalancedSectorTrainerError,
+            "train_balanced_sector_recurrent_ppo": (
+                train_balanced_sector_recurrent_ppo
+            ),
+        }[name]
     raise AttributeError(name)
 
 
@@ -68,6 +89,11 @@ __all__ = (
     "TorchDeviceError",
     "TorchDeviceResolution",
     "TrainingProgress",
+    "BALANCED_SECTOR_CONFIG_VERSION",
+    "BALANCED_SECTOR_TRAINER_VERSION",
+    "BalancedSectorRecurrentPPOConfig",
+    "BalancedSectorTrainerError",
+    "BalancedSectorTrainingResult",
     "SECTOR_RECURRENT_TRAINER_VERSION",
     "SectorRecurrentPPOConfig",
     "SectorRecurrentTrainerError",
@@ -78,4 +104,5 @@ __all__ = (
     "train_single_symbol",
     "load_sector_training_universe",
     "train_sector_recurrent_ppo",
+    "train_balanced_sector_recurrent_ppo",
 )

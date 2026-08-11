@@ -37,6 +37,12 @@ EXPECTED_HISTORY_COLUMNS = (
     "execution_date",
     "action",
     "action_name",
+    "action_valid",
+    "action_executed",
+    "trade_executed",
+    "invalid_action_reason",
+    "semantic_invalid_action_reason",
+    "execution_failure_reason",
     "execution_price",
     "shares_traded",
     "transaction_cost",
@@ -47,6 +53,7 @@ EXPECTED_HISTORY_COLUMNS = (
     "unrealized_profit_loss",
     "drawdown",
     "reward",
+    "reward_breakdown",
 )
 
 
@@ -147,7 +154,7 @@ def load_validation_context(
 
 
 def _validate_full_history(history: pd.DataFrame, context: ValidationContext) -> None:
-    if tuple(history.columns) != EXPECTED_HISTORY_COLUMNS:
+    if not set(EXPECTED_HISTORY_COLUMNS).issubset(history.columns):
         raise ValidationEvaluationError(
             "PPO history schema differs from the environment contract"
         )

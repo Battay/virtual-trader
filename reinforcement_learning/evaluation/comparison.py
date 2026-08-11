@@ -237,7 +237,7 @@ def _assert_apples_to_apples(
     expected_execution_dates = context.data["date"].iloc[1:].reset_index(drop=True)
     for strategy in strategies:
         history = strategy.history
-        if tuple(history.columns) != EXPECTED_HISTORY_COLUMNS:
+        if not set(EXPECTED_HISTORY_COLUMNS).issubset(history.columns):
             raise ValidationEvaluationError(
                 f"{strategy.strategy} history schema is incompatible"
             )

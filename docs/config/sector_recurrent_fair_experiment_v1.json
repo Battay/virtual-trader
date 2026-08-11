@@ -1,0 +1,1252 @@
+{
+  "action_validity_configuration": {
+    "action_mapping": {
+      "0": "Hold",
+      "1": "Buy",
+      "2": "Sell"
+    },
+    "action_validity_version": "sector_action_validity_v1",
+    "execution_failure_treatment": "state-valid action remains valid, action_executed is false, and no state-invalid-action penalty is charged",
+    "flat_valid_actions": [
+      0,
+      1
+    ],
+    "hold_always_valid": true,
+    "invalid_action_mode": "penalty",
+    "long_valid_actions": [
+      0,
+      2
+    ],
+    "masking_limitation": null,
+    "masking_status": "not_applicable",
+    "methodology_version": "sector_action_validity_penalty_v1",
+    "state_invalid_action_treatment": "no-op plus configured fixed penalty"
+  },
+  "action_validity_version": "sector_action_validity_v1",
+  "constituent_count": 19,
+  "constituent_symbols": [
+    "ABL",
+    "AKBL",
+    "BAFL",
+    "BAHL",
+    "BIPL",
+    "BML",
+    "BOK",
+    "BOP",
+    "FABL",
+    "HBL",
+    "HMB",
+    "JSBL",
+    "MCB",
+    "MEBL",
+    "NBP",
+    "SBL",
+    "SCBPL",
+    "SNBL",
+    "UBL"
+  ],
+  "controls": {
+    "independent_target": "10240_target_transitions",
+    "sector_balanced": "10240_transitions_per_constituent",
+    "total_compute_matched_independent": "separately_predeclared_not_executed"
+  },
+  "environment_version": "single_symbol_env_v1",
+  "evaluation_methodology": "complete_per_symbol_validation_episode_with_fresh_state",
+  "execution_status": "specification_only_not_executed",
+  "expected_total_scheduled_transitions": 194560,
+  "expected_transitions_per_symbol": 10240,
+  "experiment_spec_hash": "0c91e883f2e49d11d33c8e9891df8c89f0453865fb1f9f1c63309f342fa1345f",
+  "experiment_version": "sector_recurrent_fair_multiseed_experiment_v1",
+  "feature_version": "psx-4a-126450ec6355",
+  "full_three_seed_run_requires_future_explicit_authorization": true,
+  "normalization_contributors": [
+    "ABL",
+    "AKBL",
+    "BAFL",
+    "BAHL",
+    "BIPL",
+    "BML",
+    "BOK",
+    "BOP",
+    "FABL",
+    "HBL",
+    "HMB",
+    "JSBL",
+    "MCB",
+    "MEBL",
+    "NBP",
+    "SBL",
+    "SCBPL",
+    "SNBL",
+    "UBL"
+  ],
+  "normalization_scope": "symbol",
+  "ppo_configuration": {
+    "activation_fn": "Tanh",
+    "algorithm": "RecurrentPPO",
+    "batch_size": 64,
+    "clip_range": 0.2,
+    "config_version": "recurrent_ppo_single_symbol_v1",
+    "device": "cpu",
+    "enable_critic_lstm": true,
+    "ent_coef": 0.01,
+    "gae_lambda": 0.95,
+    "gamma": 0.99,
+    "learning_rate": 0.0003,
+    "lstm_hidden_size": 64,
+    "max_grad_norm": 0.5,
+    "n_epochs": 10,
+    "n_lstm_layers": 1,
+    "n_steps": 512,
+    "net_arch": [
+      64
+    ],
+    "ortho_init": true,
+    "policy": "MlpLstmPolicy",
+    "policy_kwargs": {
+      "activation_fn": "Tanh",
+      "enable_critic_lstm": true,
+      "lstm_hidden_size": 64,
+      "n_lstm_layers": 1,
+      "net_arch": {
+        "pi": [
+          64
+        ],
+        "vf": [
+          64
+        ]
+      },
+      "ortho_init": true,
+      "share_features_extractor": true,
+      "shared_lstm": false
+    },
+    "seed_source": "seed_policy.experiment_model_seeds",
+    "share_features_extractor": true,
+    "shared_lstm": false,
+    "total_timesteps": 194560,
+    "vf_coef": 0.5
+  },
+  "recurrent_architecture": {
+    "activation_fn": "Tanh",
+    "algorithm": "RecurrentPPO",
+    "enable_critic_lstm": true,
+    "lstm_hidden_size": 64,
+    "n_lstm_layers": 1,
+    "net_arch": [
+      64
+    ],
+    "ortho_init": true,
+    "policy": "MlpLstmPolicy",
+    "share_features_extractor": true,
+    "shared_lstm": false
+  },
+  "recurrent_contract_version": "rl_recurrent_partition_v1",
+  "reproducibility_fingerprint": {
+    "action_validity_version": "sector_action_validity_v1",
+    "data_schedule_seed": 42,
+    "experiment_spec_hash": "0c91e883f2e49d11d33c8e9891df8c89f0453865fb1f9f1c63309f342fa1345f",
+    "git_commit": "f5a13a8dd9d4c0caf2788215f77c5732726aea4e",
+    "model_seed_set": [
+      42,
+      43,
+      44
+    ],
+    "recurrent_contract_version": "rl_recurrent_partition_v1",
+    "reward_version": "sector_reward_v1",
+    "sampling_version": "sector_sampling_balanced_windows_v1",
+    "schedule_digest": "09b16449fa796a8cf4039fd0eec7fb192d32419c20237fa240ea927e7c66231f",
+    "sector_universe_hash": "589485c8adfe6170a6c2391687202ac3a287de9eb30737a2cb1f57a34f111e5b",
+    "taxonomy_version": "psx_sector_taxonomy_v1",
+    "trainer_version": "recurrent_ppo_sector_balanced_v1"
+  },
+  "reward_configuration": {
+    "drawdown_increment_definition": "positive increment only: max(0, current drawdown minus previous drawdown)",
+    "drawdown_increment_weight": 0.1,
+    "invalid_action_penalty": 0.0001,
+    "invalid_action_treatment": "invalid selections are no-ops in penalty mode and subtract the configured fixed invalid-action penalty",
+    "portfolio_growth_definition": "natural log of current portfolio value divided by previous portfolio value, after next-open execution and next-close marking",
+    "portfolio_growth_weight": 1.0,
+    "reward_equation": "portfolio_growth_weight * log(current_portfolio_value / previous_portfolio_value) - transaction_cost_weight * transaction_cost / previous_portfolio_value - drawdown_increment_weight * max(0, current_drawdown - previous_drawdown) - invalid_action_penalty when action is invalid",
+    "reward_version": "sector_reward_v1",
+    "transaction_cost_treatment": "commission and slippage already affect portfolio accounting; the optional additional penalty is transaction_cost_weight times transaction cost divided by previous portfolio value",
+    "transaction_cost_weight": 0.0
+  },
+  "reward_version": "sector_reward_v1",
+  "rollout_alignment": {
+    "artificial_window_end": "truncated_with_terminal_observation_for_bootstrap",
+    "n_steps_must_divide_total_scheduled_transitions": true,
+    "natural_train_end": "terminated_without_truncation",
+    "post_schedule_vecenv_reset": "passive_valid_observation_with_zero_additional_exposure; subsequent_step_prohibited",
+    "requested_total_must_not_be_relabelled_after_sb3_padding": true,
+    "scheduled_environment_transitions_are_authoritative": true
+  },
+  "rounds": 20,
+  "sampling_version": "sector_sampling_balanced_windows_v1",
+  "schedule_digest": "09b16449fa796a8cf4039fd0eec7fb192d32419c20237fa240ea927e7c66231f",
+  "sector_universe_hash": "589485c8adfe6170a6c2391687202ac3a287de9eb30737a2cb1f57a34f111e5b",
+  "seed_policy": {
+    "data_schedule_seed": 42,
+    "data_schedule_seed_controls": [
+      "chronology_stratified_window_locations",
+      "per_round_symbol_order"
+    ],
+    "experiment_model_seeds": [
+      42,
+      43,
+      44
+    ],
+    "model_seed_controls": [
+      "python_rng",
+      "numpy_rng",
+      "pytorch_rng",
+      "ppo_initialization",
+      "environment_stochasticity"
+    ],
+    "ppo_seed_source": "experiment_model_seeds",
+    "ppo_template_seed_is_not_part_of_spec_identity": true,
+    "round_order_constant_across_model_seeds": true,
+    "window_locations_constant_across_model_seeds": true
+  },
+  "source_rows_per_window": 513,
+  "state_isolation": {
+    "episode_start_at_every_window": true,
+    "portfolio_state_reset_at_every_window": true,
+    "recurrent_state_reset_at_every_window": true,
+    "rollout_boundary_alone_does_not_reset": true
+  },
+  "symbol_identity_observation": "excluded_observation_shape_remains_17",
+  "target_excluded_from_pretraining": false,
+  "target_symbol": null,
+  "taxonomy_version": "psx_sector_taxonomy_v1",
+  "test_sealing_rule": "TEST_metadata_only_never_loaded_or_evaluated",
+  "trainer_version": "recurrent_ppo_sector_balanced_v1",
+  "unique_history_coverage": [
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1659,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 415,
+          "coverage_percentage": 97.83132530120481,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1555,
+          "unique_transitions_used": 406,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 415,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3684,
+          "unique_transitions_used": 415,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 415,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3593,
+          "unique_transitions_used": 415,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 414,
+          "coverage_percentage": 94.92753623188406,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1408,
+          "unique_transitions_used": 393,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 98.19168173598554,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.091796875,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8611,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1660,
+      "symbol": "ABL",
+      "unique_transitions_used": 1629,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 30,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1702,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 93.1924882629108,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1505,
+          "unique_transitions_used": 397,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3652,
+          "unique_transitions_used": 425,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3574,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 89.6470588235294,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1509,
+          "unique_transitions_used": 381,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.71092831962397,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.091796875,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8611,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1703,
+      "symbol": "AKBL",
+      "unique_transitions_used": 1629,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 73,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1702,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 92.48826291079813,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1567,
+          "unique_transitions_used": 394,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3534,
+          "unique_transitions_used": 425,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3611,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 88.0,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1528,
+          "unique_transitions_used": 374,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.12338425381904,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.189453125,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8621,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1703,
+      "symbol": "BAFL",
+      "unique_transitions_used": 1619,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 83,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1703,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 86.3849765258216,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1446,
+          "unique_transitions_used": 368,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3622,
+          "unique_transitions_used": 426,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3598,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 95.52941176470588,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1574,
+          "unique_transitions_used": 406,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.47856723429243,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.12109375,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8614,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1704,
+      "symbol": "BAHL",
+      "unique_transitions_used": 1626,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 77,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1648,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 412,
+          "coverage_percentage": 100.0,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1476,
+          "unique_transitions_used": 412,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 412,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3698,
+          "unique_transitions_used": 412,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 412,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3676,
+          "unique_transitions_used": 412,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 412,
+          "coverage_percentage": 89.07766990291262,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1390,
+          "unique_transitions_used": 367,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 97.26941747572816,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.345703125,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8637,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1649,
+      "symbol": "BIPL",
+      "unique_transitions_used": 1603,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 45,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1702,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 99.06103286384976,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1554,
+          "unique_transitions_used": 422,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3660,
+          "unique_transitions_used": 425,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3456,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 99.76470588235294,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1570,
+          "unique_transitions_used": 424,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 99.70622796709753,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 83.427734375,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8543,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1703,
+      "symbol": "BML",
+      "unique_transitions_used": 1697,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 5,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1483,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 371,
+          "coverage_percentage": 99.46091644204851,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1356,
+          "unique_transitions_used": 369,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 371,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3767,
+          "unique_transitions_used": 371,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 371,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3695,
+          "unique_transitions_used": 371,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 370,
+          "coverage_percentage": 99.72972972972973,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1422,
+          "unique_transitions_used": 369,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 99.79770734996629,
+      "maximum_usage_count": 12,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 85.546875,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8760,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1484,
+      "symbol": "BOK",
+      "unique_transitions_used": 1480,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 3,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1703,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 90.3755868544601,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1534,
+          "unique_transitions_used": 385,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3568,
+          "unique_transitions_used": 426,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3582,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 92.23529411764706,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1556,
+          "unique_transitions_used": 392,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.65472695243687,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.091796875,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8611,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1704,
+      "symbol": "BOP",
+      "unique_transitions_used": 1629,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 74,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1700,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 87.76470588235294,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1485,
+          "unique_transitions_used": 373,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3625,
+          "unique_transitions_used": 425,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3618,
+          "unique_transitions_used": 425,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 91.52941176470588,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1512,
+          "unique_transitions_used": 389,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 94.82352941176471,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.2578125,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8628,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1701,
+      "symbol": "FABL",
+      "unique_transitions_used": 1612,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 88,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1703,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 99.53051643192488,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1621,
+          "unique_transitions_used": 424,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3495,
+          "unique_transitions_used": 426,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3558,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 93.6470588235294,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1566,
+          "unique_transitions_used": 398,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 98.29712272460364,
+      "maximum_usage_count": 9,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 83.65234375,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8566,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1704,
+      "symbol": "HBL",
+      "unique_transitions_used": 1674,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 29,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1674,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 419,
+          "coverage_percentage": 87.82816229116945,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1536,
+          "unique_transitions_used": 368,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 418,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3648,
+          "unique_transitions_used": 418,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 419,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3600,
+          "unique_transitions_used": 419,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 418,
+          "coverage_percentage": 95.69377990430623,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1456,
+          "unique_transitions_used": 400,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.87813620071685,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.326171875,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8635,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1675,
+      "symbol": "HMB",
+      "unique_transitions_used": 1605,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 69,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1645,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 412,
+          "coverage_percentage": 94.90291262135922,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1510,
+          "unique_transitions_used": 391,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 411,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3624,
+          "unique_transitions_used": 411,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 411,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3637,
+          "unique_transitions_used": 411,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 411,
+          "coverage_percentage": 95.62043795620438,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1469,
+          "unique_transitions_used": 393,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 97.62917933130699,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.31640625,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8634,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1646,
+      "symbol": "JSBL",
+      "unique_transitions_used": 1606,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 39,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1703,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 93.1924882629108,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1557,
+          "unique_transitions_used": 397,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3645,
+          "unique_transitions_used": 426,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3571,
+          "unique_transitions_used": 426,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 98.82352941176471,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1467,
+          "unique_transitions_used": 420,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 98.00352319436288,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 83.701171875,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8571,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1704,
+      "symbol": "MCB",
+      "unique_transitions_used": 1669,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 34,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1690,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 423,
+          "coverage_percentage": 92.67139479905437,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1507,
+          "unique_transitions_used": 392,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 422,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3558,
+          "unique_transitions_used": 422,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 423,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3723,
+          "unique_transitions_used": 423,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 422,
+          "coverage_percentage": 90.04739336492891,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1452,
+          "unique_transitions_used": 380,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.68047337278107,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 84.208984375,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8623,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1691,
+      "symbol": "MEBL",
+      "unique_transitions_used": 1617,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 73,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1703,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1513,
+          "unique_transitions_used": 426,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3683,
+          "unique_transitions_used": 426,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3568,
+          "unique_transitions_used": 426,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 96.23529411764706,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1476,
+          "unique_transitions_used": 409,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 99.0604815032296,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 83.525390625,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8553,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1704,
+      "symbol": "NBP",
+      "unique_transitions_used": 1687,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 16,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1216,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 304,
+          "coverage_percentage": 90.46052631578948,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1350,
+          "unique_transitions_used": 275,
+          "window_start_count": 9
+        },
+        {
+          "available_unique_transitions": 304,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3788,
+          "unique_transitions_used": 304,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 304,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3756,
+          "unique_transitions_used": 304,
+          "window_start_count": 3
+        },
+        {
+          "available_unique_transitions": 304,
+          "coverage_percentage": 96.71052631578948,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1346,
+          "unique_transitions_used": 294,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 96.79276315789474,
+      "maximum_usage_count": 15,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 88.505859375,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 9063,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1217,
+      "symbol": "SBL",
+      "unique_transitions_used": 1177,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 39,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1494,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 374,
+          "coverage_percentage": 92.51336898395722,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1365,
+          "unique_transitions_used": 346,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 373,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3691,
+          "unique_transitions_used": 373,
+          "window_start_count": 8
+        },
+        {
+          "available_unique_transitions": 374,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3772,
+          "unique_transitions_used": 374,
+          "window_start_count": 5
+        },
+        {
+          "available_unique_transitions": 373,
+          "coverage_percentage": 96.24664879356568,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1412,
+          "unique_transitions_used": 359,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 97.18875502008032,
+      "maximum_usage_count": 12,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 85.8203125,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8788,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1495,
+      "symbol": "SCBPL",
+      "unique_transitions_used": 1452,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 42,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1605,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 402,
+          "coverage_percentage": 91.54228855721394,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1428,
+          "unique_transitions_used": 368,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 401,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3673,
+          "unique_transitions_used": 401,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 401,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3658,
+          "unique_transitions_used": 401,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 401,
+          "coverage_percentage": 90.27431421446384,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1481,
+          "unique_transitions_used": 362,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 95.45171339563863,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 85.0390625,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8708,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1606,
+      "symbol": "SNBL",
+      "unique_transitions_used": 1532,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 73,
+      "window_count": 20
+    },
+    {
+      "all_chronological_quartiles_represented": true,
+      "artificial_boundary_count": 20,
+      "available_unique_train_transitions": 1703,
+      "chronological_quartiles": [
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 96.94835680751174,
+          "quartile": "Q1",
+          "scheduled_transition_occurrences": 1549,
+          "unique_transitions_used": 413,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q2",
+          "scheduled_transition_occurrences": 3598,
+          "unique_transitions_used": 426,
+          "window_start_count": 7
+        },
+        {
+          "available_unique_transitions": 426,
+          "coverage_percentage": 100.0,
+          "quartile": "Q3",
+          "scheduled_transition_occurrences": 3458,
+          "unique_transitions_used": 426,
+          "window_start_count": 6
+        },
+        {
+          "available_unique_transitions": 425,
+          "coverage_percentage": 99.29411764705883,
+          "quartile": "Q4",
+          "scheduled_transition_occurrences": 1635,
+          "unique_transitions_used": 422,
+          "window_start_count": 0
+        }
+      ],
+      "coverage_percentage": 99.0604815032296,
+      "maximum_usage_count": 10,
+      "minimum_usage_count": 1,
+      "natural_boundary_count": 0,
+      "overlap_percentage": 83.525390625,
+      "overlapping_window_count": 19,
+      "repeated_transition_occurrences": 8553,
+      "reused_window_count": 0,
+      "scheduled_transitions": 10240,
+      "source_row_count": 1704,
+      "symbol": "UBL",
+      "unique_transitions_used": 1687,
+      "unique_window_count": 20,
+      "unused_unique_train_transitions": 16,
+      "window_count": 20
+    }
+  ],
+  "window_transition_count": 512
+}
