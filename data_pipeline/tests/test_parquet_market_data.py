@@ -17,6 +17,7 @@ from data_pipeline.src.parquet_market_data import (
     MarketParquetSchemaError,
     audit_market_parquet,
     inspect_market_parquet_schema,
+    load_market_calendar,
     load_market_data,
     load_market_date_range,
     main,
@@ -156,6 +157,18 @@ def test_inclusive_date_filter_uses_requested_bounds(tmp_path: Path) -> None:
     assert frame["symbol"].tolist() == ["AAA", "BBB"]
     with pytest.raises(ValueError, match="cannot be after"):
         load_market_date_range("2024-01-04", "2024-01-03", path=path)
+
+
+def test_market_calendar_reads_only_distinct_sorted_dates(tmp_path: Path) -> None:
+    path = _write_market(tmp_path / "market.parquet", _valid_rows())
+
+    calendar = load_market_calendar(
+        path, start_date="2024-01-03", end_date="2024-01-04"
+    )
+
+    assert calendar.tolist() == list(
+        pd.to_datetime(["2024-01-03", "2024-01-04"])
+    )
 
 
 def test_symbol_filter_is_exact_and_order_independent(tmp_path: Path) -> None:

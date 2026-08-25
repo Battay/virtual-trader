@@ -284,6 +284,47 @@ def load_market_data(
     ).reset_index(drop=True)
 
 
+def load_market_calendar(
+    path: str | os.PathLike[str] | None = None,
+    *,
+    start_date: date | datetime | str | None = None,
+    end_date: date | datetime | str | None = None,
+) -> pd.DatetimeIndex:
+    """Load only the distinct market-date calendar in deterministic order.
+
+    This deliberately reads no symbol, price, return, or volume values.  It is
+    useful for defining temporal boundaries before a predicate-pushed TRAIN
+    load, so sealed later partitions never need to enter memory.
+    """
+
+    resolved = _validated_file(path)
+    start = _parse_date(start_date, label="start_date")
+    end = _parse_date(end_date, label="end_date")
+    if start is not None and end is not None and start > end:
+        raise ValueError("start_date cannot be after end_date")
+    filters: list[tuple[str, str, object]] = []
+    if start is not None:
+        filters.append(("market_date", ">=", start))
+    if end is not None:
+        filters.append(("market_date", "<=", end))
+    try:
+        table = pq.read_table(
+            resolved,
+            columns=["market_date"],
+            filters=filters or None,
+        )
+    except (OSError, pa.ArrowException) as exc:
+        raise MarketParquetError(
+            f"Could not read consolidated market calendar: {exc}"
+        ) from exc
+    dates = pd.DatetimeIndex(
+        pd.to_datetime(table.column("market_date").to_pandas(), errors="coerce")
+    )
+    if dates.isna().any():
+        raise MarketParquetError("Consolidated market calendar contains null dates")
+    return dates.unique().sort_values()
+
+
 def load_market_date_range(
     start_date: date | datetime | str,
     end_date: date | datetime | str,
@@ -533,6 +574,7 @@ __all__ = (
     "REQUIRED_MARKET_COLUMNS",
     "audit_market_parquet",
     "inspect_market_parquet_schema",
+    "load_market_calendar",
     "load_market_data",
     "load_market_date_range",
     "main",
