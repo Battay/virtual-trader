@@ -16,6 +16,10 @@ NEW_LISTING_WINDOW_DAYS = 30
 AI_MINIMUM_USABLE_ROWS = 252
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PSX_MARKET_PARQUET_ENV_VAR = "PSX_MARKET_PARQUET_PATH"
+DEFAULT_PSX_MARKET_PARQUET_PATH = (
+    PROJECT_ROOT.parent / "psx-data-sync" / "data" / "parquet" / "market.parquet"
+)
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 RAW_HTML_DIR = RAW_DATA_DIR / "html"

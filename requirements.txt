@@ -4,6 +4,7 @@ jupyterlab
 matplotlib>=3.8,<4.0
 numpy
 pandas
+pyarrow>=24,<25
 requests
 scikit-learn
 sb3-contrib==2.9.0
