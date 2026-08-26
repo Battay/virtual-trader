@@ -1,0 +1,17 @@
+{
+  "available_bytes": 32128974848,
+  "checkpoint_copies_per_job": 0,
+  "conservative_total_bytes": 2884108288,
+  "estimate_version": "recurrent_full_universe_storage_estimate_v1",
+  "final_models_bytes": 456130560,
+  "identity_jobs": 508,
+  "job_state_bytes": 33292288,
+  "logs_bytes": 2280652800,
+  "optional_checkpoints_bytes": 0,
+  "required_safety_bytes": 5768216576,
+  "safe": true,
+  "safety_margin_bytes": 26360758272,
+  "sampled_model_bytes": 1048576,
+  "trainable_jobs": 435,
+  "validation_bytes": 114032640
+}
