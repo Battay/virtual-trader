@@ -1536,9 +1536,9 @@ def verify_artifact_bundle(
     requested_device = str(training_metadata.get("requested_device", ""))
     resolved_device = str(training_metadata.get("resolved_device", ""))
     actual_training_device = str(training_metadata.get("device", ""))
-    if requested_device not in {"cpu", "mps", "auto"}:
+    if requested_device not in {"cpu", "cuda", "mps", "auto"}:
         raise ArtifactCompatibilityError("Persisted requested device is invalid")
-    if resolved_device not in {"cpu", "mps"}:
+    if resolved_device not in {"cpu", "cuda", "mps"}:
         raise ArtifactCompatibilityError("Persisted resolved device is invalid")
     if str(configuration.get("device", "")) != requested_device:
         raise ArtifactCompatibilityError("Persisted PPO device request differs")

@@ -98,7 +98,7 @@ class RecurrentPPOConfig:
         if self.ent_coef < 0 or self.vf_coef < 0:
             raise ValueError("ent_coef and vf_coef cannot be negative")
         if not isinstance(self.device, str) or self.device not in SUPPORTED_TORCH_DEVICES:
-            raise ValueError("device must be one of: auto, cpu, mps")
+            raise ValueError("device must be one of: auto, cpu, cuda, mps")
         if not all(isinstance(value, bool) for value in (
             self.shared_lstm,
             self.enable_critic_lstm,
@@ -165,8 +165,8 @@ class RecurrentPPOConfig:
         }
 
     def model_kwargs(self, *, resolved_device: str) -> dict[str, object]:
-        if resolved_device not in {"cpu", "mps"}:
-            raise ValueError("resolved_device must be cpu or mps")
+        if resolved_device not in {"cpu", "cuda", "mps"}:
+            raise ValueError("resolved_device must be cpu, cuda, or mps")
         return {
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,

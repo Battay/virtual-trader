@@ -84,7 +84,7 @@ class PPOConfig:
             not isinstance(self.device, str)
             or self.device not in SUPPORTED_TORCH_DEVICES
         ):
-            raise ValueError("device must be one of: auto, cpu, mps")
+            raise ValueError("device must be one of: auto, cpu, cuda, mps")
 
     def with_runtime_overrides(
         self,
@@ -112,8 +112,8 @@ class PPOConfig:
         selected_device = self.device if resolved_device is None else resolved_device
         if selected_device == "auto":
             raise ValueError("auto device must be resolved before constructing PPO")
-        if selected_device not in {"cpu", "mps"}:
-            raise ValueError("resolved_device must be cpu or mps")
+        if selected_device not in {"cpu", "cuda", "mps"}:
+            raise ValueError("resolved_device must be cpu, cuda, or mps")
         return {
             "learning_rate": self.learning_rate,
             "n_steps": self.n_steps,

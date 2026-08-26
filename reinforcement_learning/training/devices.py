@@ -1,4 +1,4 @@
-"""Explicit CPU/Apple-MPS device resolution for PPO training."""
+"""Explicit CPU/CUDA/Apple-MPS device resolution for PPO training."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 import torch
 
 
-SUPPORTED_TORCH_DEVICES = frozenset({"cpu", "mps", "auto"})
+SUPPORTED_TORCH_DEVICES = frozenset({"cpu", "cuda", "mps", "auto"})
 
 
 class TorchDeviceError(RuntimeError):
@@ -24,10 +24,13 @@ class TorchDeviceResolution:
     resolved_device: str
     mps_built: bool
     mps_available: bool
+    cuda_available: bool = False
+    cuda_device_count: int = 0
+    device_name: str | None = None
 
     @property
     def accelerator_selected(self) -> bool:
-        return self.resolved_device == "mps"
+        return self.resolved_device in {"cuda", "mps"}
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -48,20 +51,50 @@ def _mps_state() -> tuple[bool, bool]:
     return built, available
 
 
+def _cuda_state() -> tuple[bool, int, str | None]:
+    """Return bounded CUDA discovery without starting a training run."""
+
+    try:
+        available = bool(torch.cuda.is_available())
+    except (AttributeError, RuntimeError):
+        available = False
+    if not available:
+        return False, 0, None
+    try:
+        count = int(torch.cuda.device_count())
+        name = str(torch.cuda.get_device_name(0)) if count > 0 else None
+    except (AttributeError, RuntimeError):
+        return False, 0, None
+    return count > 0, count, name
+
+
 def resolve_torch_device(requested_device: str) -> TorchDeviceResolution:
-    """Resolve CPU/MPS/AUTO without ever hiding an explicit MPS fallback."""
+    """Resolve CPU/CUDA/MPS/AUTO without hiding accelerator fallback.
+
+    Recurrent MPS training is known to be unstable on the measured Apple-M2
+    environment, so AUTO prefers CUDA and otherwise selects CPU. MPS remains an
+    explicit opt-in diagnostic path.
+    """
     if not isinstance(requested_device, str):
         raise TorchDeviceError(
-            "requested device must be one of: auto, cpu, mps"
+            "requested device must be one of: auto, cpu, cuda, mps"
         )
     requested = requested_device.strip().lower()
     if requested not in SUPPORTED_TORCH_DEVICES:
         raise TorchDeviceError(
-            "requested device must be one of: auto, cpu, mps"
+            "requested device must be one of: auto, cpu, cuda, mps"
         )
     mps_built, mps_available = _mps_state()
+    cuda_available, cuda_device_count, cuda_name = _cuda_state()
     if requested == "cpu":
         resolved = "cpu"
+    elif requested == "cuda":
+        if not cuda_available:
+            raise TorchDeviceError(
+                "CUDA was explicitly requested but is unavailable; "
+                "CPU fallback is disabled for explicit CUDA requests"
+            )
+        resolved = "cuda"
     elif requested == "mps":
         if not mps_available:
             raise TorchDeviceError(
@@ -71,7 +104,7 @@ def resolve_torch_device(requested_device: str) -> TorchDeviceResolution:
             )
         resolved = "mps"
     else:
-        resolved = "mps" if mps_available else "cpu"
+        resolved = "cuda" if cuda_available else "cpu"
     fallback_setting = os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "").strip().lower()
     if resolved == "mps" and fallback_setting in {"1", "true", "yes", "on"}:
         raise TorchDeviceError(
@@ -83,6 +116,9 @@ def resolve_torch_device(requested_device: str) -> TorchDeviceResolution:
         resolved_device=resolved,
         mps_built=mps_built,
         mps_available=mps_available,
+        cuda_available=cuda_available,
+        cuda_device_count=cuda_device_count,
+        device_name=(cuda_name if resolved == "cuda" else None),
     )
 
 
@@ -103,7 +139,7 @@ def torch_devices_equivalent(actual: object, expected: object) -> bool:
         return False
     if actual_device.type != expected_device.type:
         return False
-    if actual_device.type in {"cpu", "mps"}:
+    if actual_device.type in {"cpu", "cuda", "mps"}:
         return actual_device.index in {None, 0} and expected_device.index in {None, 0}
     return actual_device == expected_device
 
@@ -158,8 +194,16 @@ def verify_sb3_model_device(
 
 
 def synchronize_torch_device(device: str) -> None:
-    """Synchronize asynchronous MPS work; CPU requires no synchronization."""
-    if torch_device_type(device) != "mps":
+    """Synchronize accelerator work; CPU requires no synchronization."""
+
+    device_type = torch_device_type(device)
+    if device_type == "cpu":
+        return
+    if device_type == "cuda":
+        try:
+            torch.cuda.synchronize()
+        except (AttributeError, RuntimeError) as exc:
+            raise TorchDeviceError(f"CUDA synchronization failed: {exc}") from exc
         return
     resolution = resolve_torch_device("mps")
     if resolution.resolved_device != "mps":  # defensive; explicit MPS never falls back

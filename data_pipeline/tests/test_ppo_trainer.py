@@ -180,7 +180,7 @@ def test_ppo_config_defaults_are_versioned_and_exact() -> None:
         ({"max_grad_norm": 0}, "max_grad_norm"),
         ({"seed": -1}, "seed"),
         ({"total_timesteps": 0}, "total_timesteps"),
-        ({"device": "cuda"}, "device"),
+        ({"device": "xpu"}, "device"),
     ),
 )
 def test_ppo_config_rejects_invalid_values(overrides, message: str) -> None:
@@ -188,7 +188,7 @@ def test_ppo_config_rejects_invalid_values(overrides, message: str) -> None:
         PPOConfig(**overrides)
 
 
-@pytest.mark.parametrize("device", ("cpu", "mps", "auto"))
+@pytest.mark.parametrize("device", ("cpu", "cuda", "mps", "auto"))
 def test_ppo_config_accepts_supported_device_requests(device: str) -> None:
     config = PPOConfig(device=device)
 
@@ -201,9 +201,9 @@ def test_ppo_config_accepts_supported_device_requests(device: str) -> None:
         assert config.model_kwargs()["device"] == device
 
 
-@pytest.mark.parametrize("device", (None, 7, True, "cuda", "mps:0"))
+@pytest.mark.parametrize("device", (None, 7, True, "cuda:1", "mps:0"))
 def test_ppo_config_rejects_bad_device_types_and_unsupported_devices(device) -> None:
-    with pytest.raises(ValueError, match="auto, cpu, mps"):
+    with pytest.raises(ValueError, match="auto, cpu, cuda, mps"):
         PPOConfig(device=device)
 
 
@@ -213,6 +213,7 @@ def test_cpu_device_resolution_is_explicit_and_accelerator_independent(
     mps_state: tuple[bool, bool],
 ) -> None:
     monkeypatch.setattr(training_devices, "_mps_state", lambda: mps_state)
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: (False, 0, None))
 
     resolution = resolve_torch_device("cpu")
 
@@ -226,6 +227,7 @@ def test_explicit_mps_resolves_only_when_available(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: (False, 0, None))
 
     resolution = resolve_torch_device("mps")
 
@@ -239,6 +241,7 @@ def test_mps_resolution_rejects_external_silent_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: (False, 0, None))
     monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
     with pytest.raises(TorchDeviceError, match="unsupported operations could be hidden"):
@@ -249,6 +252,7 @@ def test_mps_synchronization_failure_is_reported_as_device_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: (False, 0, None))
     monkeypatch.setattr(
         training_devices.torch.mps,
         "synchronize",
@@ -265,21 +269,28 @@ def test_explicit_mps_unavailable_fails_without_cpu_fallback(
     mps_state: tuple[bool, bool],
 ) -> None:
     monkeypatch.setattr(training_devices, "_mps_state", lambda: mps_state)
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: (False, 0, None))
 
     with pytest.raises(TorchDeviceError, match="CPU fallback is disabled"):
         resolve_torch_device("mps")
 
 
 @pytest.mark.parametrize(
-    ("mps_state", "expected"),
-    (((False, False), "cpu"), ((True, False), "cpu"), ((True, True), "mps")),
+    ("cuda_state", "mps_state", "expected"),
+    (
+        ((False, 0, None), (False, False), "cpu"),
+        ((False, 0, None), (True, True), "cpu"),
+        ((True, 1, "Mock CUDA"), (True, True), "cuda"),
+    ),
 )
-def test_auto_device_resolution_routes_from_reported_mps_availability(
+def test_auto_device_resolution_prefers_cuda_then_cpu_never_mps(
     monkeypatch: pytest.MonkeyPatch,
+    cuda_state: tuple[bool, int, str | None],
     mps_state: tuple[bool, bool],
     expected: str,
 ) -> None:
     monkeypatch.setattr(training_devices, "_mps_state", lambda: mps_state)
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: cuda_state)
 
     resolution = resolve_torch_device("auto")
 
@@ -287,9 +298,29 @@ def test_auto_device_resolution_routes_from_reported_mps_availability(
     assert resolution.resolved_device == expected
 
 
-@pytest.mark.parametrize("requested", (None, 3, True, "cuda", "cuda:0"))
-def test_device_resolution_rejects_bad_types_and_cuda(requested) -> None:
-    with pytest.raises(TorchDeviceError, match="auto, cpu, mps"):
+def test_explicit_cuda_resolves_only_when_available_without_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(training_devices, "_mps_state", lambda: (True, True))
+    monkeypatch.setattr(
+        training_devices, "_cuda_state", lambda: (True, 1, "Mock CUDA GPU")
+    )
+
+    resolution = resolve_torch_device("cuda")
+
+    assert resolution.resolved_device == "cuda"
+    assert resolution.device_name == "Mock CUDA GPU"
+    assert resolution.accelerator_selected
+    assert torch_devices_equivalent("cuda", "cuda:0")
+
+    monkeypatch.setattr(training_devices, "_cuda_state", lambda: (False, 0, None))
+    with pytest.raises(TorchDeviceError, match="fallback is disabled"):
+        resolve_torch_device("cuda")
+
+
+@pytest.mark.parametrize("requested", (None, 3, True, "cuda:0", "xpu"))
+def test_device_resolution_rejects_bad_types_and_unknown_devices(requested) -> None:
+    with pytest.raises(TorchDeviceError, match="auto, cpu, cuda, mps"):
         resolve_torch_device(requested)
 
 

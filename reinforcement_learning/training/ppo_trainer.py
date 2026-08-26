@@ -82,11 +82,16 @@ def _validate_output_directory(output_dir: Path | None) -> Path | None:
 
 
 def _seed_everything(seed: int, *, resolved_device: str) -> None:
-    """Seed Python, NumPy, SB3, CPU torch, and the selected MPS backend."""
+    """Seed Python, NumPy, SB3, CPU torch, and the selected accelerator."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    if resolved_device == "mps":
+    if resolved_device == "cuda":
+        # Resolution is repeated so an explicit CUDA request cannot become a
+        # hidden CPU run between configuration and seeding.
+        resolve_torch_device("cuda")
+        torch.cuda.manual_seed_all(seed)
+    elif resolved_device == "mps":
         # Resolution is repeated deliberately so an explicit MPS request can
         # never become an implicit CPU run between configuration and seeding.
         resolve_torch_device("mps")
@@ -96,7 +101,7 @@ def _seed_everything(seed: int, *, resolved_device: str) -> None:
                 "This PyTorch build lacks torch.mps.manual_seed(); MPS training aborted"
             )
         manual_seed(seed)
-    set_random_seed(seed, using_cuda=False)
+    set_random_seed(seed, using_cuda=resolved_device == "cuda")
 
 
 def create_training_vector_environment(
@@ -439,7 +444,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--device",
-        choices=("cpu", "mps", "auto"),
+        choices=("cpu", "cuda", "mps", "auto"),
         default="cpu",
         help="Explicit torch device request; mps never silently falls back to CPU",
     )

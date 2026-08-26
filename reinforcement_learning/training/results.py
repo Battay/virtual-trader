@@ -148,10 +148,10 @@ class PPOTrainingResult:
             raise ValueError("training counts cannot be negative")
         if self.duration_seconds < 0:
             raise ValueError("duration_seconds cannot be negative")
-        if self.requested_device not in {"cpu", "mps", "auto"}:
-            raise ValueError("requested_device must be cpu, mps, or auto")
-        if self.resolved_device not in {None, "cpu", "mps"}:
-            raise ValueError("resolved_device must be cpu, mps, or None")
+        if self.requested_device not in {"cpu", "cuda", "mps", "auto"}:
+            raise ValueError("requested_device must be cpu, cuda, mps, or auto")
+        if self.resolved_device not in {None, "cpu", "cuda", "mps"}:
+            raise ValueError("resolved_device must be cpu, cuda, mps, or None")
         configured_device = self.ppo_config.get("device")
         if configured_device is not None and configured_device != self.requested_device:
             raise ValueError(
@@ -161,7 +161,12 @@ class PPOTrainingResult:
             self.requested_device == "cpu"
             and self.resolved_device not in {None, "cpu"}
         ):
-            raise ValueError("an explicit CPU request cannot resolve to MPS")
+            raise ValueError("an explicit CPU request cannot resolve to an accelerator")
+        if (
+            self.requested_device == "cuda"
+            and self.resolved_device not in {None, "cuda"}
+        ):
+            raise ValueError("an explicit CUDA request cannot fall back")
         if (
             self.requested_device == "mps"
             and self.resolved_device not in {None, "mps"}
