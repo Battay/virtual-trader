@@ -40,6 +40,12 @@ from data_pipeline.src.equity_universe import (
 from data_pipeline.src.instrument_audit import COMMON_EQUITY, OFFICIAL_LISTING_DERIVED
 from feature_engineering.schemas import FEATURE_VERSION
 from feature_engineering.storage import atomic_write_json, safe_path_component
+from reinforcement_learning.canonical_recurrent_artifacts import (
+    CANONICAL_SYMBOL_FEATURE_SCHEMA_VERSION,
+    SUPPORTED_RECURRENT_TRAIN_CONTRACT_VERSIONS,
+    load_canonical_recovery_evidence,
+    load_training_recurrent_contract_metadata,
+)
 from reinforcement_learning.environments.config import (
     DEFAULT_OBSERVATION_FEATURES,
     ENVIRONMENT_VERSION,
@@ -48,11 +54,9 @@ from reinforcement_learning.evaluation.recurrent_evaluator import (
     evaluate_recurrent_on_validation,
 )
 from reinforcement_learning.integrity import sha256_file
+from reinforcement_learning.history_policy import MATURE_MINIMUM_USABLE_OBSERVATIONS
 from reinforcement_learning.recurrent_data_contract import (
-    RL_RECURRENT_PARTITION_SCHEMA_VERSION,
-    RecurrentContractMetadata,
     RecurrentDataContractError,
-    load_recurrent_contract_metadata,
 )
 
 from .callbacks import TrainingProgress
@@ -182,7 +186,15 @@ def _readiness_evidence(path: Path | None) -> dict[str, Mapping[str, object]]:
 
 def _missing_contract_category(
     evidence: Mapping[str, object] | None,
+    recovery_evidence: Mapping[str, object] | None = None,
 ) -> tuple[str, str]:
+    if recovery_evidence and recovery_evidence.get("recovery_valid") is False:
+        usable = int(recovery_evidence.get("final_usable_feature_rows", 0))
+        return (
+            INSUFFICIENT_DATA,
+            "insufficient_canonical_train_history_v2:"
+            f"{usable}<{MATURE_MINIMUM_USABLE_OBSERVATIONS}",
+        )
     if not evidence:
         return MISSING_REQUIRED_ARTIFACTS, "recurrent_contract_missing"
     history = str(evidence.get("history_class", "")).strip().upper()
@@ -198,10 +210,13 @@ def _missing_contract_category(
     return MISSING_REQUIRED_ARTIFACTS, exclusion or "recurrent_contract_missing"
 
 
-def _metadata_compatibility(metadata: RecurrentContractMetadata) -> None:
-    if metadata.recurrent_contract_version != RL_RECURRENT_PARTITION_SCHEMA_VERSION:
+def _metadata_compatibility(metadata: object) -> None:
+    if metadata.recurrent_contract_version not in SUPPORTED_RECURRENT_TRAIN_CONTRACT_VERSIONS:
         raise RecurrentOrchestratorError("recurrent contract version is incompatible")
-    if metadata.feature_version != FEATURE_VERSION:
+    if metadata.feature_version not in {
+        FEATURE_VERSION,
+        CANONICAL_SYMBOL_FEATURE_SCHEMA_VERSION,
+    }:
         raise RecurrentOrchestratorError("feature version is incompatible")
     if metadata.environment_version != ENVIRONMENT_VERSION:
         raise RecurrentOrchestratorError("environment version is incompatible")
@@ -220,8 +235,8 @@ def discover_recurrent_training_universe(
     identity: pd.DataFrame | None = None,
     splits_dir: Path = PROCESSED_SPLITS_DIR,
     readiness_evidence_path: Path | None = DEFAULT_READINESS_EVIDENCE_PATH,
-    metadata_loader: Callable[..., RecurrentContractMetadata] = (
-        load_recurrent_contract_metadata
+    metadata_loader: Callable[..., object] = (
+        load_training_recurrent_contract_metadata
     ),
 ) -> RecurrentUniverseDiscovery:
     """Account for every frozen identity without loading a market partition."""
@@ -249,10 +264,11 @@ def discover_recurrent_training_universe(
     if universe["symbol"].eq("").any() or universe["symbol"].duplicated().any():
         raise RecurrentOrchestratorError("identity symbols must be unique and nonempty")
     evidence = _readiness_evidence(readiness_evidence_path)
+    recovery_evidence = load_canonical_recovery_evidence()
     records: list[dict[str, object]] = []
     for row in universe.to_dict(orient="records"):
         symbol = str(row["symbol"])
-        metadata: RecurrentContractMetadata | None = None
+        metadata: object | None = None
         category = ELIGIBLE_TRAINABLE
         reason = "canonical_mature_recurrent_contract"
         error = ""
@@ -260,12 +276,16 @@ def discover_recurrent_training_universe(
             metadata = metadata_loader(symbol, splits_dir=Path(splits_dir))
             _metadata_compatibility(metadata)
         except FileNotFoundError as exc:
-            category, reason = _missing_contract_category(evidence.get(symbol))
+            category, reason = _missing_contract_category(
+                evidence.get(symbol), recovery_evidence.get(symbol)
+            )
             error = f"{type(exc).__name__}: {exc}"
         except RecurrentDataContractError as exc:
             text = str(exc).lower()
             if "missing" in text:
-                category, reason = _missing_contract_category(evidence.get(symbol))
+                category, reason = _missing_contract_category(
+                    evidence.get(symbol), recovery_evidence.get(symbol)
+                )
             elif "feature" in text:
                 category, reason = INCOMPATIBLE_FEATURE_CONTRACT, str(exc)
             elif "history" in text:
@@ -301,6 +321,11 @@ def discover_recurrent_training_universe(
                 "train_rows": metadata.train.rows if metadata else 0,
                 "train_start": metadata.train.start if metadata else "",
                 "train_end": metadata.train.end if metadata else "",
+                "validation_available": (
+                    bool(getattr(metadata, "validation_available", True))
+                    if metadata
+                    else False
+                ),
             }
         )
     result = pd.DataFrame(records).sort_values("symbol", kind="mergesort").reset_index(
@@ -396,6 +421,7 @@ def build_training_run(
             }
         )
         status = QUEUED if eligible else INELIGIBLE
+        validation_available = bool(getattr(row, "validation_available", True))
         jobs.append(
             TrainingJobRecord(
                 schema_version=TRAINING_JOB_SCHEMA_VERSION,
@@ -431,7 +457,15 @@ def build_training_run(
                 checkpoint_path=_artifact_relative_path(str(row.symbol), "checkpoint"),
                 model_path=None,
                 model_sha256=None,
-                validation_status=("pending" if validation_enabled and eligible else "not_requested"),
+                validation_status=(
+                    "pending"
+                    if validation_enabled and eligible and validation_available
+                    else (
+                        "not_available_train_only_contract"
+                        if validation_enabled and eligible and not validation_available
+                        else "not_requested"
+                    )
+                ),
                 validation_metrics_reference=None,
                 failure_error_message=None,
                 retry_count=0,
@@ -646,8 +680,8 @@ def explicitly_requeue_job(
 def job_contract_compatibility(
     job: TrainingJobRecord,
     *,
-    metadata_loader: Callable[..., RecurrentContractMetadata] = (
-        load_recurrent_contract_metadata
+    metadata_loader: Callable[..., object] = (
+        load_training_recurrent_contract_metadata
     ),
     splits_dir: Path = PROCESSED_SPLITS_DIR,
 ) -> tuple[bool, str]:
@@ -676,8 +710,8 @@ def completed_job_compatibility(
     store: TrainingRunStore,
     job: TrainingJobRecord,
     *,
-    metadata_loader: Callable[..., RecurrentContractMetadata] = (
-        load_recurrent_contract_metadata
+    metadata_loader: Callable[..., object] = (
+        load_training_recurrent_contract_metadata
     ),
     splits_dir: Path = PROCESSED_SPLITS_DIR,
 ) -> tuple[bool, str]:
@@ -709,8 +743,8 @@ def mark_stale_jobs(
     store: TrainingRunStore,
     *,
     splits_dir: Path = PROCESSED_SPLITS_DIR,
-    metadata_loader: Callable[..., RecurrentContractMetadata] = (
-        load_recurrent_contract_metadata
+    metadata_loader: Callable[..., object] = (
+        load_training_recurrent_contract_metadata
     ),
 ) -> tuple[str, ...]:
     """Mark completed jobs STALE when current contracts/artifacts no longer match."""
@@ -808,8 +842,8 @@ def execute_queued_jobs(
     ),
     evaluator: Callable[..., object] = evaluate_recurrent_on_validation,
     device_resolver: Callable[[str], TorchDeviceResolution] = resolve_torch_device,
-    metadata_loader: Callable[..., RecurrentContractMetadata] = (
-        load_recurrent_contract_metadata
+    metadata_loader: Callable[..., object] = (
+        load_training_recurrent_contract_metadata
     ),
     registry_path: Path = MODEL_REGISTRY_PATH,
 ) -> tuple[TrainingJobRecord, ...]:
@@ -922,7 +956,10 @@ def execute_queued_jobs(
             )
             model_path = store.resolve_artifact(relative_model)
             model_hash = _save_model_atomically(result.model, model_path)
-            if manifest.validation_enabled:
+            validation_available = (
+                queued.validation_status != "not_available_train_only_contract"
+            )
+            if manifest.validation_enabled and validation_available:
                 store.update_job(
                     queued.symbol,
                     lambda current: transition_job(
@@ -958,7 +995,11 @@ def execute_queued_jobs(
                 validation_status = "completed"
             else:
                 relative_validation = None
-                validation_status = "not_requested"
+                validation_status = (
+                    "not_available_train_only_contract"
+                    if manifest.validation_enabled and not validation_available
+                    else "not_requested"
+                )
             duration = max(0.0, time.perf_counter() - wall_start)
             outcome = store.update_job(
                 queued.symbol,

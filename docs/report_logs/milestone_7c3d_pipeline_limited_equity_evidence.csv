@@ -1,0 +1,9 @@
+symbol,company_name,security_type,canonical_train_rows,quality_usable_ohlcv_rows,quality_rows_removed,train_cutoff,feature_warmup_loss,missing_feature_rows,final_usable_feature_rows,first_train_feature_date,last_train_feature_date,recurrent_episode_feasible,scaler_fit_feasible,recovery_valid,blocker
+ASIC,Asia Insurance Company Limited,ordinary_equity,293,146,147,2025-12-24,49,0,97,2025-01-14,2025-12-24,True,True,False,97 final TRAIN feature rows is below the versioned minimum of 126
+EWIC,East West Insurance Company Limited,ordinary_equity,324,144,180,2025-09-15,49,0,95,2021-12-13,2025-09-15,True,True,False,95 final TRAIN feature rows is below the versioned minimum of 126
+GEMMEL,Mughal Energy Limited(GEM),gem_equity,196,175,21,2025-12-31,49,0,126,2024-10-17,2025-12-31,True,True,True,
+GEMNETS,Nets International Communication Limited,gem_equity,140,139,1,2026-02-13,49,0,90,2025-08-07,2026-02-13,True,True,False,90 final TRAIN feature rows is below the versioned minimum of 126
+GEMPACRA,The Pakistan Credit Rating Agency Ltd,gem_equity,132,129,3,2026-03-18,49,0,80,2025-09-24,2026-03-18,True,True,False,80 final TRAIN feature rows is below the versioned minimum of 126
+GEMPAPL,Pak Agro Packaging Limited(GEM),gem_equity,349,289,60,2025-06-18,49,0,240,2022-03-25,2025-06-18,True,True,True,
+MUGHALC,Mughal Iron & Steel Industries Ltd(C),ordinary_equity,192,192,0,2026-04-02,49,0,143,2025-08-26,2026-04-02,True,True,True,
+ZUMA,Zuma Resources Limited,ordinary_equity,137,137,0,2026-05-11,49,0,88,2026-01-02,2026-05-11,True,True,False,88 final TRAIN feature rows is below the versioned minimum of 126

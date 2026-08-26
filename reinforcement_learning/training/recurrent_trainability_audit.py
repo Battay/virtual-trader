@@ -213,6 +213,15 @@ def _classify_gap(
             False,
             "Wait for real observations and rerun the canonical feature pipeline; do not lower the threshold for coverage counts.",
         )
+    if current_reason.startswith("insufficient_canonical_train_history_v2:"):
+        return (
+            INSUFFICIENT_HISTORY,
+            "The canonical TRAIN-only v2 feature path is mechanically compatible "
+            f"but does not meet the approved Mature minimum: {current_reason}.",
+            DATA_LIMITED,
+            False,
+            "Wait for additional real TRAIN-eligible observations; do not use sealed later values or lower the v2 threshold.",
+        )
     if current_reason.startswith("unsupported_security_type:gem_equity"):
         return (
             LEGACY_PIPELINE_ONLY,
@@ -457,4 +466,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-

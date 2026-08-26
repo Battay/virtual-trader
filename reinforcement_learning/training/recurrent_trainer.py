@@ -11,16 +11,18 @@ import time
 import numpy as np
 from sb3_contrib import RecurrentPPO
 
-from data_pipeline.src.config import PROCESSED_SPLITS_DIR
+from data_pipeline.src.config import (
+    CANONICAL_RECURRENT_TRAIN_V2_DIR,
+    PROCESSED_SPLITS_DIR,
+)
+from reinforcement_learning.canonical_recurrent_artifacts import (
+    SUPPORTED_RECURRENT_TRAIN_CONTRACT_VERSIONS,
+    load_training_recurrent_partition as load_recurrent_partition,
+)
 from reinforcement_learning.environments import SingleSymbolTradingEnv
 from reinforcement_learning.environments.validation import validate_environment
 from reinforcement_learning.history_policy import HistoryClass
 from reinforcement_learning.integrity import sha256_file
-from reinforcement_learning.recurrent_data_contract import (
-    RL_RECURRENT_PARTITION_SCHEMA_VERSION,
-    RecurrentDataContractError,
-    load_recurrent_partition,
-)
 
 from .callbacks import ProgressHandler
 from .devices import (
@@ -70,6 +72,7 @@ def train_recurrent_single_symbol(
     output_dir: Path | None = None,
     progress_callback: ProgressHandler | None = None,
     splits_dir: Path = PROCESSED_SPLITS_DIR,
+    canonical_artifacts_dir: Path = CANONICAL_RECURRENT_TRAIN_V2_DIR,
     smoke_test: bool = False,
 ) -> RecurrentPPOTrainingResult:
     """Train RecurrentPPO from the canonical recurrent TRAIN partition only."""
@@ -182,15 +185,20 @@ def train_recurrent_single_symbol(
         resolution = resolve_torch_device(effective.device)
 
         # Sole market-frame load. This API cannot load TEST.
+        loader_kwargs: dict[str, Path] = {"splits_dir": Path(splits_dir)}
+        if Path(canonical_artifacts_dir) != CANONICAL_RECURRENT_TRAIN_V2_DIR:
+            loader_kwargs["canonical_artifacts_dir"] = Path(
+                canonical_artifacts_dir
+            )
         loaded = load_recurrent_partition(
             symbol_text,
             "train",
-            splits_dir=Path(splits_dir),
+            **loader_kwargs,
         )
         if loaded.partition != "train":
             raise RecurrentPPOTrainerError("recurrent loader returned non-TRAIN data")
         metadata = loaded.metadata
-        if metadata.recurrent_contract_version != RL_RECURRENT_PARTITION_SCHEMA_VERSION:
+        if metadata.recurrent_contract_version not in SUPPORTED_RECURRENT_TRAIN_CONTRACT_VERSIONS:
             raise RecurrentPPOTrainerError("recurrent contract version is incompatible")
         if metadata.history.history_class is not HistoryClass.MATURE:
             raise RecurrentPPOTrainerError(
@@ -200,7 +208,10 @@ def train_recurrent_single_symbol(
             raise RecurrentPPOTrainerError(
                 "symbol is not approved for independent recurrent training"
             )
-        if metadata.episode_strategy != "full_partition":
+        if metadata.episode_strategy not in {
+            "full_partition",
+            "full_train_partition",
+        }:
             raise RecurrentPPOTrainerError("unsupported recurrent episode strategy")
         if not bool(loaded.episode_start[0]) or int(loaded.episode_start.sum()) != 1:
             raise RecurrentPPOTrainerError("TRAIN reset mask is incompatible")
