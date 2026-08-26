@@ -325,6 +325,45 @@ def load_market_calendar(
     return dates.unique().sort_values()
 
 
+def load_symbol_market_date_inventory(
+    path: str | os.PathLike[str] | None = None,
+    *,
+    symbols: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """Load only symbol/date identity metadata in deterministic order.
+
+    The inventory deliberately excludes every price, return, and volume field.
+    It can therefore establish symbol-specific chronological boundaries before
+    a predicate-pushed TRAIN-value load without exposing later market values.
+    """
+
+    resolved = _validated_file(path)
+    selected_symbols = _canonical_symbols(symbols)
+    filters = (
+        [("symbol", "in", list(selected_symbols))]
+        if selected_symbols is not None
+        else None
+    )
+    try:
+        table = pq.read_table(
+            resolved,
+            columns=["market_date", "symbol"],
+            filters=filters,
+        )
+    except (OSError, pa.ArrowException) as exc:
+        raise MarketParquetError(
+            f"Could not read consolidated symbol/date inventory: {exc}"
+        ) from exc
+    frame = table.to_pandas()
+    frame["market_date"] = pd.to_datetime(frame["market_date"], errors="coerce")
+    frame["symbol"] = frame["symbol"].astype("string").str.strip()
+    if frame["market_date"].isna().any() or frame["symbol"].isna().any():
+        raise MarketParquetError("Symbol/date inventory contains null identity values")
+    return frame.sort_values(
+        ["market_date", "symbol"], kind="mergesort"
+    ).reset_index(drop=True)
+
+
 def load_market_date_range(
     start_date: date | datetime | str,
     end_date: date | datetime | str,

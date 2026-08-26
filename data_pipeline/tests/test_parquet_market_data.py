@@ -20,6 +20,7 @@ from data_pipeline.src.parquet_market_data import (
     load_market_calendar,
     load_market_data,
     load_market_date_range,
+    load_symbol_market_date_inventory,
     main,
     resolve_market_parquet_path,
 )
@@ -168,6 +169,18 @@ def test_market_calendar_reads_only_distinct_sorted_dates(tmp_path: Path) -> Non
 
     assert calendar.tolist() == list(
         pd.to_datetime(["2024-01-03", "2024-01-04"])
+    )
+
+
+def test_symbol_date_inventory_exposes_no_market_values(tmp_path: Path) -> None:
+    path = _write_market(tmp_path / "market.parquet", _valid_rows())
+
+    inventory = load_symbol_market_date_inventory(path, symbols=["BBB"])
+
+    assert inventory.columns.tolist() == ["market_date", "symbol"]
+    assert inventory["symbol"].tolist() == ["BBB", "BBB"]
+    assert inventory["market_date"].tolist() == list(
+        pd.to_datetime(["2024-01-02", "2024-01-03"])
     )
 
 
