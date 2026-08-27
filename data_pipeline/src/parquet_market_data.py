@@ -1,7 +1,7 @@
-"""Read-only access and quality auditing for consolidated PSX market Parquet.
+"""Read-only access and quality auditing for the native consolidated Parquet.
 
-PSX Data Sync owns and produces the Parquet file.  This module deliberately
-contains no write, conversion, cleaning, download, or training integration.
+The writer lives in :mod:`native_market_pipeline`; this boundary deliberately
+remains read-only and defaults to virtual-trader's own validated artifact.
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def resolve_market_parquet_path(
     *,
     environ: Mapping[str, str] | None = None,
 ) -> Path:
-    """Resolve explicit, environment, or sibling-project development path.
+    """Resolve explicit, environment, or virtual-trader-local canonical path.
 
     Relative explicit paths follow the caller's current working directory.
     Relative environment paths are anchored to ``virtual-trader`` so service

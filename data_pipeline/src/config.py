@@ -17,9 +17,13 @@ AI_MINIMUM_USABLE_ROWS = 252
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PSX_MARKET_PARQUET_ENV_VAR = "PSX_MARKET_PARQUET_PATH"
-DEFAULT_PSX_MARKET_PARQUET_PATH = (
+LOCAL_PSX_MARKET_PARQUET_PATH = PROJECT_ROOT / "data" / "parquet" / "market.parquet"
+BOOTSTRAP_PSX_MARKET_PARQUET_PATH = (
     PROJECT_ROOT.parent / "psx-data-sync" / "data" / "parquet" / "market.parquet"
 )
+# The sibling-project file is an explicit migration/bootstrap input only.  Runtime
+# readers default to the canonical artifact owned by virtual-trader.
+DEFAULT_PSX_MARKET_PARQUET_PATH = LOCAL_PSX_MARKET_PARQUET_PATH
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 RAW_HTML_DIR = RAW_DATA_DIR / "html"
@@ -39,6 +43,10 @@ SOFT_RELATIONSHIP_REPRESENTATION_DIR = (
 PROCESSED_SYMBOLS_DIR = PROCESSED_DATA_DIR / "symbols"
 PROCESSED_MASTER_DIR = PROCESSED_DATA_DIR / "master"
 PROCESSED_MASTER_PATH = PROCESSED_MASTER_DIR / "psx_ai_master.csv"
+NATIVE_MARKET_MASTER_PATH = PROCESSED_MASTER_DIR / "psx_market_master.csv"
+NATIVE_MARKET_SYMBOLS_DIR = PROCESSED_DATA_DIR / "market_symbols"
+PARQUET_DATA_DIR = DATA_DIR / "parquet"
+DAILY_MARKET_PARQUET_DIR = PARQUET_DATA_DIR / "daily"
 PROCESSED_SPLITS_DIR = PROCESSED_DATA_DIR / "splits"
 CANONICAL_RECURRENT_TRAIN_V2_DIR = (
     PROCESSED_DATA_DIR / "canonical_recurrent_train_v2"
@@ -50,6 +58,7 @@ SAVED_MODELS_DIR = PROJECT_ROOT / "reinforcement_learning" / "saved_models"
 SYMBOL_MODELS_DIR = SAVED_MODELS_DIR / "symbol_models"
 MASTER_MODELS_DIR = SAVED_MODELS_DIR / "master_models"
 METADATA_DIR = DATA_DIR / "metadata"
+NATIVE_MARKET_PIPELINE_STATE_PATH = METADATA_DIR / "native_market_pipeline_state.json"
 BACKFILL_STATE_PATH = METADATA_DIR / "backfill_state.json"
 LISTINGS_METADATA_DIR = METADATA_DIR / "listings"
 CURRENT_LISTINGS_PATH = LISTINGS_METADATA_DIR / "current_listings.csv"
