@@ -1,0 +1,12 @@
+{
+  "error": "worker_exit_2:usage: recurrent_budget_study.py [-h]\n                                 (--prepare | --run | --aggregate | --worker)\n                                 --output-directory OUTPUT_DIRECTORY\n                                 [--symbol SYMBOL] [--seed SEED]\n                                 [--budget BUDGET] [--splits-dir SPLITS_DIR]\n                                 [--canonical-artifacts-dir CANONICAL_ARTIFACTS_DIR]\nrecurrent_budget_study.py: error: the following arguments are required: --output-directory",
+  "requested_device": "cpu",
+  "requested_timesteps": 250000,
+  "run_id": "budget-63fd7b160d64bd7ea1ba",
+  "seed": 42,
+  "status": "failed",
+  "study_fingerprint": "1f2f95d2b816e0887fc1acee788a002bd4d2689dfdf7e5b273d0a01ea13ad53f",
+  "symbol": "MARI",
+  "test_partition_loaded": false,
+  "validation_status": "not_run"
+}

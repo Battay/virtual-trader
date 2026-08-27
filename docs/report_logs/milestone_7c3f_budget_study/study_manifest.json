@@ -1,0 +1,250 @@
+{
+  "budgets": [
+    50000,
+    100000,
+    250000
+  ],
+  "config_except_seed_budget": {
+    "activation_fn": "Tanh",
+    "algorithm": "RecurrentPPO",
+    "batch_size": 64,
+    "clip_range": 0.2,
+    "config_version": "recurrent_ppo_single_symbol_v1",
+    "device": "cpu",
+    "enable_critic_lstm": true,
+    "ent_coef": 0.01,
+    "gae_lambda": 0.95,
+    "gamma": 0.99,
+    "learning_rate": 0.0003,
+    "lstm_hidden_size": 64,
+    "max_grad_norm": 0.5,
+    "n_epochs": 10,
+    "n_lstm_layers": 1,
+    "n_steps": 512,
+    "net_arch": [
+      64
+    ],
+    "ortho_init": true,
+    "policy": "MlpLstmPolicy",
+    "policy_kwargs": {
+      "activation_fn": "Tanh",
+      "enable_critic_lstm": true,
+      "lstm_hidden_size": 64,
+      "n_lstm_layers": 1,
+      "net_arch": {
+        "pi": [
+          64
+        ],
+        "vf": [
+          64
+        ]
+      },
+      "ortho_init": true,
+      "share_features_extractor": true,
+      "shared_lstm": false
+    },
+    "share_features_extractor": true,
+    "shared_lstm": false,
+    "vf_coef": 0.5
+  },
+  "decision_thresholds": {
+    "material_explained_variance_delta": 0.05,
+    "material_value_loss_reduction": 0.2,
+    "mature_diagnostic_fraction": 0.9,
+    "maximum_mature_approximate_kl": 0.1,
+    "maximum_mature_clip_fraction": 0.3,
+    "minimum_mature_median_explained_variance": 0.0,
+    "minimum_successful_runs_per_budget": 17,
+    "minimum_successful_seeds_per_symbol_budget": 2,
+    "validation_profit_used_for_decision": false,
+    "widespread_pair_count": 12
+  },
+  "decision_version": "smallest_technically_mature_v1",
+  "requested_device": "cpu",
+  "run_count": 54,
+  "seeds": [
+    42,
+    123,
+    2026
+  ],
+  "selection_targets": [
+    {
+      "coverage_rank": 0.95,
+      "history_rank": 0.95,
+      "liquidity_rank": 0.55,
+      "regime": "long_history_high_coverage"
+    },
+    {
+      "coverage_rank": 0.7,
+      "history_rank": 0.5,
+      "liquidity_rank": 0.5,
+      "regime": "medium_history"
+    },
+    {
+      "coverage_rank": 0.75,
+      "history_rank": 0.05,
+      "liquidity_rank": 0.5,
+      "regime": "shorter_valid_history"
+    },
+    {
+      "coverage_rank": 0.85,
+      "history_rank": 0.7,
+      "liquidity_rank": 0.95,
+      "regime": "high_liquidity"
+    },
+    {
+      "coverage_rank": 0.9,
+      "history_rank": 0.75,
+      "liquidity_rank": 0.5,
+      "regime": "medium_liquidity"
+    },
+    {
+      "coverage_rank": 0.4,
+      "history_rank": 0.25,
+      "liquidity_rank": 0.05,
+      "regime": "lower_liquidity_sparse_valid"
+    }
+  ],
+  "selection_version": "train_regime_archetypes_v1",
+  "source_inventory_hash": "4e59e97bf00cb5d39b5b98deea96657cf724de14e549ce68fd708e63356ab44d",
+  "study_version": "recurrent_budget_study_v1",
+  "symbol_descriptors": [
+    {
+      "active_span_coverage": 1.0,
+      "average_volume": 37894.43133802817,
+      "coverage_rank": 0.8900462962962963,
+      "environment_version": "single_symbol_env_v1",
+      "feature_version": "psx-4a-126450ec6355",
+      "history_rank": 0.9259259259259259,
+      "liquidity_rank": 0.5578703703703703,
+      "median_volume": 21222.0,
+      "non_positive_close_rows": 0,
+      "recurrent_contract_version": "rl_recurrent_partition_v1",
+      "selection_distance": 0.004235950360082298,
+      "selection_regime": "long_history_high_coverage",
+      "symbol": "MARI",
+      "train_end": "2023-08-23",
+      "train_rows": 1704,
+      "train_start": "2016-10-06",
+      "validation_available": true,
+      "zero_ohl_ratio": 0.0,
+      "zero_volume_ratio": 0.0
+    },
+    {
+      "active_span_coverage": 0.9978932584269663,
+      "average_volume": 272549.85080928926,
+      "coverage_rank": 0.7245370370370371,
+      "environment_version": "single_symbol_env_v1",
+      "feature_version": "psx-4a-126450ec6355",
+      "history_rank": 0.5324074074074074,
+      "liquidity_rank": 0.6805555555555556,
+      "median_volume": 86106.0,
+      "non_positive_close_rows": 0,
+      "recurrent_contract_version": "rl_recurrent_partition_v1",
+      "selection_distance": 0.034252614883401936,
+      "selection_regime": "medium_history",
+      "symbol": "AGP",
+      "train_end": "2024-02-15",
+      "train_rows": 1421,
+      "train_start": "2018-05-15",
+      "validation_available": true,
+      "zero_ohl_ratio": 0.0,
+      "zero_volume_ratio": 0.0
+    },
+    {
+      "active_span_coverage": 0.9912790697674418,
+      "average_volume": 41883.90615835777,
+      "coverage_rank": 0.6712962962962963,
+      "environment_version": "single_symbol_env_v1",
+      "feature_version": "psx-4a-126450ec6355",
+      "history_rank": 0.05324074074074074,
+      "liquidity_rank": 0.4583333333333333,
+      "median_volume": 8361.0,
+      "non_positive_close_rows": 0,
+      "recurrent_contract_version": "rl_recurrent_partition_v1",
+      "selection_distance": 0.007940886488340196,
+      "selection_regime": "shorter_valid_history",
+      "symbol": "LSEFSL",
+      "train_end": "2025-12-29",
+      "train_rows": 341,
+      "train_start": "2024-08-16",
+      "validation_available": true,
+      "zero_ohl_ratio": 0.0,
+      "zero_volume_ratio": 0.0
+    },
+    {
+      "active_span_coverage": 1.0,
+      "average_volume": 1206105.343980344,
+      "coverage_rank": 0.8900462962962963,
+      "environment_version": "single_symbol_env_v1",
+      "feature_version": "psx-4a-126450ec6355",
+      "history_rank": 0.6435185185185185,
+      "liquidity_rank": 0.8356481481481481,
+      "median_volume": 489000.0,
+      "non_positive_close_rows": 0,
+      "recurrent_contract_version": "rl_recurrent_partition_v1",
+      "selection_distance": 0.017870209619341555,
+      "selection_regime": "high_liquidity",
+      "symbol": "WAVES",
+      "train_end": "2023-10-09",
+      "train_rows": 1628,
+      "train_start": "2017-03-10",
+      "validation_available": true,
+      "zero_ohl_ratio": 0.0,
+      "zero_volume_ratio": 0.0
+    },
+    {
+      "active_span_coverage": 1.0,
+      "average_volume": 131322.01996476806,
+      "coverage_rank": 0.8900462962962963,
+      "environment_version": "single_symbol_env_v1",
+      "feature_version": "psx-4a-126450ec6355",
+      "history_rank": 0.8333333333333334,
+      "liquidity_rank": 0.6261574074074074,
+      "median_volume": 44500.0,
+      "non_positive_close_rows": 0,
+      "recurrent_contract_version": "rl_recurrent_partition_v1",
+      "selection_distance": 0.02295921210562416,
+      "selection_regime": "medium_liquidity",
+      "symbol": "GLAXO",
+      "train_end": "2023-08-22",
+      "train_rows": 1703,
+      "train_start": "2016-10-06",
+      "validation_available": true,
+      "zero_ohl_ratio": 0.0,
+      "zero_volume_ratio": 0.0
+    },
+    {
+      "active_span_coverage": 0.8102857142857143,
+      "average_volume": 2595.366713681241,
+      "coverage_rank": 0.4236111111111111,
+      "environment_version": "single_symbol_env_v1",
+      "feature_version": "psx-4a-126450ec6355",
+      "history_rank": 0.18287037037037038,
+      "liquidity_rank": 0.10648148148148148,
+      "median_volume": 800.0,
+      "non_positive_close_rows": 0,
+      "recurrent_contract_version": "rl_recurrent_partition_v1",
+      "selection_distance": 0.008254029492455416,
+      "selection_regime": "lower_liquidity_sparse_valid",
+      "symbol": "AKDHL",
+      "train_end": "2025-04-21",
+      "train_rows": 709,
+      "train_start": "2021-10-07",
+      "validation_available": true,
+      "zero_ohl_ratio": 0.0,
+      "zero_volume_ratio": 0.0
+    }
+  ],
+  "symbols": [
+    "MARI",
+    "AGP",
+    "LSEFSL",
+    "WAVES",
+    "GLAXO",
+    "AKDHL"
+  ],
+  "test_partition_loaded": false,
+  "universe_hash": "571f32af6de4d864ded90bbc06e814cf309fdffe4f61151102895a93ec588ef5",
+  "universe_version": "current_common_equity_universe_v1"
+}

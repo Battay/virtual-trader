@@ -1,0 +1,70 @@
+{
+  "comparisons": {
+    "100000_to_250000": {
+      "comparable_pairs": 18,
+      "explained_variance_positive_pairs": 16,
+      "larger": 250000,
+      "median_explained_variance_delta": 0.21521276235580444,
+      "median_relative_value_loss_reduction": 0.24767256161330492,
+      "smaller": 100000,
+      "value_loss_improved_pairs": 13,
+      "widespread": true
+    },
+    "50000_to_100000": {
+      "comparable_pairs": 18,
+      "explained_variance_positive_pairs": 8,
+      "larger": 100000,
+      "median_explained_variance_delta": -0.028159499168395996,
+      "median_relative_value_loss_reduction": 0.26641047459460265,
+      "smaller": 50000,
+      "value_loss_improved_pairs": 13,
+      "widespread": true
+    }
+  },
+  "decision": "BLOCKED_BUDGET_SELECTION",
+  "decision_version": "smallest_technically_mature_v1",
+  "maturity": {
+    "100000": {
+      "budget": 100000,
+      "continuity_all": true,
+      "diagnostic_fraction_ok": 1.0,
+      "median_explained_variance": 0.7479817569255829,
+      "successful_runs": 18,
+      "successful_validation_runs": 18,
+      "technically_mature": true
+    },
+    "250000": {
+      "budget": 250000,
+      "continuity_all": true,
+      "diagnostic_fraction_ok": 0.8888888888888888,
+      "median_explained_variance": 0.9651954770088196,
+      "successful_runs": 18,
+      "successful_validation_runs": 18,
+      "technically_mature": false
+    },
+    "50000": {
+      "budget": 50000,
+      "continuity_all": true,
+      "diagnostic_fraction_ok": 1.0,
+      "median_explained_variance": 0.7460681796073914,
+      "successful_runs": 18,
+      "successful_validation_runs": 18,
+      "technically_mature": true
+    }
+  },
+  "reason": "No budget satisfied the predeclared smallest-mature rule.",
+  "test_partition_loaded": false,
+  "thresholds": {
+    "material_explained_variance_delta": 0.05,
+    "material_value_loss_reduction": 0.2,
+    "mature_diagnostic_fraction": 0.9,
+    "maximum_mature_approximate_kl": 0.1,
+    "maximum_mature_clip_fraction": 0.3,
+    "minimum_mature_median_explained_variance": 0.0,
+    "minimum_successful_runs_per_budget": 17,
+    "minimum_successful_seeds_per_symbol_budget": 2,
+    "validation_profit_used_for_decision": false,
+    "widespread_pair_count": 12
+  },
+  "validation_profit_used": false
+}
