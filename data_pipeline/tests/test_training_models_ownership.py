@@ -29,6 +29,27 @@ def test_training_page_uses_frozen_recurrent_production_authority() -> None:
     assert "RecurrentPPOConfig(" not in source
 
 
+def test_training_page_has_native_top_spacing_and_unambiguous_frozen_labels() -> None:
+    source = _source()
+
+    assert source.index('st.space("medium")') < source.index(
+        'st.title("Training & Models")'
+    )
+    required_labels = (
+        "Frozen research universe",
+        "Frozen snapshot date",
+        "Research identities",
+        "Frozen universe version",
+        "Frozen universe hash",
+        "Execution-training policy",
+        "Trainable agents",
+        "Trainable symbol hash",
+        "Underlying identity contract",
+    )
+    assert not [label for label in required_labels if label not in source]
+    assert "The current operational identity universe is outside this run." in source
+
+
 def test_training_page_contains_no_dataset_build_or_split_controls() -> None:
     source = _source()
     forbidden = (

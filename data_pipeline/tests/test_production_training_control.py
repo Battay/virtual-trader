@@ -140,6 +140,11 @@ def test_production_plan_is_exact_and_not_ui_mutable() -> None:
     plan = production_plan()
 
     assert plan.identity_count == 508
+    assert plan.identity_snapshot == "2026-08-02"
+    assert plan.frozen_universe_version == (
+        "frozen_research_common_equity_identity_v1"
+    )
+    assert plan.universe_version == "current_common_equity_universe_v1"
     assert plan.trainable_count == 435
     assert plan.excluded_count == 73
     assert plan.requested_timesteps == 100_000

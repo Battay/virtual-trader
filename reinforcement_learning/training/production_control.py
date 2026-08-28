@@ -31,6 +31,7 @@ from data_pipeline.src.config import (
 )
 from data_pipeline.src.identity_universe_policy import (
     FROZEN_RESEARCH_IDENTITY_COUNT,
+    FROZEN_RESEARCH_IDENTITY_MANIFEST_VERSION,
     FROZEN_RESEARCH_IDENTITY_SNAPSHOT,
     FROZEN_RESEARCH_TRAINING_POLICY,
     FROZEN_RESEARCH_UNIVERSE,
@@ -105,6 +106,7 @@ class ProductionPlan:
     control_version: str
     identity_policy: str
     identity_snapshot: str
+    frozen_universe_version: str
     universe_version: str
     universe_hash: str
     identity_count: int
@@ -309,6 +311,7 @@ def production_plan() -> ProductionPlan:
         control_version=PRODUCTION_CONTROL_VERSION,
         identity_policy=FROZEN_RESEARCH_UNIVERSE,
         identity_snapshot=FROZEN_RESEARCH_IDENTITY_SNAPSHOT,
+        frozen_universe_version=FROZEN_RESEARCH_IDENTITY_MANIFEST_VERSION,
         universe_version="current_common_equity_universe_v1",
         universe_hash=FROZEN_RESEARCH_UNIVERSE_HASH,
         identity_count=FROZEN_RESEARCH_IDENTITY_COUNT,

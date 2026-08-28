@@ -65,6 +65,24 @@ The page is organized as:
 The pre-run view does not display a misleading zero-percent running bar. A
 completed view states: “TRAIN and VALIDATION complete. TEST remains sealed.”
 
+### Final pre-production polish
+
+A native `st.space("medium")` now precedes the page title so Streamlit's top
+navigation does not clip the heading or introductory caption on ordinary
+desktop Safari/Chrome layouts. No CSS or browser-specific override was added.
+
+The production-plan table now separates frozen experiment identity from its
+underlying authoritative contract. It explicitly renders the frozen research
+universe role, snapshot date `2026-08-02`, 508 research identities, frozen
+manifest version, frozen universe hash, execution-training policy, 435
+trainable agents, and trainable-symbol hash. The retained
+`current_common_equity_universe_v1` provenance is labelled **Underlying identity
+contract**, not frozen universe version. A nearby statement makes clear that
+the current operational identity universe is outside this training run.
+
+The readiness cards and immutable PPO/LSTM production configuration remain
+unchanged. The pre-run state continues to contain no progress bars.
+
 ## Detached process and recovery design
 
 Streamlit launches a detached Python controller with a new process session,
@@ -175,7 +193,7 @@ are retained instead.
 - Focused control-center suite: 30 passed.
 - Streamlit page-state acceptance: pre-run, prepared, running, partial failure,
   and completed all passed without an exception.
-- Full repository pytest: **793 passed, 2 skipped in 58.91 seconds**.
+- Full repository pytest: **794 passed, 2 skipped in 60.02 seconds**.
 - `pip check`: **No broken requirements found**.
 - `git diff --check`: **passed**.
 - No recurrent training occurred.

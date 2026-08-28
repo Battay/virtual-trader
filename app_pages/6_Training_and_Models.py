@@ -73,6 +73,7 @@ def _filtered_jobs(
     return filtered.reset_index(drop=True)
 
 
+st.space("medium")
 st.title("Training & Models")
 st.caption(
     "Production control center for the frozen single-symbol RecurrentPPO run. "
@@ -107,14 +108,23 @@ with st.expander("Full immutable hashes", icon=":material/fingerprint:"):
 
 st.subheader("Production training plan")
 with st.container(border=True):
+    st.caption(
+        "Training scope is the frozen 508-identity research snapshot dated "
+        "2026-08-02. The current operational identity universe is outside this run."
+    )
     st.dataframe(
         pd.DataFrame(
             {
                 "Frozen field": [
-                    "Identity role",
-                    "Identity snapshot",
-                    "Universe version",
-                    "Execution policy",
+                    "Frozen research universe",
+                    "Frozen snapshot date",
+                    "Research identities",
+                    "Frozen universe version",
+                    "Frozen universe hash",
+                    "Execution-training policy",
+                    "Trainable agents",
+                    "Trainable symbol hash",
+                    "Underlying identity contract",
                     "Algorithm / policy",
                     "Seed",
                     "Timesteps",
@@ -127,8 +137,13 @@ with st.container(border=True):
                 "Value": [
                     str(plan.identity_policy),
                     str(plan.identity_snapshot),
-                    str(plan.universe_version),
+                    f"{plan.identity_count:,}",
+                    str(plan.frozen_universe_version),
+                    str(plan.universe_hash),
                     str(plan.execution_training_policy),
+                    f"{plan.trainable_count:,}",
+                    str(plan.trainable_symbol_hash),
+                    str(plan.universe_version),
                     f"{plan.algorithm} / {plan.policy}",
                     str(plan.seed),
                     f"{plan.requested_timesteps:,}",

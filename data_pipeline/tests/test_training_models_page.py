@@ -173,6 +173,10 @@ def test_page_loads_in_pre_run_state_without_creating_a_run(
     assert not app.exception
     assert [item.value for item in app.title] == ["Training & Models"]
     assert "Prepare production run" in [item.label for item in app.button]
+    assert not app.get("progress")
+    captions = "\n".join(item.value for item in app.caption)
+    assert "frozen 508-identity research snapshot" in captions
+    assert "current operational identity universe is outside this run" in captions
     assert list(tmp_path.iterdir()) == before
 
 
