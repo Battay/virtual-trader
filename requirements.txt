@@ -6,7 +6,8 @@ numpy
 pandas
 pyarrow>=24,<25
 requests
-scikit-learn
+# Persisted StandardScaler artifacts were serialized with this exact version.
+scikit-learn==1.9.0
 sb3-contrib==2.9.0
 stable-baselines3==2.9.0
 streamlit

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -28,13 +30,16 @@ def test_cuda_preflight_fails_closed_without_cpu_fallback(monkeypatch) -> None:
         cuda_hardware_preflight()
 
 
-def test_cuda_preflight_records_hardware_and_effective_cuda(monkeypatch) -> None:
+@pytest.mark.parametrize("resolved_device", ["cuda", "cuda:0"])
+def test_cuda_preflight_records_hardware_and_effective_cuda(
+    monkeypatch, resolved_device: str
+) -> None:
     monkeypatch.setattr(
         cuda_benchmark,
         "resolve_torch_device",
         lambda _requested: TorchDeviceResolution(
             requested_device="cuda",
-            resolved_device="cuda",
+            resolved_device=resolved_device,
             mps_built=False,
             mps_available=False,
             cuda_available=True,
@@ -54,7 +59,7 @@ def test_cuda_preflight_records_hardware_and_effective_cuda(monkeypatch) -> None
     result = cuda_hardware_preflight()
 
     assert result["requested_device"] == "cuda"
-    assert result["effective_device"] == "cuda"
+    assert result["effective_device"] == resolved_device
     assert result["gpu_model"] == "Test NVIDIA GPU"
     assert result["gpu_total_memory_bytes"] == 24 * 1024**3
 
@@ -78,17 +83,68 @@ def test_cuda_contract_and_command_are_deterministic_and_explicit(tmp_path: Path
     assert contract.to_dict()["test_partition_loaded"] is False
 
 
-def test_non_cuda_worker_result_cannot_be_reported_as_cuda() -> None:
-    completed = cuda_benchmark.subprocess.CompletedProcess(
+_MISSING = object()
+
+
+def _worker_result_payload(
+    *, effective_device: object = _MISSING, status: str = "completed"
+) -> subprocess.CompletedProcess[str]:
+    payload = {"status": status}
+    if effective_device is not _MISSING:
+        payload["effective_device"] = effective_device
+    return subprocess.CompletedProcess(
         args=["worker"],
         returncode=0,
         stdout=(
             cuda_benchmark.CUDA_BENCHMARK_MARKER
-            + '{"status":"completed","effective_device":"cpu"}\n'
+            + json.dumps(payload)
+            + "\n"
         ),
         stderr="",
     )
+
+
+@pytest.mark.parametrize("effective_device", ["cuda", "cuda:0"])
+def test_equivalent_cuda_worker_result_is_accepted_and_preserved(
+    effective_device: str,
+) -> None:
+    result = cuda_benchmark._parse_worker_output(
+        _worker_result_payload(effective_device=effective_device)
+    )
+
+    assert result["effective_device"] == effective_device
+
+
+@pytest.mark.parametrize(
+    "effective_device", ["cpu", "mps", None, "cuda:1", "not-a-device"]
+)
+def test_non_cuda_or_malformed_worker_result_cannot_be_reported_as_cuda(
+    effective_device: object,
+) -> None:
+    completed = _worker_result_payload(effective_device=effective_device)
     with pytest.raises(CudaBenchmarkError, match="non-CUDA"):
+        cuda_benchmark._parse_worker_output(completed)
+
+
+def test_missing_worker_device_is_rejected() -> None:
+    with pytest.raises(CudaBenchmarkError, match="non-CUDA"):
+        cuda_benchmark._parse_worker_output(_worker_result_payload())
+
+
+def test_malformed_worker_payload_is_rejected() -> None:
+    completed = subprocess.CompletedProcess(
+        args=["worker"],
+        returncode=0,
+        stdout=cuda_benchmark.CUDA_BENCHMARK_MARKER + "[]\n",
+        stderr="",
+    )
+    with pytest.raises(CudaBenchmarkError, match="malformed"):
+        cuda_benchmark._parse_worker_output(completed)
+
+
+def test_failed_cuda_worker_status_is_rejected() -> None:
+    completed = _worker_result_payload(effective_device="cuda:0", status="failed")
+    with pytest.raises(CudaBenchmarkError, match="did not complete"):
         cuda_benchmark._parse_worker_output(completed)
 
 

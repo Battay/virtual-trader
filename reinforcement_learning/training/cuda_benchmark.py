@@ -109,7 +109,7 @@ def cuda_hardware_preflight() -> dict[str, object]:
         resolution = resolve_torch_device("cuda")
     except TorchDeviceError as exc:
         raise CudaBenchmarkError(str(exc)) from exc
-    if resolution.resolved_device != "cuda":
+    if not torch_devices_equivalent(resolution.resolved_device, "cuda"):
         raise CudaBenchmarkError("explicit CUDA resolution did not resolve to CUDA")
     try:
         properties = torch.cuda.get_device_properties(0)
@@ -119,7 +119,7 @@ def cuda_hardware_preflight() -> dict[str, object]:
         raise CudaBenchmarkError(f"CUDA device telemetry failed: {exc}") from exc
     return {
         "requested_device": "cuda",
-        "effective_device": "cuda",
+        "effective_device": resolution.resolved_device,
         "gpu_model": resolution.device_name,
         "gpu_count": resolution.cuda_device_count,
         "gpu_total_memory_bytes": memory,
@@ -257,9 +257,13 @@ def _parse_worker_output(completed: subprocess.CompletedProcess[str]) -> dict[st
         payload = json.loads(markers[0])
     except json.JSONDecodeError as exc:
         raise CudaBenchmarkError("isolated CUDA worker returned invalid JSON") from exc
-    if payload.get("effective_device") != "cuda" or payload.get("status") != "completed":
+    if not isinstance(payload, Mapping):
+        raise CudaBenchmarkError("isolated CUDA worker returned a malformed payload")
+    if payload.get("status") != "completed":
+        raise CudaBenchmarkError("isolated CUDA worker did not complete successfully")
+    if not torch_devices_equivalent(payload.get("effective_device"), "cuda"):
         raise CudaBenchmarkError("non-CUDA result cannot be reported as CUDA performance")
-    return payload
+    return dict(payload)
 
 
 def run_cuda_contract(
