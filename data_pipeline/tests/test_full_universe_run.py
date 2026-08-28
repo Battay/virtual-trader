@@ -153,5 +153,9 @@ def test_safety_gates_keep_full_execution_blocked_until_cuda_and_budget_freeze(t
 def test_full_spec_rejects_test_or_unsafe_worker_device() -> None:
     with pytest.raises(ValueError, match="TEST"):
         FullUniverseTrainingSpec(test_partition_loaded=True)
-    with pytest.raises(ValueError, match="exactly one worker"):
-        FullUniverseTrainingSpec(requested_device="cpu", worker_count=2)
+    assert FullUniverseTrainingSpec(requested_device="cpu", worker_count=2).worker_count == 2
+    assert FullUniverseTrainingSpec(requested_device="cpu", worker_count=4).worker_count == 4
+    with pytest.raises(ValueError, match="CPU-only"):
+        FullUniverseTrainingSpec(requested_device="cuda", worker_count=2)
+    with pytest.raises(ValueError, match="1, 2, 4"):
+        FullUniverseTrainingSpec(requested_device="cpu", worker_count=3)

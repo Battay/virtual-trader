@@ -31,6 +31,7 @@ from .job_state import INELIGIBLE, QUEUED, canonical_hash
 from .recurrent_config import RECURRENT_PPO_CONFIG_VERSION, RecurrentPPOConfig
 from .recurrent_orchestrator import (
     RESUME_CAPABILITY,
+    SUPPORTED_PROCESS_WORKERS,
     RecurrentUniverseDiscovery,
     build_training_run,
     discover_recurrent_training_universe,
@@ -76,11 +77,12 @@ class FullUniverseTrainingSpec:
             raise ValueError("timesteps must be positive and seed cannot be negative")
         if self.requested_device not in {"cpu", "cuda"}:
             raise ValueError("full-run candidate device must be explicit CPU or CUDA")
-        if self.worker_count != 1:
+        if self.worker_count not in SUPPORTED_PROCESS_WORKERS:
             raise ValueError(
-                "the current production orchestrator supports exactly one worker; "
-                "2/4 remain CUDA benchmark candidates only"
+                "worker count must be one of the bounded orchestrator values: 1, 2, 4"
             )
+        if self.worker_count > 1 and self.requested_device != "cpu":
+            raise ValueError("bounded multi-worker execution is CPU-only")
         if self.test_partition_loaded:
             raise ValueError("TEST cannot enter a full-run specification")
 
@@ -368,7 +370,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--timesteps", type=int, default=CANDIDATE_TIMESTEP_BUDGET)
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
-    parser.add_argument("--workers", type=int, choices=(1,), default=1)
+    parser.add_argument(
+        "--workers", type=int, choices=SUPPORTED_PROCESS_WORKERS, default=1
+    )
     return parser
 
 

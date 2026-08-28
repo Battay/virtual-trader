@@ -204,7 +204,10 @@ class TrainingRunManifest:
         if self.identity_count != self.eligible_count + self.ineligible_count:
             raise TrainingJobStateError("run identity accounting does not reconcile")
         if self.worker_limit != 1:
-            raise TrainingJobStateError("v1 supports exactly one training worker")
+            raise TrainingJobStateError(
+                "v1 run identity retains worker_limit=1; bounded runtime CPU "
+                "concurrency is invocation metadata and does not change model identity"
+            )
         if self.test_partition_loaded:
             raise TrainingJobStateError("TEST cannot enter orchestration metadata")
 

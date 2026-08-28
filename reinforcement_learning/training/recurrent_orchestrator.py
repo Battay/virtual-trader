@@ -1,20 +1,26 @@
 """Persistent, restart-safe orchestration for independent recurrent agents.
 
-Version 1 deliberately runs one worker at a time. It creates one job for every
-member of the frozen identity universe, retains explicit ineligible records,
-loads TRAIN for optimization, and optionally loads VALIDATION only after
-training. TEST is not exposed by this module.
+The v1 job and run schemas remain stable. Execution defaults to the validated
+sequential path and additionally supports explicit bounded CPU process workers.
+Workers own only symbol-local temporary artifacts; the parent owns every shared
+state transition and promotion. TEST is not exposed by this module.
 """
 
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, replace
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, replace
 import fcntl
 import json
+import math
+import multiprocessing
+from multiprocessing.connection import wait as wait_for_connections
 import os
 from pathlib import Path
+import resource
 import shutil
+import sys
 import tempfile
 import time
 from typing import Callable, Mapping, Sequence
@@ -103,7 +109,11 @@ MODELS_DIRECTORY_NAME = "models"
 CHECKPOINTS_DIRECTORY_NAME = "checkpoints"
 VALIDATION_DIRECTORY_NAME = "validation"
 LOGS_DIRECTORY_NAME = "logs"
+WORKSPACES_DIRECTORY_NAME = "workspaces"
+ACTIVE_WORKERS_FILENAME = "active_workers.json"
+EXECUTION_LOCK_FILENAME = ".execution.lock"
 RESUME_CAPABILITY = "restart_from_zero_only_no_optimizer_checkpoint_v1"
+SUPPORTED_PROCESS_WORKERS = (1, 2, 4)
 
 ELIGIBLE_TRAINABLE = "eligible_trainable"
 INSUFFICIENT_DATA = "insufficient_data"
@@ -517,6 +527,8 @@ class TrainingRunStore:
         self.manifest_path = self.run_directory / RUN_MANIFEST_FILENAME
         self.jobs_directory = self.run_directory / JOBS_DIRECTORY_NAME
         self.lock_path = self.run_directory / ".state.lock"
+        self.execution_lock_path = self.run_directory / EXECUTION_LOCK_FILENAME
+        self.active_workers_path = self.run_directory / ACTIVE_WORKERS_FILENAME
 
     def initialize(
         self,
@@ -531,6 +543,7 @@ class TrainingRunStore:
             CHECKPOINTS_DIRECTORY_NAME,
             VALIDATION_DIRECTORY_NAME,
             LOGS_DIRECTORY_NAME,
+            WORKSPACES_DIRECTORY_NAME,
         ):
             (self.run_directory / name).mkdir(parents=True, exist_ok=True)
         atomic_write_json(manifest.to_dict(), self.manifest_path)
@@ -594,6 +607,50 @@ class TrainingRunStore:
             raise RecurrentOrchestratorError("job artifact escaped run directory")
         return resolved
 
+    @contextmanager
+    def execution_lock(self):
+        """Prevent overlapping orchestrator invocations for one run."""
+
+        self.run_directory.mkdir(parents=True, exist_ok=True)
+        with self.execution_lock_path.open("a+b") as handle:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise RecurrentOrchestratorError(
+                    "another orchestrator invocation already owns this run"
+                ) from exc
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def read_active_workers(self) -> dict[str, Mapping[str, object]]:
+        if not self.active_workers_path.is_file():
+            return {}
+        try:
+            payload = json.loads(self.active_workers_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+            raise RecurrentOrchestratorError(
+                "active-worker state is unreadable"
+            ) from exc
+        workers = payload.get("workers") if isinstance(payload, dict) else None
+        if not isinstance(workers, dict):
+            raise RecurrentOrchestratorError("active-worker state is malformed")
+        return {str(key): dict(value) for key, value in workers.items()}
+
+    def write_active_workers(
+        self, workers: Mapping[str, Mapping[str, object]]
+    ) -> None:
+        atomic_write_json(
+            {
+                "schema_version": "recurrent_active_workers_v1",
+                "workers": {
+                    key: dict(value) for key, value in sorted(workers.items())
+                },
+            },
+            self.active_workers_path,
+        )
+
 
 def create_training_run(
     discovery: RecurrentUniverseDiscovery,
@@ -649,6 +706,8 @@ def recover_interrupted_jobs(
             ),
         )
         recovered.append(job.symbol)
+    if store.active_workers_path.is_file():
+        store.write_active_workers({})
     return tuple(recovered)
 
 
@@ -829,7 +888,7 @@ def _elapsed(started_at: str | None, now: float, wall_start: float) -> float:
     return max(0.0, now - wall_start)
 
 
-def execute_queued_jobs(
+def _execute_queued_jobs_sequential(
     store: TrainingRunStore,
     *,
     config: RecurrentPPOConfig,
@@ -847,7 +906,7 @@ def execute_queued_jobs(
     ),
     registry_path: Path = MODEL_REGISTRY_PATH,
 ) -> tuple[TrainingJobRecord, ...]:
-    """Run at most ``max_jobs`` queued symbols sequentially and persist each stage."""
+    """Run the original sequential path without acquiring the invocation lock."""
 
     if max_jobs < 1:
         raise ValueError("max_jobs must be positive")
@@ -1063,13 +1122,916 @@ def execute_queued_jobs(
     return tuple(outcomes)
 
 
+def _peak_parent_rss_bytes() -> int:
+    value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    return value if sys.platform == "darwin" else value * 1024
+
+
+def _parallel_workspace(store: TrainingRunStore, job: TrainingJobRecord) -> Path:
+    return (
+        store.run_directory
+        / WORKSPACES_DIRECTORY_NAME
+        / safe_path_component(job.symbol)
+        / f"attempt_{job.retry_count:03d}"
+    )
+
+
+def _parallel_log_path(store: TrainingRunStore, job: TrainingJobRecord) -> Path:
+    return (
+        store.run_directory
+        / LOGS_DIRECTORY_NAME
+        / safe_path_component(job.symbol)
+        / f"attempt_{job.retry_count:03d}.json"
+    )
+
+
+def _parallel_invocation_log_path(
+    store: TrainingRunStore, invocation_id: str
+) -> Path:
+    return store.run_directory / LOGS_DIRECTORY_NAME / "invocations" / f"{invocation_id}.json"
+
+
+def _validate_worker_message(
+    payload: object, *, symbol: str
+) -> Mapping[str, object]:
+    from .parallel_worker import PARALLEL_WORKER_PROTOCOL_VERSION
+
+    if not isinstance(payload, Mapping):
+        raise RecurrentOrchestratorError("parallel worker returned a malformed payload")
+    if payload.get("protocol_version") != PARALLEL_WORKER_PROTOCOL_VERSION:
+        raise RecurrentOrchestratorError("parallel worker protocol is incompatible")
+    if payload.get("symbol") != symbol:
+        raise RecurrentOrchestratorError("parallel worker returned another symbol")
+    if payload.get("type") not in {"progress", "stage", "result"}:
+        raise RecurrentOrchestratorError("parallel worker message type is invalid")
+    return payload
+
+
+def _validate_worker_result(
+    payload: Mapping[str, object],
+    *,
+    validation_expected: bool,
+    requested_timesteps: int,
+    maximum_actual_timesteps: int,
+    expected_worker_pid: int,
+    expected_cpu_threads: int | None,
+) -> None:
+    if payload.get("type") != "result":
+        raise RecurrentOrchestratorError("parallel worker result marker is missing")
+    status = payload.get("status")
+    if status not in {"completed", "failed", "interrupted"}:
+        raise RecurrentOrchestratorError("parallel worker terminal status is invalid")
+    if payload.get("test_partition_loaded") is not False:
+        raise RecurrentOrchestratorError("parallel worker reported TEST access")
+    timesteps = payload.get("actual_timesteps")
+    duration = payload.get("duration_seconds")
+    worker_pid = payload.get("worker_pid")
+    if (
+        isinstance(timesteps, bool)
+        or not isinstance(timesteps, int)
+        or timesteps < 0
+    ):
+        raise RecurrentOrchestratorError("parallel worker timesteps are invalid")
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or duration < 0
+        or not math.isfinite(float(duration))
+    ):
+        raise RecurrentOrchestratorError("parallel worker duration is invalid")
+    if isinstance(worker_pid, bool) or not isinstance(worker_pid, int) or worker_pid < 1:
+        raise RecurrentOrchestratorError("parallel worker PID is invalid")
+    if worker_pid != expected_worker_pid:
+        raise RecurrentOrchestratorError("parallel worker PID does not match its process")
+    if status == "completed":
+        if timesteps < requested_timesteps or timesteps > maximum_actual_timesteps:
+            raise RecurrentOrchestratorError(
+                "parallel worker completed outside the bounded rollout budget"
+            )
+        if payload.get("requested_timesteps") != requested_timesteps:
+            raise RecurrentOrchestratorError(
+                "parallel worker requested-timestep telemetry is inconsistent"
+            )
+        if not torch_devices_equivalent(payload.get("effective_device"), "cpu"):
+            raise RecurrentOrchestratorError(
+                "parallel CPU worker reported an unexpected device"
+            )
+        if payload.get("model_file") != "model.zip":
+            raise RecurrentOrchestratorError("parallel worker model reference is invalid")
+        model_hash = payload.get("model_sha256")
+        if (
+            not isinstance(model_hash, str)
+            or len(model_hash) != 64
+            or any(value not in "0123456789abcdef" for value in model_hash)
+        ):
+            raise RecurrentOrchestratorError("parallel worker model hash is invalid")
+        expected_validation = "validation.json" if validation_expected else None
+        if payload.get("validation_file") != expected_validation:
+            raise RecurrentOrchestratorError(
+                "parallel worker validation reference is inconsistent"
+            )
+        thread_policy = payload.get("cpu_thread_policy")
+        if not isinstance(thread_policy, Mapping):
+            raise RecurrentOrchestratorError(
+                "parallel worker CPU thread telemetry is missing"
+            )
+        if thread_policy.get("requested_threads_per_worker") != expected_cpu_threads:
+            raise RecurrentOrchestratorError(
+                "parallel worker CPU thread policy differs from its request"
+            )
+        if expected_cpu_threads is not None and thread_policy.get(
+            "torch_intraop_threads"
+        ) != expected_cpu_threads:
+            raise RecurrentOrchestratorError(
+                "parallel worker did not enforce the Torch CPU thread limit"
+            )
+
+
+def _terminate_process(process: multiprocessing.Process) -> None:
+    if process.is_alive():
+        process.terminate()
+    process.join(timeout=5)
+    if process.is_alive():
+        process.kill()
+        process.join(timeout=5)
+
+
+def _write_parallel_log(
+    store: TrainingRunStore,
+    job: TrainingJobRecord,
+    payload: Mapping[str, object],
+) -> None:
+    atomic_write_json(dict(payload), _parallel_log_path(store, job))
+
+
+def _finalize_parallel_payload(
+    store: TrainingRunStore,
+    job: TrainingJobRecord,
+    *,
+    payload: Mapping[str, object],
+    workspace: Path,
+    validation_expected: bool,
+    maximum_actual_timesteps: int,
+    expected_worker_pid: int,
+    expected_cpu_threads: int | None,
+) -> TrainingJobRecord:
+    """Validate/promote one worker result and perform parent-owned transitions."""
+
+    _validate_worker_result(
+        payload,
+        validation_expected=validation_expected,
+        requested_timesteps=job.requested_timesteps,
+        maximum_actual_timesteps=maximum_actual_timesteps,
+        expected_worker_pid=expected_worker_pid,
+        expected_cpu_threads=expected_cpu_threads,
+    )
+    status = str(payload["status"])
+    duration = float(payload["duration_seconds"])
+    actual_timesteps = int(payload["actual_timesteps"])
+    if status == "interrupted":
+        current = store.read_job(job.symbol)
+        if current.status not in {TRAINING, VALIDATING}:
+            raise RecurrentOrchestratorError("interrupted worker job is not in flight")
+        return store.update_job(
+            job.symbol,
+            lambda value: transition_job(
+                value,
+                INTERRUPTED,
+                message="parallel_worker_interrupted",
+                completed_timesteps=actual_timesteps,
+                wall_clock_duration_seconds=duration,
+                failure_error_message=str(payload.get("error") or "worker interrupted"),
+            ),
+        )
+    if status == "failed":
+        current = store.read_job(job.symbol)
+        if current.status not in {TRAINING, VALIDATING}:
+            raise RecurrentOrchestratorError("failed worker job is not in flight")
+        return store.update_job(
+            job.symbol,
+            lambda value: transition_job(
+                value,
+                FAILED,
+                message="parallel_worker_failed_without_affecting_peers",
+                completed_timesteps=actual_timesteps,
+                wall_clock_duration_seconds=duration,
+                failure_error_message=str(payload.get("error") or "worker failed"),
+            ),
+        )
+
+    model_source = workspace / "model.zip"
+    if not model_source.is_file() or sha256_file(model_source) != payload["model_sha256"]:
+        raise RecurrentOrchestratorError("parallel worker model artifact is missing or changed")
+    relative_model = _artifact_relative_path(
+        job.symbol, "model", attempt=job.retry_count
+    )
+    model_destination = store.resolve_artifact(relative_model)
+    relative_validation: str | None = None
+    validation_destination: Path | None = None
+    promoted: list[Path] = []
+    try:
+        if model_destination.exists():
+            raise FileExistsError(f"model path already exists: {model_destination}")
+        model_destination.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(model_source, model_destination)
+        promoted.append(model_destination)
+
+        current = store.read_job(job.symbol)
+        if validation_expected:
+            if current.status == TRAINING:
+                current = store.update_job(
+                    job.symbol,
+                    lambda value: transition_job(
+                        value,
+                        VALIDATING,
+                        message="parent_observed_validation_after_training",
+                        completed_timesteps=actual_timesteps,
+                        wall_clock_duration_seconds=duration,
+                    ),
+                )
+            if current.status != VALIDATING:
+                raise RecurrentOrchestratorError("validation state is inconsistent")
+            validation_source = workspace / "validation.json"
+            try:
+                validation_payload = json.loads(
+                    validation_source.read_text(encoding="utf-8")
+                )
+            except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+                raise RecurrentOrchestratorError(
+                    "parallel validation artifact is unreadable"
+                ) from exc
+            if not isinstance(validation_payload, dict):
+                raise RecurrentOrchestratorError(
+                    "parallel validation artifact is malformed"
+                )
+            if validation_payload.get("test_evaluated") is True:
+                raise RecurrentOrchestratorError("parallel evaluator reported TEST access")
+            relative_validation = _artifact_relative_path(
+                job.symbol, "validation", attempt=job.retry_count
+            )
+            validation_destination = store.resolve_artifact(relative_validation)
+            if validation_destination.exists():
+                raise FileExistsError(
+                    f"validation path already exists: {validation_destination}"
+                )
+            validation_destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(validation_source, validation_destination)
+            promoted.append(validation_destination)
+            validation_status = "completed"
+        else:
+            if current.status != TRAINING:
+                raise RecurrentOrchestratorError("training state is inconsistent")
+            validation_status = (
+                "not_available_train_only_contract"
+                if job.validation_status == "not_available_train_only_contract"
+                else "not_requested"
+            )
+        return store.update_job(
+            job.symbol,
+            lambda value: transition_job(
+                value,
+                COMPLETED,
+                message="parallel_training_and_requested_validation_completed",
+                completed_timesteps=actual_timesteps,
+                wall_clock_duration_seconds=duration,
+                model_path=relative_model,
+                model_sha256=str(payload["model_sha256"]),
+                validation_status=validation_status,
+                validation_metrics_reference=relative_validation,
+                failure_error_message=None,
+            ),
+        )
+    except Exception:
+        for path in promoted:
+            path.unlink(missing_ok=True)
+        raise
+
+
+def _execute_queued_jobs_processes(
+    store: TrainingRunStore,
+    *,
+    config: RecurrentPPOConfig,
+    max_jobs: int,
+    workers: int,
+    cpu_threads_per_worker: int | None,
+    symbols: Sequence[str] | None,
+    fail_fast: bool,
+    splits_dir: Path,
+    metadata_loader: Callable[..., object],
+    registry_path: Path,
+    process_worker: Callable[[Mapping[str, object], object], None] | None,
+    cancellation_requested: Callable[[], bool] | None,
+    device_resolver: Callable[[str], TorchDeviceResolution],
+) -> tuple[TrainingJobRecord, ...]:
+    """Run bounded spawned CPU workers while the parent owns shared state."""
+
+    from .parallel_worker import (
+        CPU_THREAD_ENVIRONMENT_VARIABLES,
+        PARALLEL_WORKER_PROTOCOL_VERSION,
+        run_recurrent_process_worker,
+    )
+
+    if config.device != "cpu":
+        raise RecurrentOrchestratorError(
+            "parallel recurrent execution requires explicit device=cpu"
+        )
+    if workers not in SUPPORTED_PROCESS_WORKERS:
+        raise ValueError("workers must be one of: 1, 2, 4")
+    if workers > 1 and cpu_threads_per_worker is None:
+        raise RecurrentOrchestratorError(
+            "parallel CPU runs require an explicit --cpu-threads-per-worker policy"
+        )
+    if cpu_threads_per_worker is not None and (
+        isinstance(cpu_threads_per_worker, bool) or cpu_threads_per_worker < 1
+    ):
+        raise ValueError("cpu_threads_per_worker must be positive")
+    manifest = store.read_manifest()
+    if config.total_timesteps != manifest.requested_timesteps or config.seed != manifest.seed:
+        raise RecurrentOrchestratorError("runtime configuration differs from run manifest")
+    if config.device != manifest.requested_device:
+        raise RecurrentOrchestratorError("runtime device differs from run manifest")
+    if canonical_hash(config.to_dict()) != manifest.hyperparameters_hash:
+        raise RecurrentOrchestratorError("runtime hyperparameters differ from run manifest")
+    resolution = device_resolver("cpu")
+    validate_recurrent_device_resolution(resolution)
+    if not torch_devices_equivalent(resolution.resolved_device, "cpu"):
+        raise RecurrentOrchestratorError("parallel CPU resolution is not CPU")
+    mark_stale_jobs(store, splits_dir=Path(splits_dir), metadata_loader=metadata_loader)
+    all_jobs = store.list_jobs()
+    requested_symbols = None if symbols is None else {str(value).strip() for value in symbols}
+    if requested_symbols is not None:
+        unknown = requested_symbols.difference(job.symbol for job in all_jobs)
+        if unknown:
+            raise RecurrentOrchestratorError(
+                "requested symbols are absent from run: " + ", ".join(sorted(unknown))
+            )
+    queued = [job for job in all_jobs if job.status == QUEUED]
+    if requested_symbols is not None:
+        queued = [job for job in queued if job.symbol in requested_symbols]
+    queued.sort(key=lambda item: item.symbol)
+    selected = queued[:max_jobs]
+    if not selected:
+        store.write_active_workers({})
+        return ()
+
+    context = multiprocessing.get_context("spawn")
+    target = process_worker or run_recurrent_process_worker
+    registry_before = _file_bytes(Path(registry_path))
+    pending = list(selected)
+    active: dict[str, dict[str, object]] = {}
+    outcomes: dict[str, TrainingJobRecord] = {}
+    stop_launching = False
+    interrupted_by_user = False
+    invocation_error: str | None = None
+    invocation_started_at = utc_now()
+    invocation_wall_start = time.perf_counter()
+    invocation_id = (
+        f"cpu-process-{time.time_ns()}-"
+        + canonical_hash(
+            {
+                "symbols": [job.symbol for job in selected],
+                "workers": workers,
+                "cpu_threads_per_worker": cpu_threads_per_worker,
+            }
+        )[:12]
+    )
+    invocation_log_path = _parallel_invocation_log_path(store, invocation_id)
+    atomic_write_json(
+        {
+            "schema_version": "recurrent_parallel_invocation_v1",
+            "invocation_id": invocation_id,
+            "status": "running",
+            "started_at": invocation_started_at,
+            "workers": workers,
+            "max_jobs": max_jobs,
+            "selected_symbols": [job.symbol for job in selected],
+            "cpu_threads_per_worker": cpu_threads_per_worker,
+            "requested_device": "cpu",
+            "test_partition_loaded": False,
+        },
+        invocation_log_path,
+    )
+
+    def persist_active() -> None:
+        store.write_active_workers(
+            {
+                symbol: {
+                    "worker_pid": int(item["process"].pid),
+                    "status": store.read_job(symbol).status,
+                    "requested_timesteps": store.read_job(symbol).requested_timesteps,
+                    "started_at": store.read_job(symbol).started_at,
+                    "device": "cpu",
+                }
+                for symbol, item in active.items()
+            }
+        )
+
+    def mark_protocol_failure(symbol: str, message: str) -> None:
+        item = active[symbol]
+        current = store.read_job(symbol)
+        if current.status in {TRAINING, VALIDATING}:
+            current = store.update_job(
+                symbol,
+                lambda value: transition_job(
+                    value,
+                    FAILED,
+                    message="parallel_worker_protocol_failure",
+                    wall_clock_duration_seconds=max(
+                        value.wall_clock_duration_seconds,
+                        time.perf_counter() - float(item["wall_start"]),
+                    ),
+                    failure_error_message=message,
+                ),
+            )
+        outcomes[symbol] = current
+
+    def launch(job: TrainingJobRecord) -> None:
+        nonlocal stop_launching
+        workspace = _parallel_workspace(store, job)
+        if workspace.exists():
+            store.update_job(
+                job.symbol,
+                lambda value: transition_job(
+                    value,
+                    TRAINING,
+                    message="parallel_workspace_collision_detected",
+                ),
+            )
+            outcomes[job.symbol] = store.update_job(
+                job.symbol,
+                lambda value: transition_job(
+                    value,
+                    FAILED,
+                    message="parallel_worker_not_launched",
+                    failure_error_message=(
+                        f"isolated workspace already exists: {workspace}"
+                    ),
+                ),
+            )
+            if fail_fast:
+                stop_launching = True
+            return
+        workspace.parent.mkdir(parents=True, exist_ok=True)
+        training_job = store.update_job(
+            job.symbol,
+            lambda current: transition_job(
+                current,
+                TRAINING,
+                message="parallel_process_training_started",
+            ),
+        )
+        training_job = store.update_job(
+            job.symbol,
+            lambda current: replace(
+                current,
+                effective_device="cpu",
+                device_name=resolution.device_name,
+                updated_at=utc_now(),
+            ),
+        )
+        validation_expected = bool(
+            manifest.validation_enabled
+            and training_job.validation_status
+            != "not_available_train_only_contract"
+        )
+        receive_connection, send_connection = context.Pipe(duplex=False)
+        request = {
+            "protocol_version": PARALLEL_WORKER_PROTOCOL_VERSION,
+            "symbol": job.symbol,
+            "config": asdict(config),
+            "requested_device": "cpu",
+            "cpu_threads_per_worker": cpu_threads_per_worker,
+            "splits_dir": str(Path(splits_dir).resolve(strict=False)),
+            "workspace": str(workspace),
+            "validation_enabled": validation_expected,
+            "test_partition_loaded": False,
+        }
+        process = context.Process(
+            target=target,
+            args=(request, send_connection),
+            name=f"rppo-{safe_path_component(job.symbol)}",
+        )
+        inherited_thread_environment = {
+            name: os.environ.get(name)
+            for name in CPU_THREAD_ENVIRONMENT_VARIABLES
+        }
+        try:
+            if cpu_threads_per_worker is not None:
+                for name in CPU_THREAD_ENVIRONMENT_VARIABLES:
+                    os.environ[name] = str(cpu_threads_per_worker)
+            process.start()
+        except Exception as exc:
+            send_connection.close()
+            receive_connection.close()
+            current = store.update_job(
+                job.symbol,
+                lambda value: transition_job(
+                    value,
+                    FAILED,
+                    message="parallel_worker_launch_failed",
+                    failure_error_message=f"{type(exc).__name__}: {exc}",
+                ),
+            )
+            outcomes[job.symbol] = current
+            if fail_fast:
+                stop_launching = True
+            return
+        finally:
+            for name, value in inherited_thread_environment.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        send_connection.close()
+        active[job.symbol] = {
+            "job": job,
+            "process": process,
+            "connection": receive_connection,
+            "workspace": workspace,
+            "wall_start": time.perf_counter(),
+            "validation_expected": validation_expected,
+            "result": None,
+        }
+        persist_active()
+
+    def finish(symbol: str, payload: Mapping[str, object]) -> None:
+        nonlocal stop_launching
+        item = active[symbol]
+        job = item["job"]
+        process = item["process"]
+        connection = item["connection"]
+        workspace = item["workspace"]
+        process.join(timeout=5)
+        if process.is_alive():
+            _terminate_process(process)
+            payload = {
+                "type": "result",
+                "protocol_version": PARALLEL_WORKER_PROTOCOL_VERSION,
+                "symbol": symbol,
+                "status": "failed",
+                "error": "worker reported a result but did not exit",
+                "actual_timesteps": int(payload.get("actual_timesteps", 0)),
+                "effective_device": payload.get("effective_device"),
+                "duration_seconds": time.perf_counter() - float(item["wall_start"]),
+                "worker_pid": int(process.pid or 1),
+                "test_partition_loaded": False,
+            }
+        try:
+            outcome = _finalize_parallel_payload(
+                store,
+                job,
+                payload=payload,
+                workspace=workspace,
+                validation_expected=bool(item["validation_expected"]),
+                maximum_actual_timesteps=(
+                    math.ceil(job.requested_timesteps / config.n_steps)
+                    * config.n_steps
+                ),
+                expected_worker_pid=int(process.pid),
+                expected_cpu_threads=cpu_threads_per_worker,
+            )
+        except Exception as exc:
+            mark_protocol_failure(symbol, f"{type(exc).__name__}: {exc}")
+            outcome = outcomes[symbol]
+        log_payload = {
+            **dict(payload),
+            "parent_final_status": outcome.status,
+            "parent_peak_rss_bytes": _peak_parent_rss_bytes(),
+        }
+        _write_parallel_log(store, job, log_payload)
+        outcomes[symbol] = outcome
+        if outcome.status == FAILED and fail_fast:
+            stop_launching = True
+        connection.close()
+        if process.is_alive():
+            _terminate_process(process)
+        try:
+            process.close()
+        except ValueError:
+            pass
+        shutil.rmtree(workspace, ignore_errors=True)
+        del active[symbol]
+        persist_active()
+
+    store.write_active_workers({})
+    try:
+        while pending or active:
+            if cancellation_requested is not None and cancellation_requested():
+                raise KeyboardInterrupt
+            while pending and len(active) < workers and not stop_launching:
+                launch(pending.pop(0))
+            if not active:
+                break
+            connections = [item["connection"] for item in active.values()]
+            ready = wait_for_connections(connections, timeout=0.1)
+            for connection in ready:
+                symbol = next(
+                    key
+                    for key, item in active.items()
+                    if item["connection"] is connection
+                )
+                try:
+                    raw = connection.recv()
+                    payload = _validate_worker_message(raw, symbol=symbol)
+                    message_type = payload["type"]
+                    if message_type == "progress":
+                        timesteps = payload.get("actual_timesteps")
+                        elapsed = payload.get("elapsed_seconds")
+                        if (
+                            isinstance(timesteps, bool)
+                            or not isinstance(timesteps, int)
+                            or timesteps < 0
+                            or timesteps
+                            > math.ceil(
+                                store.read_job(symbol).requested_timesteps
+                                / config.n_steps
+                            )
+                            * config.n_steps
+                            or not isinstance(elapsed, (int, float))
+                            or isinstance(elapsed, bool)
+                            or float(elapsed) < 0
+                            or not math.isfinite(float(elapsed))
+                        ):
+                            raise RecurrentOrchestratorError(
+                                "parallel progress payload is invalid"
+                            )
+                        store.update_job(
+                            symbol,
+                            lambda current: replace(
+                                current,
+                                completed_timesteps=max(
+                                    current.completed_timesteps, timesteps
+                                ),
+                                updated_at=str(payload.get("timestamp") or utc_now()),
+                                wall_clock_duration_seconds=max(
+                                    current.wall_clock_duration_seconds,
+                                    float(elapsed),
+                                ),
+                            ),
+                        )
+                    elif message_type == "stage":
+                        if payload.get("stage") != "validating" or not bool(
+                            active[symbol]["validation_expected"]
+                        ):
+                            raise RecurrentOrchestratorError(
+                                "parallel worker stage is invalid"
+                            )
+                        stage_timesteps = payload.get("actual_timesteps")
+                        stage_elapsed = payload.get("elapsed_seconds")
+                        if (
+                            isinstance(stage_timesteps, bool)
+                            or not isinstance(stage_timesteps, int)
+                            or stage_timesteps
+                            < store.read_job(symbol).requested_timesteps
+                            or stage_timesteps
+                            > math.ceil(
+                                store.read_job(symbol).requested_timesteps
+                                / config.n_steps
+                            )
+                            * config.n_steps
+                            or isinstance(stage_elapsed, bool)
+                            or not isinstance(stage_elapsed, (int, float))
+                            or float(stage_elapsed) < 0
+                            or not math.isfinite(float(stage_elapsed))
+                        ):
+                            raise RecurrentOrchestratorError(
+                                "parallel validation-stage telemetry is invalid"
+                            )
+                        current = store.read_job(symbol)
+                        if current.status == TRAINING:
+                            store.update_job(
+                                symbol,
+                                lambda value: transition_job(
+                                    value,
+                                    VALIDATING,
+                                    message="parallel_validation_started_after_training",
+                                    completed_timesteps=int(
+                                        stage_timesteps
+                                    ),
+                                    wall_clock_duration_seconds=float(
+                                        stage_elapsed
+                                    ),
+                                    validation_status="running",
+                                ),
+                            )
+                            persist_active()
+                    else:
+                        finish(symbol, payload)
+                except EOFError:
+                    process = active[symbol]["process"]
+                    process.join(timeout=1)
+                    synthetic = {
+                        "type": "result",
+                        "protocol_version": PARALLEL_WORKER_PROTOCOL_VERSION,
+                        "symbol": symbol,
+                        "status": "failed",
+                        "error": f"worker exited without a result (exit={process.exitcode})",
+                        "actual_timesteps": store.read_job(symbol).completed_timesteps,
+                        "effective_device": None,
+                        "duration_seconds": time.perf_counter()
+                        - float(active[symbol]["wall_start"]),
+                        "worker_pid": int(process.pid or 1),
+                        "test_partition_loaded": False,
+                    }
+                    finish(symbol, synthetic)
+                except Exception as exc:
+                    process = active[symbol]["process"]
+                    _terminate_process(process)
+                    mark_protocol_failure(symbol, f"{type(exc).__name__}: {exc}")
+                    _write_parallel_log(
+                        store,
+                        active[symbol]["job"],
+                        {
+                            "type": "protocol_failure",
+                            "symbol": symbol,
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "parent_final_status": outcomes[symbol].status,
+                        },
+                    )
+                    active[symbol]["connection"].close()
+                    shutil.rmtree(active[symbol]["workspace"], ignore_errors=True)
+                    del active[symbol]
+                    persist_active()
+                    if fail_fast:
+                        stop_launching = True
+            # A child that closed unexpectedly may need one final pipe read; if
+            # no data remain, the next wait iteration yields EOF deterministically.
+    except KeyboardInterrupt:
+        stop_launching = True
+        interrupted_by_user = True
+        for symbol, item in list(active.items()):
+            _terminate_process(item["process"])
+            current = store.read_job(symbol)
+            if current.status in {TRAINING, VALIDATING}:
+                current = store.update_job(
+                    symbol,
+                    lambda value: transition_job(
+                        value,
+                        INTERRUPTED,
+                        message="parallel_orchestrator_keyboard_interrupt",
+                        wall_clock_duration_seconds=max(
+                            value.wall_clock_duration_seconds,
+                            time.perf_counter() - float(item["wall_start"]),
+                        ),
+                        failure_error_message=(
+                            "Interrupted without optimizer checkpoint; explicit "
+                            "restart from zero is required."
+                        ),
+                    ),
+                )
+            outcomes[symbol] = current
+            item["connection"].close()
+            shutil.rmtree(item["workspace"], ignore_errors=True)
+            del active[symbol]
+        persist_active()
+    except BaseException as exc:
+        invocation_error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        had_active_workers = bool(active)
+        for item in active.values():
+            _terminate_process(item["process"])
+            item["connection"].close()
+            shutil.rmtree(item["workspace"], ignore_errors=True)
+        active.clear()
+        if had_active_workers:
+            recover_interrupted_jobs(store)
+        store.write_active_workers({})
+        registry_changed = _file_bytes(Path(registry_path)) != registry_before
+        final_jobs = {
+            job.symbol: store.read_job(job.symbol) for job in selected
+        }
+        statuses = {symbol: job.status for symbol, job in final_jobs.items()}
+        if interrupted_by_user:
+            invocation_status = "interrupted"
+        elif invocation_error is not None or registry_changed:
+            invocation_status = "failed"
+        elif any(status == FAILED for status in statuses.values()):
+            invocation_status = "completed_with_failures"
+        else:
+            invocation_status = "completed"
+        atomic_write_json(
+            {
+                "schema_version": "recurrent_parallel_invocation_v1",
+                "invocation_id": invocation_id,
+                "status": invocation_status,
+                "started_at": invocation_started_at,
+                "completed_at": utc_now(),
+                "duration_seconds": time.perf_counter() - invocation_wall_start,
+                "workers": workers,
+                "max_jobs": max_jobs,
+                "selected_symbols": [job.symbol for job in selected],
+                "cpu_threads_per_worker": cpu_threads_per_worker,
+                "requested_device": "cpu",
+                "job_statuses": statuses,
+                "error": invocation_error,
+                "registry_unchanged": not registry_changed,
+                "test_partition_loaded": False,
+            },
+            invocation_log_path,
+        )
+        if registry_changed:
+            raise RecurrentOrchestratorError("model registry changed during run")
+    return tuple(outcomes[job.symbol] for job in selected if job.symbol in outcomes)
+
+
+def execute_queued_jobs(
+    store: TrainingRunStore,
+    *,
+    config: RecurrentPPOConfig,
+    max_jobs: int = 1,
+    workers: int = 1,
+    cpu_threads_per_worker: int | None = None,
+    symbols: Sequence[str] | None = None,
+    fail_fast: bool = False,
+    splits_dir: Path = PROCESSED_SPLITS_DIR,
+    trainer: Callable[..., RecurrentPPOTrainingResult] = train_recurrent_single_symbol,
+    evaluator: Callable[..., object] = evaluate_recurrent_on_validation,
+    device_resolver: Callable[[str], TorchDeviceResolution] = resolve_torch_device,
+    metadata_loader: Callable[..., object] = load_training_recurrent_contract_metadata,
+    registry_path: Path = MODEL_REGISTRY_PATH,
+    process_worker: Callable[[Mapping[str, object], object], None] | None = None,
+    cancellation_requested: Callable[[], bool] | None = None,
+    force_process_workers: bool = False,
+) -> tuple[TrainingJobRecord, ...]:
+    """Process at most ``max_jobs`` with a distinct bounded worker count."""
+
+    if max_jobs < 1:
+        raise ValueError("max_jobs must be positive")
+    if workers not in SUPPORTED_PROCESS_WORKERS:
+        raise ValueError("workers must be one of: 1, 2, 4")
+    with store.execution_lock():
+        if workers == 1 and not force_process_workers:
+            if cpu_threads_per_worker is not None:
+                raise RecurrentOrchestratorError(
+                    "CPU thread policy applies to spawned workers; omit it for "
+                    "the legacy sequential path"
+                )
+            return _execute_queued_jobs_sequential(
+                store,
+                config=config,
+                max_jobs=max_jobs,
+                symbols=symbols,
+                fail_fast=fail_fast,
+                splits_dir=splits_dir,
+                trainer=trainer,
+                evaluator=evaluator,
+                device_resolver=device_resolver,
+                metadata_loader=metadata_loader,
+                registry_path=registry_path,
+            )
+        if trainer is not train_recurrent_single_symbol or evaluator is not evaluate_recurrent_on_validation:
+            raise RecurrentOrchestratorError(
+                "spawned workers use the production trainer/evaluator; inject a "
+                "bounded process_worker for offline tests"
+            )
+        return _execute_queued_jobs_processes(
+            store,
+            config=config,
+            max_jobs=max_jobs,
+            workers=workers,
+            cpu_threads_per_worker=cpu_threads_per_worker,
+            symbols=symbols,
+            fail_fast=fail_fast,
+            splits_dir=Path(splits_dir),
+            metadata_loader=metadata_loader,
+            registry_path=Path(registry_path),
+            process_worker=process_worker,
+            cancellation_requested=cancellation_requested,
+            device_resolver=device_resolver,
+        )
+
+
 def training_status_table(store: TrainingRunStore) -> pd.DataFrame:
     """Return deterministic download-style job progress for every identity."""
 
-    rows = [progress_snapshot(job) for job in store.list_jobs()]
+    active_workers = store.read_active_workers()
+    rows = []
+    for job in store.list_jobs():
+        row = progress_snapshot(job)
+        active = active_workers.get(job.symbol, {})
+        row["worker_process_id"] = active.get("worker_pid")
+        rows.append(row)
     return pd.DataFrame(rows).sort_values("symbol", kind="mergesort").reset_index(
         drop=True
     )
+
+
+def training_status_summary(store: TrainingRunStore) -> dict[str, int]:
+    """Return reconciled global counts without changing persisted state."""
+
+    jobs = store.list_jobs()
+    counts = pd.Series([job.status for job in jobs], dtype="string").value_counts()
+    active = int(counts.get(TRAINING, 0) + counts.get(VALIDATING, 0))
+    return {
+        "total": len(jobs),
+        "eligible": sum(job.trainability == "eligible" for job in jobs),
+        "queued": int(counts.get(QUEUED, 0)),
+        "active": active,
+        "completed": int(counts.get(COMPLETED, 0)),
+        "failed": int(counts.get(FAILED, 0)),
+        "interrupted": int(counts.get(INTERRUPTED, 0)),
+    }
 
 
 def _print_discovery(discovery: RecurrentUniverseDiscovery) -> None:
@@ -1081,7 +2043,9 @@ def _print_discovery(discovery: RecurrentUniverseDiscovery) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Track sequential recurrent PPO jobs")
+    parser = argparse.ArgumentParser(
+        description="Track and run bounded recurrent PPO symbol jobs"
+    )
     parser.add_argument("--discover", action="store_true")
     parser.add_argument("--create-run", action="store_true")
     parser.add_argument("--status", action="store_true")
@@ -1092,6 +2056,18 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="cpu")
     parser.add_argument("--max-jobs", type=int, default=1)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        choices=SUPPORTED_PROCESS_WORKERS,
+        default=1,
+        help="Concurrent processes; --max-jobs remains the invocation job limit.",
+    )
+    parser.add_argument(
+        "--cpu-threads-per-worker",
+        type=int,
+        help="Explicit Torch/BLAS thread limit for spawned CPU workers.",
+    )
     parser.add_argument("--symbol", action="append")
     parser.add_argument("--no-validation", action="store_true")
     return parser
@@ -1126,12 +2102,15 @@ def main() -> int:
         return 2
     store = TrainingRunStore(args.run_directory)
     if args.status:
+        print(json.dumps(training_status_summary(store), sort_keys=True))
         print(training_status_table(store).to_string(index=False))
         return 0
     outcomes = execute_queued_jobs(
         store,
         config=config,
         max_jobs=args.max_jobs,
+        workers=args.workers,
+        cpu_threads_per_worker=args.cpu_threads_per_worker,
         symbols=args.symbol,
     )
     print(pd.DataFrame([progress_snapshot(job) for job in outcomes]).to_string(index=False))
@@ -1149,6 +2128,7 @@ __all__ = [
     "INSUFFICIENT_DATA",
     "MISSING_REQUIRED_ARTIFACTS",
     "RESUME_CAPABILITY",
+    "SUPPORTED_PROCESS_WORKERS",
     "UNSUPPORTED",
     "RecurrentOrchestratorError",
     "RecurrentUniverseDiscovery",
@@ -1163,5 +2143,6 @@ __all__ = [
     "mark_stale_jobs",
     "recover_interrupted_jobs",
     "training_status_table",
+    "training_status_summary",
     "validate_recurrent_device_resolution",
 ]

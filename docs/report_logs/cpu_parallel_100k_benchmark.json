@@ -1,0 +1,538 @@
+{
+  "benchmark_version": "recurrent_cpu_parallel_benchmark_v1",
+  "candidates": [
+    {
+      "agents_per_hour": 16.09435434076555,
+      "aggregate_actual_timesteps": 401408,
+      "aggregate_steps_per_second": 448.63906855680676,
+      "completed_jobs": 4,
+      "cpu_threads_per_worker": 8,
+      "effective_devices": [
+        "cpu"
+      ],
+      "failed_jobs": 0,
+      "interrupted_jobs": 0,
+      "maximum_worker_peak_rss_bytes": 502398976,
+      "peak_parent_rss_bytes": 400703488,
+      "per_agent": [
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 231.9641429580006,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 432.6185880296582,
+          "symbol": "786",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.020421642810106277,
+            "clip_fraction": 0.1171875,
+            "entropy_loss": -0.4680764278396964,
+            "explained_variance": 0.7935302257537842,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.016910583362914622,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0017044927841197931
+          },
+          "training_duration_seconds": 231.8092060409981,
+          "training_end": "2024-08-07",
+          "training_rows": 1152,
+          "training_start": "2018-11-15",
+          "validation_duration_seconds": 0.11583729200356174,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 502398976,
+          "worker_pid": 84992
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 219.33652508399973,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 457.5252569610465,
+          "symbol": "CCM",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04655243828892708,
+            "clip_fraction": 0.157421875,
+            "entropy_loss": -0.33476953860372305,
+            "explained_variance": 0.9739097356796265,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.023198998131556438,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0017137857299530878
+          },
+          "training_duration_seconds": 219.2425629999998,
+          "training_end": "2025-08-13",
+          "training_rows": 544,
+          "training_start": "2017-10-12",
+          "validation_duration_seconds": 0.0627576249971753,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 496386048,
+          "worker_pid": 86000
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 218.5214199999973,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 459.23186843651865,
+          "symbol": "DCL",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04976753145456314,
+            "clip_fraction": 0.19921875,
+            "entropy_loss": -0.48360373750329017,
+            "explained_variance": 0.5537593364715576,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.02574883188935928,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.001617843261010421
+          },
+          "training_duration_seconds": 218.34516958300082,
+          "training_end": "2023-08-23",
+          "training_rows": 1704,
+          "training_start": "2016-10-06",
+          "validation_duration_seconds": 0.14641845800360898,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 501579776,
+          "worker_pid": 86951
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 214.8204180840039,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 467.1436770072671,
+          "symbol": "ECOP",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04055541753768921,
+            "clip_fraction": 0.1482421875,
+            "entropy_loss": -0.4342133946716785,
+            "explained_variance": 0.8686420321464539,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.026606162264943122,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0011029980072635227
+          },
+          "training_duration_seconds": 214.65126620899537,
+          "training_end": "2023-08-29",
+          "training_rows": 1601,
+          "training_start": "2016-10-06",
+          "validation_duration_seconds": 0.13923079099913593,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 499449856,
+          "worker_pid": 87891
+        }
+      ],
+      "safe": true,
+      "sum_worker_peak_rss_bytes": 1999814656,
+      "symbols": [
+        "786",
+        "CCM",
+        "DCL",
+        "ECOP"
+      ],
+      "system_memory_after": {
+        "available_bytes": null,
+        "total_bytes": 17179869184
+      },
+      "test_partition_loaded": false,
+      "validation_behavior": "validation_only_after_train",
+      "wall_clock_seconds": 894.7236835420044,
+      "workers": 1
+    },
+    {
+      "agents_per_hour": 30.22277159025781,
+      "aggregate_actual_timesteps": 401408,
+      "aggregate_steps_per_second": 842.4765485070977,
+      "completed_jobs": 4,
+      "cpu_threads_per_worker": 4,
+      "effective_devices": [
+        "cpu"
+      ],
+      "failed_jobs": 0,
+      "interrupted_jobs": 0,
+      "maximum_worker_peak_rss_bytes": 510181376,
+      "peak_parent_rss_bytes": 402145280,
+      "per_agent": [
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 229.08427775000018,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 438.0571245902532,
+          "symbol": "786",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.020421642810106277,
+            "clip_fraction": 0.1171875,
+            "entropy_loss": -0.4680764278396964,
+            "explained_variance": 0.7935302257537842,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.016910583362914622,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0017044927841197931
+          },
+          "training_duration_seconds": 228.91028758299944,
+          "training_end": "2024-08-07",
+          "training_rows": 1152,
+          "training_start": "2018-11-15",
+          "validation_duration_seconds": 0.12974312499864027,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 502775808,
+          "worker_pid": 88824
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 244.1620991249947,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 411.0056407592829,
+          "symbol": "CCM",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04655243828892708,
+            "clip_fraction": 0.157421875,
+            "entropy_loss": -0.33476953860372305,
+            "explained_variance": 0.9739097356796265,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.023198998131556438,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0017137857299530878
+          },
+          "training_duration_seconds": 244.0609365420023,
+          "training_end": "2025-08-13",
+          "training_rows": 544,
+          "training_start": "2017-10-12",
+          "validation_duration_seconds": 0.06774591700377641,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 502333440,
+          "worker_pid": 88825
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 233.86628575000213,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 429.0999007324812,
+          "symbol": "DCL",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04976753145456314,
+            "clip_fraction": 0.19921875,
+            "entropy_loss": -0.48360373750329017,
+            "explained_variance": 0.5537593364715576,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.02574883188935928,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.001617843261010421
+          },
+          "training_duration_seconds": 233.66732975000195,
+          "training_end": "2023-08-23",
+          "training_rows": 1704,
+          "training_start": "2016-10-06",
+          "validation_duration_seconds": 0.16548966700065648,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 510181376,
+          "worker_pid": 89828
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 225.0352456670007,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 445.9390336947368,
+          "symbol": "ECOP",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04055541753768921,
+            "clip_fraction": 0.1482421875,
+            "entropy_loss": -0.4342133946716785,
+            "explained_variance": 0.8686420321464539,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.026606162264943122,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0011029980072635227
+          },
+          "training_duration_seconds": 224.86435124999844,
+          "training_end": "2023-08-29",
+          "training_rows": 1601,
+          "training_start": "2016-10-06",
+          "validation_duration_seconds": 0.13938591699843528,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 503185408,
+          "worker_pid": 89896
+        }
+      ],
+      "safe": true,
+      "sum_worker_peak_rss_bytes": 2018476032,
+      "symbols": [
+        "786",
+        "CCM",
+        "DCL",
+        "ECOP"
+      ],
+      "system_memory_after": {
+        "available_bytes": null,
+        "total_bytes": 17179869184
+      },
+      "test_partition_loaded": false,
+      "validation_behavior": "validation_only_after_train",
+      "wall_clock_seconds": 476.4619272919954,
+      "workers": 2
+    },
+    {
+      "agents_per_hour": 46.810208609119,
+      "aggregate_actual_timesteps": 401408,
+      "aggregate_steps_per_second": 1304.8605706506416,
+      "completed_jobs": 4,
+      "cpu_threads_per_worker": 2,
+      "effective_devices": [
+        "cpu"
+      ],
+      "failed_jobs": 0,
+      "interrupted_jobs": 0,
+      "maximum_worker_peak_rss_bytes": 513769472,
+      "peak_parent_rss_bytes": 402358272,
+      "per_agent": [
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 290.3511160420021,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 345.6229180999019,
+          "symbol": "786",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.020421642810106277,
+            "clip_fraction": 0.1171875,
+            "entropy_loss": -0.4680764278396964,
+            "explained_variance": 0.7935302257537842,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.016910583362914622,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0017044927841197931
+          },
+          "training_duration_seconds": 290.1511852909971,
+          "training_end": "2024-08-07",
+          "training_rows": 1152,
+          "training_start": "2018-11-15",
+          "validation_duration_seconds": 0.15591379100078484,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 507412480,
+          "worker_pid": 90891
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 301.2507021249985,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 333.11789579949516,
+          "symbol": "CCM",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04655243828892708,
+            "clip_fraction": 0.157421875,
+            "entropy_loss": -0.33476953860372305,
+            "explained_variance": 0.9739097356796265,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.023198998131556438,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0017137857299530878
+          },
+          "training_duration_seconds": 301.1334223329977,
+          "training_end": "2025-08-13",
+          "training_rows": 544,
+          "training_start": "2017-10-12",
+          "validation_duration_seconds": 0.07844258399563842,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 503218176,
+          "worker_pid": 90892
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 302.96688958300365,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 331.23091483073307,
+          "symbol": "DCL",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04976753145456314,
+            "clip_fraction": 0.19921875,
+            "entropy_loss": -0.48360373750329017,
+            "explained_variance": 0.5537593364715576,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.02574883188935928,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.001617843261010421
+          },
+          "training_duration_seconds": 302.78698804099986,
+          "training_end": "2023-08-23",
+          "training_rows": 1704,
+          "training_start": "2016-10-06",
+          "validation_duration_seconds": 0.1465652080005384,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 513769472,
+          "worker_pid": 90893
+        },
+        {
+          "actual_timesteps": 100352,
+          "duration_seconds": 288.02135866699973,
+          "effective_device": "cpu",
+          "requested_timesteps": 100000,
+          "status": "COMPLETED",
+          "steps_per_second": 348.4186050105523,
+          "symbol": "ECOP",
+          "test_partition_loaded": false,
+          "training_diagnostics": {
+            "approximate_kl": 0.04055541753768921,
+            "clip_fraction": 0.1482421875,
+            "entropy_loss": -0.4342133946716785,
+            "explained_variance": 0.8686420321464539,
+            "learning_rate": 0.0003,
+            "policy_gradient_loss": -0.026606162264943122,
+            "timesteps": 100352,
+            "updates": 1960,
+            "value_loss": 0.0011029980072635227
+          },
+          "training_duration_seconds": 287.7378711659985,
+          "training_end": "2023-08-29",
+          "training_rows": 1601,
+          "training_start": "2016-10-06",
+          "validation_duration_seconds": 0.23059733300033258,
+          "validation_status": "completed",
+          "worker_peak_rss_bytes": 511262720,
+          "worker_pid": 90894
+        }
+      ],
+      "safe": true,
+      "sum_worker_peak_rss_bytes": 2035662848,
+      "symbols": [
+        "786",
+        "CCM",
+        "DCL",
+        "ECOP"
+      ],
+      "system_memory_after": {
+        "available_bytes": null,
+        "total_bytes": 17179869184
+      },
+      "test_partition_loaded": false,
+      "validation_behavior": "validation_only_after_train",
+      "wall_clock_seconds": 307.62520458400104,
+      "workers": 4
+    }
+  ],
+  "contract": {
+    "benchmark_version": "recurrent_cpu_parallel_benchmark_v1",
+    "ppo_lstm_config": {
+      "activation_fn": "Tanh",
+      "algorithm": "RecurrentPPO",
+      "batch_size": 64,
+      "clip_range": 0.2,
+      "config_version": "recurrent_ppo_single_symbol_v1",
+      "device": "cpu",
+      "enable_critic_lstm": true,
+      "ent_coef": 0.01,
+      "gae_lambda": 0.95,
+      "gamma": 0.99,
+      "learning_rate": 0.0003,
+      "lstm_hidden_size": 64,
+      "max_grad_norm": 0.5,
+      "n_epochs": 10,
+      "n_lstm_layers": 1,
+      "n_steps": 512,
+      "net_arch": [
+        64
+      ],
+      "ortho_init": true,
+      "policy": "MlpLstmPolicy",
+      "policy_kwargs": {
+        "activation_fn": "Tanh",
+        "enable_critic_lstm": true,
+        "lstm_hidden_size": 64,
+        "n_lstm_layers": 1,
+        "net_arch": {
+          "pi": [
+            64
+          ],
+          "vf": [
+            64
+          ]
+        },
+        "ortho_init": true,
+        "share_features_extractor": true,
+        "shared_lstm": false
+      },
+      "seed": 42,
+      "share_features_extractor": true,
+      "shared_lstm": false,
+      "total_timesteps": 100000,
+      "vf_coef": 0.5
+    },
+    "requested_device": "cpu",
+    "requested_timesteps_per_symbol": 100000,
+    "seed": 42,
+    "symbol_selection_policy": "train_row_depth_quantiles_v1",
+    "symbols": [
+      "786",
+      "CCM",
+      "DCL",
+      "ECOP"
+    ],
+    "test_partition_loaded": false,
+    "thread_policy": {
+      "1": 8,
+      "2": 4,
+      "4": 2
+    },
+    "validation_enabled": true,
+    "worker_candidates": [
+      1,
+      2,
+      4
+    ]
+  },
+  "contract_fingerprint": "045ad0abba3a098a4154667369f378f938d620ee467dfb0a715259d5b2397ca9",
+  "data_models_unchanged": true,
+  "platform": "macOS-26.5.2-arm64-arm-64bit",
+  "production_saved_models_unchanged": true,
+  "python_version": "3.11.9",
+  "recommendation": {
+    "reason": "Highest safe agents/hour, preferring the lower worker count when within 5% for memory/CPU headroom.",
+    "status": "selected",
+    "worker_count": 4
+  },
+  "registry_unchanged": true,
+  "selection_authoritative_for_100k": true,
+  "system_memory_before": {
+    "available_bytes": null,
+    "total_bytes": 17179869184
+  },
+  "temporary_runs_cleaned": true,
+  "test_partition_loaded": false,
+  "training_source_artifacts_unchanged": true
+}
