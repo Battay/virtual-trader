@@ -20,6 +20,14 @@ from typing import Mapping
 import pandas as pd
 
 from data_pipeline.src.config import TRAINING_RUNS_DIR
+from data_pipeline.src.identity_universe_policy import (
+    FROZEN_RESEARCH_IDENTITY_COUNT,
+    FROZEN_RESEARCH_IDENTITY_SNAPSHOT,
+    FROZEN_RESEARCH_TRAINING_POLICY,
+    FROZEN_RESEARCH_UNIVERSE,
+    FROZEN_RESEARCH_UNIVERSE_HASH,
+    load_frozen_research_identity,
+)
 from feature_engineering.storage import atomic_write_json
 from reinforcement_learning.environments.config import (
     DEFAULT_OBSERVATION_FEATURES,
@@ -43,7 +51,7 @@ FULL_RUN_SPEC_VERSION = "recurrent_full_universe_run_spec_v1"
 FULL_RUN_PLAN_VERSION = "recurrent_full_universe_dry_run_plan_v1"
 STORAGE_ESTIMATE_VERSION = "recurrent_full_universe_storage_estimate_v1"
 CANDIDATE_TIMESTEP_BUDGET = 100_000
-EXPECTED_IDENTITY_COUNT = 508
+EXPECTED_IDENTITY_COUNT = FROZEN_RESEARCH_IDENTITY_COUNT
 EXPECTED_TRAINABLE_COUNT = 435
 EXPECTED_INELIGIBLE_COUNT = 73
 GIB = 1024**3
@@ -213,6 +221,21 @@ def build_full_universe_plan(
 ) -> tuple[Mapping[str, object], pd.DataFrame]:
     """Materialize an in-memory plan; no run store or trainer is invoked."""
 
+    if discovery.identity_policy != FROZEN_RESEARCH_UNIVERSE:
+        raise FullUniverseRunError(
+            "full research run requires the explicit frozen research identity"
+        )
+    if discovery.execution_training_policy != FROZEN_RESEARCH_TRAINING_POLICY:
+        raise FullUniverseRunError(
+            "full research run training policy is not the frozen policy"
+        )
+    if (
+        discovery.universe_hash != FROZEN_RESEARCH_UNIVERSE_HASH
+        or discovery.identity_snapshot != FROZEN_RESEARCH_IDENTITY_SNAPSHOT
+    ):
+        raise FullUniverseRunError(
+            "full research run identity hash/snapshot differs from the frozen contract"
+        )
     if discovery.identity_count != expected_identity_count:
         raise FullUniverseRunError(
             f"identity accounting changed: {discovery.identity_count}!={expected_identity_count}"
@@ -266,6 +289,10 @@ def build_full_universe_plan(
         "run_fingerprint": manifest.run_fingerprint,
         "universe_version": discovery.universe_version,
         "universe_hash": discovery.universe_hash,
+        "identity_policy": discovery.identity_policy,
+        "identity_snapshot": discovery.identity_snapshot,
+        "execution_training_policy": discovery.execution_training_policy,
+        "trainable_symbol_hash": discovery.trainable_symbol_hash,
         "source_inventory_hash": discovery.source_inventory_hash,
         "identity_count": len(plan),
         "trainable_count": expected_trainable_count,
@@ -319,7 +346,17 @@ def evaluate_full_run_gates(
         "all_identities_accounted": len(plan) == EXPECTED_IDENTITY_COUNT,
         "trainable_jobs_materialized": int(plan["trainability"].eq("eligible").sum()) == EXPECTED_TRAINABLE_COUNT,
         "explicit_ineligible_jobs": int(plan["trainability"].eq("ineligible").sum()) == EXPECTED_INELIGIBLE_COUNT,
-        "source_and_universe_hashes_present": all(identity.get(key) for key in ("universe_hash", "source_inventory_hash")),
+        "identity_provenance_present": all(
+            identity.get(key)
+            for key in (
+                "identity_policy",
+                "identity_snapshot",
+                "execution_training_policy",
+                "universe_hash",
+                "trainable_symbol_hash",
+                "source_inventory_hash",
+            )
+        ),
         "test_sealed": not bool(plan["test_partition_loaded"].any()) and not bool(identity.get("test_partition_loaded")),
         "storage_safe": storage.safe,
         "cuda_benchmarked_for_cuda_run": cuda_benchmark_completed,
@@ -383,7 +420,12 @@ def main() -> int:
         requested_device=args.device,
         worker_count=args.workers,
     )
-    discovery = discover_recurrent_training_universe()
+    frozen_identity = load_frozen_research_identity()
+    discovery = discover_recurrent_training_universe(
+        identity=frozen_identity,
+        identity_policy=FROZEN_RESEARCH_UNIVERSE,
+        execution_training_policy=FROZEN_RESEARCH_TRAINING_POLICY,
+    )
     identity, plan = build_full_universe_plan(discovery, spec=spec)
     storage = estimate_full_run_storage(
         trainable_jobs=discovery.eligible_count,

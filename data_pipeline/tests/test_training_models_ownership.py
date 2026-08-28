@@ -18,14 +18,15 @@ def _source() -> str:
     return PAGE_PATH.read_text(encoding="utf-8")
 
 
-def test_training_page_has_one_fixed_current_mlp_readiness_authority() -> None:
+def test_training_page_uses_frozen_recurrent_production_authority() -> None:
     source = _source()
 
-    assert "AI_MINIMUM_USABLE_ROWS" in source
-    assert "Minimum usable rows for symbol eligibility" not in source
-    assert "training_minimum_history" not in source
-    assert "history_counts = future_history_class_counts(status_table)" in source
-    assert "do not rewrite this gate" in source
+    assert "production_plan()" in source
+    assert "prepare_production_run()" in source
+    assert "launch_production_controller(snapshot.store)" in source
+    assert "TRAINABLE_MEMBERS_OF_FROZEN_RESEARCH_UNIVERSE_V1" not in source
+    assert "total_timesteps =" not in source
+    assert "RecurrentPPOConfig(" not in source
 
 
 def test_training_page_contains_no_dataset_build_or_split_controls() -> None:
@@ -57,13 +58,14 @@ def test_dataset_operation_backends_remain_available_for_future_owner() -> None:
     assert callable(create_master_split)
 
 
-def test_page_actions_remain_explicit_and_test_has_no_execution_route() -> None:
+def test_page_actions_are_explicit_detached_and_test_has_no_execution_route() -> None:
     source = _source()
 
-    assert "if train_clicked:" in source
-    assert "if validation_clicked:" in source
-    assert '"Save candidate"' in source
-    assert 'load_rl_partition(\n            symbol,\n            "train"' in source
-    assert 'load_rl_partition(\n            symbol,\n            "test"' not in source
+    assert '"Confirm start/continue"' in source
+    assert '"Confirm stop after current jobs"' in source
+    assert '"Confirm active interruption"' in source
+    assert "run_training_action" not in source
+    assert "train_recurrent_single_symbol" not in source
+    assert "load_rl_partition" not in source
     assert "test_rl.csv" not in source
-    assert "FINAL TEST SET: SEALED" in source
+    assert "TEST remains sealed" in source

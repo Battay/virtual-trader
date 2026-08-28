@@ -1,910 +1,653 @@
-"""Inspect readiness and run an explicit, leakage-safe PPO model lifecycle."""
-
-from pathlib import Path
+"""Production control center for frozen-universe recurrent PPO training."""
 
 import pandas as pd
 import streamlit as st
 
-from dashboard.data_loader import load_dashboard_dataset
-from dashboard.ppo_workflow import (
-    CPU_MPS_SPEED_MULTIPLIER,
-    DEFAULT_DEVICE,
-    DEFAULT_SEED,
-    DEVICE_OPTIONS,
-    DEVICE_RECOMMENDATION,
-    TIMESTEP_PRESETS,
-    build_ready_symbol_catalog,
-    build_workflow_identity,
-    claim_workflow_job,
-    future_history_class_counts,
-    initialize_workflow_session,
-    mark_candidate_persisted,
-    persistence_availability,
-    pilot_readiness_table,
-    preview_candidate_version,
-    readiness_reconciliation,
-    registry_history_table,
-    release_workflow_job,
-    reset_workflow_results,
-    run_persistence_action,
-    run_training_action,
-    run_validation_action,
-    selected_symbol_summary,
-    selected_symbol_training_profile,
-    sync_workflow_identity,
-    training_availability,
-    validation_availability,
-    validation_chart_frames,
-    validation_metrics_table,
+from dashboard.presentation import format_date, format_integer, safe_display_value
+from reinforcement_learning.training.job_state import FAILED, INTERRUPTED
+from reinforcement_learning.training.production_control import (
+    PRODUCTION_RUN_KIND,
+    ProductionControlError,
+    bounded_log_tail,
+    latest_job_diagnostics,
+    launch_production_controller,
+    list_run_catalog,
+    load_run_snapshot,
+    load_validation_metrics,
+    prepare_production_run,
+    production_plan,
+    recent_orchestration_events,
+    registry_view,
+    request_interrupt,
+    request_stop_after_current,
+    requeue_jobs,
+    symbol_contract_summary,
 )
-from dashboard.presentation import (
-    format_date,
-    format_integer,
-    format_symbol_company,
-    safe_display_value,
-    status_label,
-)
-from dashboard.registry_loader import load_company_registry
-from data_pipeline.src.config import (
-    AI_MINIMUM_USABLE_ROWS,
-    PROCESSED_SPLITS_DIR,
-    PROCESSED_SYMBOLS_DIR,
-)
-from feature_engineering.schemas import FEATURE_VERSION
-from reinforcement_learning.data_contract import (
-    RL_PARTITION_SCHEMA_VERSION,
-    load_rl_partition,
-)
-from reinforcement_learning.environments import (
-    ENVIRONMENT_VERSION,
-    SingleSymbolTradingEnv,
-)
-from reinforcement_learning.environments.validation import validate_environment
-from reinforcement_learning.history_policy import HistoryClass
-from reinforcement_learning.model_management.registry import (
-    MODEL_REGISTRY_SCHEMA_VERSION,
-    ModelRegistryError,
-    empty_model_registry,
-    load_model_registry,
-)
-from reinforcement_learning.model_management.persistence import (
-    PPOPersistenceError,
-    RegistryCommitPendingError,
-)
-from reinforcement_learning.model_management.status import (
-    build_model_readiness_table,
-)
-from reinforcement_learning.training.config import PPO_CONFIG_VERSION, PPOConfig
-from reinforcement_learning.training.devices import TorchDeviceError, resolve_torch_device
 
 
-def _processed_symbol_fingerprint() -> tuple[tuple[str, int, int], ...]:
-    """Return a bounded cache key that changes when processed files change."""
-    values: list[tuple[str, int, int]] = []
-    for path in sorted(Path(PROCESSED_SYMBOLS_DIR).glob("*.csv")):
-        try:
-            details = path.stat()
-        except OSError:
-            continue
-        values.append((path.name, details.st_mtime_ns, details.st_size))
-    return tuple(values)
+def _duration(seconds: object) -> str:
+    if seconds is None or pd.isna(seconds):
+        return "—"
+    value = max(0, int(float(seconds)))
+    hours, remainder = divmod(value, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:d}h {minutes:02d}m" if hours else f"{minutes:d}m {secs:02d}s"
 
 
-def _rl_contract_fingerprint() -> tuple[tuple[str, int, int], ...]:
-    """Invalidate cached readiness when contract/scaler metadata changes."""
-    values: list[tuple[str, int, int]] = []
-    root = Path(PROCESSED_SPLITS_DIR) / "symbols"
-    metadata_names = (
-        "rl_contract.json",
-        "metadata.json",
-        "rl_observation_scaler.json",
-        "rl_observation_scaler.joblib",
-    )
-    partition_names = tuple(
-        filename
-        for partition in ("train", "validation", "test")
-        for filename in (f"{partition}.csv", f"{partition}_rl.csv")
-    )
-    for name in (*metadata_names, *partition_names):
-        for path in sorted(root.glob(f"*/{name}")):
-            try:
-                details = path.stat()
-            except OSError:
-                continue
-            values.append(
-                (str(path.relative_to(root)), details.st_mtime_ns, details.st_size)
-            )
-    return tuple(values)
+def _status_callout(status: str, message: str) -> None:
+    if status == "RUNNING":
+        st.info(message, icon=":material/progress_activity:")
+    elif status == "COMPLETED":
+        st.success(message, icon=":material/check_circle:")
+    elif status in {"PARTIAL_FAILURE", "PAUSED/INTERRUPTED"}:
+        st.warning(message, icon=":material/warning:")
+    elif status == "BLOCKED":
+        st.error(message, icon=":material/error:")
+    else:
+        st.caption(message)
 
 
-@st.cache_data(max_entries=8, show_spinner=False)
-def _validate_rl_environment(
-    symbol: str,
-    contract_sha256: str,
-    scaler_sha256: str,
-    scaler_metadata_sha256: str,
-    train_validation_fingerprint: str,
-    splits_dir_text: str,
-) -> dict[str, object]:
-    """Validate one selected canonical TRAIN environment on explicit request."""
-    del (
-        contract_sha256,
-        scaler_sha256,
-        scaler_metadata_sha256,
-        train_validation_fingerprint,
-    )
-    try:
-        loaded = load_rl_partition(
-            symbol,
-            "train",
-            splits_dir=Path(splits_dir_text),
-        )
-        environment = SingleSymbolTradingEnv(loaded.data)
-        try:
-            result = validate_environment(environment)
-        finally:
-            environment.close()
-        return {
-            "status": "Environment Ready" if result.valid else "Validation Failed",
-            "message": (
-                f"{symbol} canonical TRAIN environment is ready"
-                if result.valid
-                else "; ".join(result.errors)
-            ),
-            "shape": result.observation_shape,
-        }
-    except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
-        return {
-            "status": "Validation Failed",
-            "message": str(exc),
-            "shape": None,
-        }
-
-
-@st.cache_data(ttl="5m", max_entries=8, show_spinner=False)
-def _cached_model_readiness(
-    market: pd.DataFrame,
-    registry: pd.DataFrame,
-    models: pd.DataFrame,
-    minimum_usable_rows: int,
-    processed_fingerprint: tuple[tuple[str, int, int], ...],
+def _filtered_jobs(
+    jobs: pd.DataFrame,
+    *,
+    statuses: list[str],
+    sectors: list[str],
+    eligibility: str,
+    search: str,
 ) -> pd.DataFrame:
-    """Cache expensive feature readiness while retaining file invalidation."""
-    del processed_fingerprint
-    return build_model_readiness_table(
-        market,
-        registry,
-        models,
-        minimum_usable_rows=minimum_usable_rows,
-    )
+    filtered = jobs.copy(deep=True)
+    if statuses:
+        filtered = filtered.loc[filtered["state"].isin(statuses)]
+    if sectors:
+        filtered = filtered.loc[filtered["sector"].isin(sectors)]
+    if eligibility != "All":
+        filtered = filtered.loc[filtered["eligibility"].eq(eligibility.lower())]
+    query = search.strip()
+    if query:
+        matched = filtered["symbol"].astype("string").str.contains(
+            query, case=False, regex=False, na=False
+        ) | filtered["company_name"].astype("string").str.contains(
+            query, case=False, regex=False, na=False
+        )
+        filtered = filtered.loc[matched]
+    return filtered.reset_index(drop=True)
 
 
-@st.cache_data(ttl="5m", max_entries=8, show_spinner=False)
-def _cached_rl_ready_catalog(
-    status: pd.DataFrame,
-    contract_fingerprint: tuple[tuple[str, int, int], ...],
-    feature_version: str,
-    rl_contract_version: str,
-    environment_version: str,
-):
-    """Cache metadata-only contract validation with file invalidation."""
-    del (
-        contract_fingerprint,
-        feature_version,
-        rl_contract_version,
-        environment_version,
-    )
-    return build_ready_symbol_catalog(status, splits_dir=Path(PROCESSED_SPLITS_DIR))
-
-
-st.title("Training & Model Management")
+st.title("Training & Models")
 st.caption(
-    "Inspect canonical readiness, train one in-memory PPO candidate, compare it "
-    "on VALIDATION, and explicitly save validation-passing candidates. Dataset "
-    "building and split orchestration are intentionally outside this page."
+    "Production control center for the frozen single-symbol RecurrentPPO run. "
+    "This page reads persistent state and issues explicit commands; browser "
+    "reruns never own worker lifetimes."
 )
 
-market_result = load_dashboard_dataset()
-registry_result = load_company_registry()
-if market_result.data.empty:
-    st.info("No master market history is available. Fetch and rebuild data first.")
-    st.stop()
-if not registry_result.available:
-    for error in registry_result.errors:
-        st.error(error)
-    st.info("Build the Company Registry before preparing model datasets.")
-    st.stop()
+plan = production_plan()
+catalog = list_run_catalog()
 
-try:
-    model_registry = load_model_registry()
-except ModelRegistryError as exc:
-    st.error(str(exc))
-    model_registry = empty_model_registry()
-
-status_table = _cached_model_readiness(
-    market_result.data,
-    registry_result.data,
-    model_registry,
-    AI_MINIMUM_USABLE_ROWS,
-    _processed_symbol_fingerprint(),
-)
-
-rl_catalog = _cached_rl_ready_catalog(
-    status_table,
-    _rl_contract_fingerprint(),
-    FEATURE_VERSION,
-    RL_PARTITION_SCHEMA_VERSION,
-    ENVIRONMENT_VERSION,
-)
-workflow_state = initialize_workflow_session(st.session_state)
-ready_symbols = rl_catalog.ready_symbols
-readiness_counts = readiness_reconciliation(status_table, rl_catalog)
-history_counts = future_history_class_counts(status_table)
-insufficient_history_count = int(
-    status_table["readiness_status"].eq("Insufficient History").sum()
-)
-
-st.subheader("A. RL readiness")
+st.subheader("System readiness")
 with st.container(horizontal=True):
-    st.metric("Environment", ENVIRONMENT_VERSION, border=True)
-    st.metric("RL contract", RL_PARTITION_SCHEMA_VERSION, border=True)
-    st.metric("PPO trainer", PPO_CONFIG_VERSION, border=True)
-    st.metric(
-        "Current MLP PPO ready",
-        format_integer(len(ready_symbols)),
-        border=True,
-    )
-    st.metric(
-        "Current MLP · Insufficient history",
-        format_integer(insufficient_history_count),
-        border=True,
-    )
-    st.metric("Registered models", format_integer(len(model_registry)), border=True)
+    st.metric("Research identities", format_integer(plan.identity_count), border=True)
+    st.metric("Trainable agents", format_integer(plan.trainable_count), border=True)
+    st.metric("Excluded", format_integer(plan.excluded_count), border=True)
+    st.metric("TEST", plan.test_status, border=True)
 with st.container(horizontal=True):
-    st.metric(
-        "Future history · Mature",
-        format_integer(history_counts[HistoryClass.MATURE]),
-        border=True,
-    )
-    st.metric(
-        "Future history · Cold Start",
-        format_integer(history_counts[HistoryClass.COLD_START]),
-        border=True,
-    )
-    st.metric(
-        "Future history · Insufficient",
-        format_integer(history_counts[HistoryClass.INSUFFICIENT]),
-        border=True,
-    )
-if ready_symbols:
-    st.success(
-        f"Single-symbol PPO research is ready for {len(ready_symbols):,} securities. "
-        f"The registry contains {len(model_registry):,} persisted model record(s)."
-    )
-else:
-    st.error(
-        "No symbol has both current training readiness and a compatible RL contract."
-    )
+    st.metric("Algorithm", plan.algorithm, border=True)
+    st.metric("Policy", plan.policy, border=True)
+    st.metric("Budget / symbol", f"{plan.requested_timesteps:,}", border=True)
+    st.metric("Execution", "CPU · 4 × 2 threads", border=True)
+st.caption(f"Training policy: `{plan.execution_training_policy}`")
 st.caption(
-    f"Current MLP PPO readiness uses the fixed {AI_MINIMUM_USABLE_ROWS}-usable-row "
-    f"production gate: {readiness_counts.eligible_symbols:,} processed-ready, "
-    f"{readiness_counts.compatible_rl_symbols:,} compatible rl_partition_v1, "
-    f"{readiness_counts.intersection:,} in the selectable intersection. Future "
-    "history classes are read-only research metadata and do not rewrite this gate."
+    f"Trainable symbol hash: `{plan.trainable_symbol_hash[:12]}…{plan.trainable_symbol_hash[-8:]}`"
 )
-st.info(
-    f"{DEVICE_RECOMMENDATION}. In the controlled MCB 5,120-step benchmark, "
-    f"CPU was approximately {CPU_MPS_SPEED_MULTIPLIER:.2f}x faster than MPS."
-)
-with st.expander(
-    "Current single-symbol pilot universe",
-    icon=":material/groups:",
-):
-    st.caption("Read-only preparation. This page does not offer Train All.")
+with st.expander("Full immutable hashes", icon=":material/fingerprint:"):
+    st.code(
+        f"universe_hash={plan.universe_hash}\n"
+        f"trainable_symbol_hash={plan.trainable_symbol_hash}",
+        language="text",
+    )
+
+st.subheader("Production training plan")
+with st.container(border=True):
     st.dataframe(
-        pilot_readiness_table(
-            ready_symbols,
-            rejected_reasons=rl_catalog.rejected_reasons,
+        pd.DataFrame(
+            {
+                "Frozen field": [
+                    "Identity role",
+                    "Identity snapshot",
+                    "Universe version",
+                    "Execution policy",
+                    "Algorithm / policy",
+                    "Seed",
+                    "Timesteps",
+                    "Recurrent config",
+                    "Environment",
+                    "Trainer",
+                    "Validation",
+                    "TEST",
+                ],
+                "Value": [
+                    str(plan.identity_policy),
+                    str(plan.identity_snapshot),
+                    str(plan.universe_version),
+                    str(plan.execution_training_policy),
+                    f"{plan.algorithm} / {plan.policy}",
+                    str(plan.seed),
+                    f"{plan.requested_timesteps:,}",
+                    str(plan.recurrent_config_version),
+                    str(plan.environment_version),
+                    str(plan.trainer_version),
+                    "after TRAIN",
+                    str(plan.test_status),
+                ],
+            }
         ),
         hide_index=True,
-        width="stretch",
     )
-
-selected_summary = None
-selected_profile = None
-workflow_identity = None
-device_resolution = None
-device_error = None
-
-st.subheader("B. Model architecture and status")
-with st.container(border=True):
-    with st.container(horizontal=True):
-        st.metric("Current algorithm", "PPO · MlpPolicy", border=True)
-        st.metric("Current scope", "Single symbol", border=True)
-        st.metric("Current lifecycle", "TRAIN → VALIDATION", border=True)
-        st.metric("Future architecture", "Sector transfer · Planned", border=True)
     st.caption(
-        "Recurrent PPO and sector pretraining are approved future research work, "
-        "but they are not installed, trained, or selectable on this page yet."
+        "These values are immutable and have no editing controls. The qualified "
+        f"Apple M2 throughput was approximately {plan.qualified_agents_per_hour:.2f} "
+        "agents/hour; this is an estimate, not a completion guarantee."
     )
 
-if ready_symbols:
-    company_names = {
-        str(row["symbol"]): row.get("company_name", "")
-        for _, row in status_table.iterrows()
-    }
-    default_symbol = "OGDC" if "OGDC" in ready_symbols else ready_symbols[0]
-    previous_symbol = st.session_state.get("ppo_training_symbol")
-    if previous_symbol not in ready_symbols:
-        if previous_symbol:
-            reason = rl_catalog.rejected_reasons.get(
-                str(previous_symbol),
-                "The symbol is no longer in the current ready universe.",
-            )
-            st.warning(
-                f"{previous_symbol} is no longer selectable: {reason} "
-                f"Selection was reset to {default_symbol}."
-            )
-        st.session_state["ppo_training_symbol"] = default_symbol
-    st.session_state.setdefault("ppo_training_timesteps", TIMESTEP_PRESETS[0])
-    st.session_state.setdefault("ppo_training_seed", DEFAULT_SEED)
-    st.session_state.setdefault("ppo_training_device", DEFAULT_DEVICE)
-    controls_disabled = workflow_state.get("job_phase") != "idle"
+st.subheader("Run selection and controls")
+if catalog:
+    options = {entry.run_id: entry for entry in catalog}
+    production_ids = [
+        entry.run_id for entry in catalog if entry.run_kind == PRODUCTION_RUN_KIND
+    ]
+    default_id = production_ids[0] if production_ids else catalog[0].run_id
+    if st.session_state.get("training_control_run_id") not in options:
+        st.session_state["training_control_run_id"] = default_id
+    selected_run_id = st.selectbox(
+        "Run",
+        list(options),
+        format_func=lambda run_id: (
+            f"[{options[run_id].run_kind}] {run_id} — {options[run_id].status}"
+        ),
+        key="training_control_run_id",
+        persist_state="session",
+    )
+else:
+    options = {}
+    selected_run_id = None
+    st.caption("No recurrent run has been prepared yet.")
 
-    st.subheader("C. Training configuration")
-    with st.container(border=True):
-        selected_symbol = st.selectbox(
-            "Training-ready symbol",
-            ready_symbols,
-            format_func=lambda symbol: format_symbol_company(
-                symbol,
-                company_names.get(symbol),
-            ),
-            key="ppo_training_symbol",
-            disabled=controls_disabled,
-            persist_state="session",
-        )
-        with st.container(horizontal=True, vertical_alignment="bottom"):
-            requested_timesteps = st.segmented_control(
-                "Timesteps",
-                TIMESTEP_PRESETS,
-                format_func=lambda value: f"{int(value):,}",
-                key="ppo_training_timesteps",
-                required=True,
-                disabled=controls_disabled,
-                persist_state="session",
-            )
-            requested_seed = st.number_input(
-                "Deterministic seed",
-                min_value=0,
-                step=1,
-                key="ppo_training_seed",
-                disabled=controls_disabled,
-                persist_state="session",
-            )
-            requested_device = st.segmented_control(
-                "Requested device",
-                DEVICE_OPTIONS,
-                format_func=lambda value: {
-                    "cpu": "CPU · Recommended",
-                    "mps": "MPS",
-                    "auto": "AUTO",
-                }[value],
-                key="ppo_training_device",
-                required=True,
-                disabled=controls_disabled,
-                persist_state="session",
-            )
+snapshot = None
+if selected_run_id:
+    try:
+        snapshot = load_run_snapshot(options[selected_run_id].run_directory)
+    except (OSError, ValueError, ProductionControlError) as exc:
+        st.error(f"Could not load selected run safely: {type(exc).__name__}: {exc}")
 
-        selected_summary = selected_symbol_summary(rl_catalog, selected_symbol)
-        selected_profile = selected_symbol_training_profile(
-            status_table,
-            rl_catalog,
-            selected_symbol,
+with st.container(border=True):
+    if snapshot is None:
+        st.markdown("**Pre-run state**")
+        st.write(
+            "Preparing creates 508 persistent job records: 435 eligible and 73 "
+            "explicitly ineligible. It does not start training."
         )
-        workflow_identity = build_workflow_identity(
-            selected_summary,
-            int(requested_timesteps),
-            int(requested_seed),
-            str(requested_device),
+        prepare_confirmed = st.checkbox(
+            "I confirm this will create the immutable production run only.",
+            key="confirm_prepare_production_run",
         )
-        sync_workflow_identity(st.session_state, workflow_identity)
-        workflow_state = initialize_workflow_session(st.session_state)
-        try:
-            device_resolution = resolve_torch_device(
-                workflow_identity.requested_device
-            )
-        except TorchDeviceError as exc:
-            device_error = str(exc)
-        if device_error:
-            st.error(f"Requested device is unavailable: {device_error}")
-        elif device_resolution is not None:
-            st.caption(
-                f"Requested device: {device_resolution.requested_device.upper()} · "
-                f"Preflight resolution: {device_resolution.resolved_device.upper()}. "
-                "The trainer will verify the actual model and policy device."
-            )
-
-        with st.expander(
-            "Read-only PPO defaults",
-            icon=":material/tune:",
+        if st.button(
+            "Prepare production run",
+            type="primary",
+            icon=":material/inventory_2:",
+            disabled=not prepare_confirmed,
         ):
-            ppo_defaults = PPOConfig().to_dict()
-            default_labels = {
-                "policy": "Policy",
-                "learning_rate": "Learning rate",
-                "n_steps": "Rollout steps",
-                "batch_size": "Batch size",
-                "n_epochs": "Epochs",
-                "gamma": "Gamma",
-                "gae_lambda": "GAE lambda",
-                "clip_range": "Clip range",
-                "ent_coef": "Entropy coefficient",
-                "vf_coef": "Value-function coefficient",
-                "max_grad_norm": "Maximum gradient norm",
-            }
+            try:
+                store, created = prepare_production_run()
+                st.session_state["training_control_run_id"] = store.read_manifest().run_id
+                st.toast(
+                    "Production run prepared." if created else "Compatible run already exists.",
+                    icon=":material/check_circle:",
+                )
+                st.rerun()
+            except (OSError, ValueError, ProductionControlError) as exc:
+                st.error(f"Preparation failed safely: {type(exc).__name__}: {exc}")
+    else:
+        st.markdown(
+            f"**{snapshot.run_kind}** · `{snapshot.manifest.run_id}` · "
+            f"controller `{snapshot.controller.state}`"
+        )
+        if snapshot.run_kind != PRODUCTION_RUN_KIND:
+            st.warning(
+                "Benchmark, smoke, and legacy runs are read-only here and cannot "
+                "be resumed as the production run."
+            )
+        else:
+            st.write(
+                "Start confirmation: 435 eligible agents · 100,000 timesteps each · "
+                "4 workers · 2 CPU threads/worker · CPU · validation enabled · TEST sealed."
+            )
+            with st.container(horizontal=True, vertical_alignment="bottom"):
+                if st.button(
+                    "Refresh status", icon=":material/refresh:", key="refresh_training_status"
+                ):
+                    st.rerun()
+                start_confirmed = st.checkbox(
+                    "Confirm start/continue",
+                    key="confirm_start_production_run",
+                    disabled=snapshot.controller.alive,
+                )
+                if st.button(
+                    "Start / continue run",
+                    type="primary",
+                    icon=":material/play_arrow:",
+                    disabled=(
+                        snapshot.controller.alive
+                        or snapshot.progress.queued == 0
+                        or not start_confirmed
+                    ),
+                ):
+                    try:
+                        launch_production_controller(snapshot.store)
+                        st.toast("Detached controller started.", icon=":material/check_circle:")
+                        st.rerun()
+                    except (OSError, ValueError, ProductionControlError) as exc:
+                        st.error(f"Start failed safely: {type(exc).__name__}: {exc}")
+            if snapshot.controller.alive:
+                with st.container(horizontal=True, vertical_alignment="bottom"):
+                    stop_confirmed = st.checkbox(
+                        "Confirm stop after current jobs", key="confirm_stop_after_current"
+                    )
+                    if st.button(
+                        "Stop after current jobs",
+                        icon=":material/pause:",
+                        disabled=not stop_confirmed,
+                    ):
+                        try:
+                            request_stop_after_current(snapshot.store)
+                            st.rerun()
+                        except ProductionControlError as exc:
+                            st.error(str(exc))
+                    interrupt_confirmed = st.checkbox(
+                        "Confirm active interruption", key="confirm_interrupt_run"
+                    )
+                    if st.button(
+                        "Interrupt active run",
+                        icon=":material/stop_circle:",
+                        disabled=not interrupt_confirmed,
+                    ):
+                        try:
+                            request_interrupt(snapshot.store)
+                            st.rerun()
+                        except (OSError, ProductionControlError) as exc:
+                            st.error(str(exc))
+                st.caption(
+                    "Stop-after-current launches no new jobs. Interrupt sends SIGINT; "
+                    "active jobs become INTERRUPTED and can only restart from zero."
+                )
+
+if snapshot is not None:
+    progress = snapshot.progress
+    st.subheader("Overall progress")
+    _status_callout(progress.system_status, f"Execution status: {progress.system_status}")
+    if (
+        progress.completed_training_timesteps > 0
+        or progress.active
+        or progress.failed
+        or progress.interrupted
+    ):
+        st.progress(
+            progress.progress_percent / 100.0,
+            text=(
+                f"{progress.completed_training_timesteps:,} / "
+                f"{progress.requested_training_timesteps:,} persisted training "
+                f"timesteps · {progress.progress_percent:.1f}%"
+            ),
+        )
+    else:
+        st.caption("Prepared and not running; no progress indicator is implied.")
+    with st.container(horizontal=True):
+        st.metric(
+            "Agents completed",
+            f"{progress.completed:,} / {progress.eligible:,}",
+            border=True,
+        )
+        st.metric("Active", progress.active, border=True)
+        st.metric("Queued", progress.queued, border=True)
+        st.metric("Validating", progress.validating, border=True)
+    with st.container(horizontal=True):
+        st.metric("Failed", progress.failed, border=True)
+        st.metric("Interrupted", progress.interrupted, border=True)
+        st.metric("Ineligible", progress.ineligible, border=True)
+        st.metric("Elapsed", _duration(progress.elapsed_seconds), border=True)
+    st.caption(
+        "Observed throughput: "
+        + (
+            f"{progress.agents_per_hour:.2f} agents/hour"
+            if progress.agents_per_hour is not None
+            else "not available until at least two jobs complete over one minute"
+        )
+        + " · Estimated remaining time: "
+        + (
+            _duration(progress.estimated_remaining_seconds)
+            if progress.estimated_remaining_seconds is not None
+            else "not yet defensible"
+        )
+    )
+    if progress.system_status == "COMPLETED":
+        st.success(
+            "TRAIN and VALIDATION complete. TEST remains sealed.",
+            icon=":material/verified:",
+        )
+
+    st.subheader("Active jobs")
+    active_jobs = snapshot.jobs.loc[
+        snapshot.jobs["state"].isin({"TRAINING", "VALIDATING"})
+    ].copy()
+    if active_jobs.empty:
+        st.caption("No active TRAINING or VALIDATING jobs.")
+    else:
+        for active in active_jobs.itertuples(index=False):
+            state_label = (
+                "Training complete — validating"
+                if active.state == "VALIDATING"
+                else "Training"
+            )
+            with st.container(border=True, gap="small"):
+                st.markdown(
+                    f"**{active.symbol}** · "
+                    f"{safe_display_value(active.company_name)} · "
+                    f"{safe_display_value(active.sector)}"
+                )
+                st.caption(state_label)
+                st.progress(
+                    float(active.progress_percent) / 100.0,
+                    text=(
+                        f"{int(active.actual_timesteps):,} / "
+                        f"{int(active.requested_timesteps):,} timesteps · "
+                        f"{float(active.progress_percent):.1f}%"
+                    ),
+                )
+                st.caption(
+                    f"Elapsed {_duration(active.runtime_seconds)} · "
+                    f"worker slot {safe_display_value(active.worker_slot)} · "
+                    f"PID {safe_display_value(active.worker_pid)} · "
+                    f"{safe_display_value(active.effective_device)} · "
+                    f"{safe_display_value(active.cpu_threads)} CPU threads"
+                )
+                with st.expander(
+                    f"{active.symbol} advanced diagnostics",
+                    icon=":material/query_stats:",
+                ):
+                    diagnostics = latest_job_diagnostics(
+                        snapshot.store, active.symbol
+                    )
+                    if diagnostics:
+                        diagnostic_keys = (
+                            "explained_variance",
+                            "approx_kl",
+                            "clip_fraction",
+                            "entropy_loss",
+                            "value_loss",
+                            "policy_gradient_loss",
+                        )
+                        st.dataframe(
+                            pd.DataFrame(
+                                {
+                                    "Metric": diagnostic_keys,
+                                    "Value": [
+                                        diagnostics.get(key)
+                                        for key in diagnostic_keys
+                                    ],
+                                }
+                            ),
+                            hide_index=True,
+                            key=f"active_diagnostics_{active.symbol}",
+                        )
+                    else:
+                        st.caption("No retained diagnostics yet.")
+
+    st.subheader("All jobs")
+    with st.form("training_job_filters", border=False):
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            selected_statuses = st.multiselect(
+                "Status", sorted(snapshot.jobs["state"].dropna().unique()),
+                key="training_job_status_filter",
+            )
+            selected_sectors = st.multiselect(
+                "Sector", sorted(snapshot.jobs["sector"].dropna().astype(str).unique()),
+                key="training_job_sector_filter",
+            )
+            selected_eligibility = st.segmented_control(
+                "Eligibility", ["All", "Eligible", "Ineligible"], default="All",
+                key="training_job_eligibility_filter",
+            )
+            search = st.text_input("Search symbol/company", key="training_job_search")
+            st.form_submit_button("Apply filters", icon=":material/filter_alt:")
+    filtered = _filtered_jobs(
+        snapshot.jobs,
+        statuses=selected_statuses,
+        sectors=selected_sectors,
+        eligibility=str(selected_eligibility or "All"),
+        search=search,
+    )
+    st.dataframe(
+        filtered.loc[
+            :,
+            [
+                "symbol", "company_name", "sector", "eligibility", "state",
+                "exclusion_reason", "requested_timesteps", "actual_timesteps",
+                "progress_percent", "validation_status", "runtime_seconds",
+                "started_at", "completed_at", "attempts", "last_error",
+                "model_artifact_status",
+            ],
+        ],
+        hide_index=True,
+        column_config={
+            "symbol": st.column_config.TextColumn("Symbol", pinned=True),
+            "progress_percent": st.column_config.ProgressColumn(
+                "Progress", min_value=0, max_value=100, format="%.1f%%"
+            ),
+        },
+        key="training_all_jobs",
+    )
+
+    st.subheader("Failures and retries")
+    failures = snapshot.jobs.loc[
+        snapshot.jobs["state"].isin({FAILED, INTERRUPTED})
+    ].copy()
+    if failures.empty:
+        st.caption("No FAILED or INTERRUPTED jobs.")
+    else:
+        st.dataframe(
+            failures.loc[
+                :,
+                [
+                    "symbol", "state", "error_type", "last_error", "attempts",
+                    "actual_timesteps", "requested_timesteps", "progress_percent",
+                    "updated_at",
+                ],
+            ],
+            hide_index=True,
+            column_config={
+                "progress_percent": st.column_config.ProgressColumn(
+                    "Last persisted progress",
+                    min_value=0,
+                    max_value=100,
+                    format="%.1f%%",
+                )
+            },
+        )
+        retry_symbols = st.multiselect(
+            "Selected jobs to restart from zero", failures["symbol"].tolist(),
+            key="training_retry_symbols",
+        )
+        retry_confirmed = st.checkbox(
+            "I understand these jobs restart from timestep zero.",
+            key="confirm_retry_jobs",
+        )
+        with st.container(horizontal=True):
+            if st.button(
+                "Retry selected", icon=":material/replay:",
+                disabled=snapshot.controller.alive or not retry_confirmed or not retry_symbols,
+            ):
+                states = frozenset(
+                    snapshot.jobs.loc[
+                        snapshot.jobs["symbol"].isin(retry_symbols), "state"
+                    ]
+                )
+                try:
+                    requeue_jobs(snapshot.store, statuses=states, symbols=retry_symbols)
+                    st.rerun()
+                except ProductionControlError as exc:
+                    st.error(str(exc))
+            if st.button(
+                "Retry all failed", icon=":material/restart_alt:",
+                disabled=snapshot.controller.alive or not retry_confirmed or progress.failed == 0,
+            ):
+                try:
+                    requeue_jobs(snapshot.store, statuses=frozenset({FAILED}))
+                    st.rerun()
+                except ProductionControlError as exc:
+                    st.error(str(exc))
+            if st.button(
+                "Requeue interrupted", icon=":material/resume:",
+                disabled=(
+                    snapshot.controller.alive or not retry_confirmed
+                    or progress.interrupted == 0
+                ),
+            ):
+                try:
+                    requeue_jobs(snapshot.store, statuses=frozenset({INTERRUPTED}))
+                    st.rerun()
+                except ProductionControlError as exc:
+                    st.error(str(exc))
+
+    st.subheader("Model registry")
+    try:
+        models = registry_view()
+    except ProductionControlError as exc:
+        st.error(f"Model registry could not be verified: {exc}")
+        models = pd.DataFrame(columns=["symbol", "model_family"])
+    if models.empty:
+        st.caption(
+            "No model registry records exist. Run-isolated recurrent artifacts are "
+            "tracked by job state and are not silently promoted or registered."
+        )
+    else:
+        family = st.segmented_control(
+            "Model family", ["All", "RECURRENT", "LEGACY"], default="All"
+        )
+        shown_models = (
+            models if family == "All" else models.loc[models["model_family"].eq(family)]
+        )
+        st.dataframe(shown_models, hide_index=True, key="training_model_registry")
+
+    st.subheader("Symbol details")
+    selected_symbol = st.selectbox(
+        "Symbol", snapshot.jobs["symbol"].tolist(), key="training_detail_symbol",
+        persist_state="session",
+    )
+    detail = snapshot.jobs.loc[snapshot.jobs["symbol"].eq(selected_symbol)].iloc[0]
+    with st.container(border=True):
+        with st.container(horizontal=True):
+            st.metric("Symbol", selected_symbol, border=True)
+            st.metric("Company", safe_display_value(detail["company_name"]), border=True)
+            st.metric("Sector", safe_display_value(detail["sector"]), border=True)
+            st.metric("State", detail["state"], border=True)
+        contract = symbol_contract_summary(selected_symbol)
+        if contract:
             st.dataframe(
                 pd.DataFrame(
                     {
-                        "Parameter": list(default_labels.values()),
+                        "Contract field": [
+                            "TRAIN range", "TRAIN rows", "Observation features",
+                            "Recurrent contract", "Feature version", "Environment version",
+                        ],
                         "Value": [
-                            safe_display_value(ppo_defaults[key])
-                            for key in default_labels
+                            f"{format_date(contract['train_start'])} to {format_date(contract['train_end'])}",
+                            format_integer(contract["train_rows"]),
+                            format_integer(contract["observation_count"]),
+                            contract["recurrent_contract_version"],
+                            contract["feature_version"],
+                            contract["environment_version"],
                         ],
                     }
                 ),
                 hide_index=True,
-                width="stretch",
-            )
-            st.caption(
-                "Fixed for the current MLP PPO contract. No tuning or Optuna "
-                "controls are exposed."
-            )
-
-    st.subheader("D. Selected-symbol training metadata")
-    with st.container(border=True):
-        with st.container(horizontal=True):
-            st.metric("Symbol", selected_profile.symbol, border=True)
-            st.metric(
-                "Company",
-                safe_display_value(selected_profile.company_name),
-                border=True,
-            )
-            st.metric(
-                "Sector",
-                safe_display_value(selected_profile.sector),
-                border=True,
-            )
-            st.metric(
-                "Usable observations",
-                format_integer(selected_profile.usable_observations),
-                border=True,
-            )
-            st.metric(
-                "Future history class",
-                selected_profile.history_class_label,
-                border=True,
-            )
-            st.metric(
-                "Current MLP PPO ready",
-                "Yes" if selected_profile.current_mlp_ppo_ready else "No",
-                border=True,
-            )
-        st.info(f"Future intended route: {selected_profile.future_training_route}")
-        partition_summary = pd.DataFrame(
-            {
-                "Partition": ["TRAIN", "VALIDATION", "TEST · SEALED"],
-                "Rows": [
-                    selected_summary.train_rows,
-                    selected_summary.validation_rows,
-                    selected_summary.test_rows,
-                ],
-                "Start": [
-                    format_date(selected_summary.train_start),
-                    format_date(selected_summary.validation_start),
-                    format_date(selected_summary.test_start),
-                ],
-                "End": [
-                    format_date(selected_summary.train_end),
-                    format_date(selected_summary.validation_end),
-                    format_date(selected_summary.test_end),
-                ],
-                "Permitted use": [
-                    "PPO learning only",
-                    "Candidate evaluation only",
-                    "Metadata display only",
-                ],
-            }
-        )
-        st.dataframe(partition_summary, hide_index=True, width="stretch")
-        st.success(
-            "FINAL TEST SET: SEALED — row count and dates above come from "
-            "rl_contract.json metadata. The TEST frame is not loaded."
-        )
-        with st.container(horizontal=True):
-            st.metric("Observation shape", str(selected_summary.observation_shape), border=True)
-            st.metric("Feature version", selected_summary.feature_version, border=True)
-            st.metric("RL contract", selected_summary.rl_contract_version, border=True)
-            st.metric("Environment", selected_summary.environment_version, border=True)
-
-        validation_key = (
-            workflow_identity.symbol,
-            workflow_identity.contract_sha256,
-            workflow_identity.observation_scaler_sha256,
-            workflow_identity.observation_scaler_metadata_sha256,
-            workflow_identity.train_validation_artifact_fingerprint,
-        )
-        environment_validation = st.session_state.get(
-            "ppo_selected_environment_validation"
-        )
-        if st.button(
-            "Validate selected TRAIN environment",
-            icon=":material/fact_check:",
-            key="validate_selected_ppo_environment",
-            disabled=controls_disabled,
-        ):
-            result = _validate_rl_environment(
-                workflow_identity.symbol,
-                workflow_identity.contract_sha256,
-                workflow_identity.observation_scaler_sha256,
-                workflow_identity.observation_scaler_metadata_sha256,
-                workflow_identity.train_validation_artifact_fingerprint,
-                str(PROCESSED_SPLITS_DIR),
-            )
-            st.session_state["ppo_selected_environment_validation"] = {
-                "key": validation_key,
-                "result": result,
-            }
-            environment_validation = st.session_state[
-                "ppo_selected_environment_validation"
-            ]
-        if (
-            isinstance(environment_validation, dict)
-            and environment_validation.get("key") == validation_key
-        ):
-            result = environment_validation["result"]
-            if result["status"] == "Environment Ready":
-                st.success(
-                    f"{result['message']} · Observation shape: {result['shape']}"
-                )
-            else:
-                st.error(result["message"])
-
-    st.subheader("E. Train PPO candidate")
-    with st.container(border=True):
-        st.markdown(
-            f"**{workflow_identity.symbol}** · TRAIN "
-            f"{format_date(selected_summary.train_start)} to "
-            f"{format_date(selected_summary.train_end)} · "
-            f"{selected_summary.train_rows:,} rows · "
-            f"{workflow_identity.requested_timesteps:,} requested timesteps · "
-            f"seed {workflow_identity.seed} · "
-            f"{workflow_identity.requested_device.upper()}"
-        )
-        train_gate = training_availability(st.session_state, workflow_identity)
-        train_disabled = not train_gate.allowed or device_error is not None
-        train_clicked = st.button(
-            "Train PPO candidate",
-            type="primary",
-            icon=":material/model_training:",
-            key="train_single_ppo_candidate",
-            disabled=train_disabled,
-        )
-        st.caption(
-            "Training is synchronous and session-scoped. Streamlit cannot guarantee "
-            "interactive cancellation after the page process is blocked, so no "
-            "misleading cancel control is shown."
-        )
-        if not train_gate.allowed:
-            st.caption(train_gate.reason)
-
-        if train_clicked:
-            claim = claim_workflow_job(
-                st.session_state,
-                workflow_identity,
-                "training",
-            )
-            if not claim.allowed:
-                st.error(claim.reason)
-            else:
-                workflow_state["training_error"] = None
-                progress_bar = st.progress(0, text="Preparing canonical TRAIN data…")
-
-                def _show_training_progress(event) -> bool:
-                    percent = max(0, min(100, int(round(event.progress_percent))))
-                    progress_bar.progress(
-                        percent,
-                        text=(
-                            f"{event.symbol}: {event.current_timesteps:,} / "
-                            f"{event.requested_timesteps:,} timesteps · {event.phase}"
-                        ),
-                    )
-                    workflow_state["progress"] = event
-                    return True
-
-                try:
-                    with st.status(
-                        "Training one in-memory PPO candidate…",
-                        expanded=True,
-                    ) as training_status:
-                        training_result = run_training_action(
-                            workflow_identity,
-                            progress_callback=_show_training_progress,
-                        )
-                        workflow_state["training_result"] = training_result
-                        workflow_state["validation_result"] = None
-                        workflow_state["persisted_bundle"] = None
-                        workflow_state["persisted_candidate_key"] = None
-                        if training_result.status == "completed":
-                            training_status.update(
-                                label="PPO training completed in memory",
-                                state="complete",
-                            )
-                        elif training_result.status == "interrupted":
-                            training_status.update(
-                                label="PPO training was interrupted",
-                                state="error",
-                            )
-                        else:
-                            training_status.update(
-                                label="PPO training failed safely",
-                                state="error",
-                            )
-                except Exception as exc:
-                    workflow_state["training_error"] = (
-                        f"{type(exc).__name__}: {exc}"
-                    )
-                finally:
-                    release_workflow_job(st.session_state)
-
-        training_result = workflow_state.get("training_result")
-        if workflow_state.get("training_error"):
-            st.error(f"Training error: {workflow_state['training_error']}")
-        if training_result is not None:
-            if training_result.status == "completed":
-                st.success(
-                    "Training completed. This is an in-memory research candidate, "
-                    "not a profitability claim or production model."
-                )
-            elif training_result.status == "interrupted":
-                st.warning(training_result.message)
-            else:
-                st.error(
-                    f"{training_result.message} "
-                    f"{training_result.error or ''}".strip()
-                )
-            with st.container(horizontal=True):
-                st.metric("Status", status_label(training_result.status), border=True)
-                st.metric(
-                    "Timesteps",
-                    f"{training_result.actual_timesteps:,} actual / "
-                    f"{training_result.requested_timesteps:,} requested",
-                    border=True,
-                )
-                st.metric(
-                    "Duration",
-                    f"{training_result.duration_seconds:,.2f} seconds",
-                    border=True,
-                )
-                st.metric("TRAIN rows", format_integer(training_result.training_rows), border=True)
-            st.caption(
-                f"TRAIN {format_date(training_result.training_start)} to "
-                f"{format_date(training_result.training_end)} · seed "
-                f"{training_result.seed} · requested device "
-                f"{training_result.requested_device.upper()} · resolved "
-                f"{safe_display_value(training_result.resolved_device).upper()} · "
-                f"actual {safe_display_value(training_result.device).upper()} · "
-                f"environment {training_result.environment_version} · feature "
-                f"{training_result.feature_version} · contract "
-                f"{training_result.rl_contract_version}"
-            )
-
-    st.subheader("F. Validation results")
-    with st.container(border=True):
-        validation_gate = validation_availability(
-            st.session_state,
-            workflow_identity,
-        )
-        validation_clicked = st.button(
-            "Evaluate on validation",
-            icon=":material/analytics:",
-            key="evaluate_ppo_on_validation",
-            disabled=not validation_gate.allowed,
-        )
-        if not validation_gate.allowed:
-            st.caption(validation_gate.reason)
-        if validation_clicked:
-            claim = claim_workflow_job(
-                st.session_state,
-                workflow_identity,
-                "validating",
-            )
-            if not claim.allowed:
-                st.error(claim.reason)
-            else:
-                workflow_state["validation_error"] = None
-                try:
-                    with st.status(
-                        "Comparing PPO and baselines on VALIDATION…",
-                        expanded=True,
-                    ) as validation_status:
-                        comparison = run_validation_action(
-                            workflow_state["training_result"],
-                            workflow_identity,
-                        )
-                        workflow_state["validation_result"] = comparison
-                        validation_status.update(
-                            label="VALIDATION comparison completed",
-                            state="complete",
-                        )
-                except Exception as exc:
-                    workflow_state["validation_error"] = (
-                        f"{type(exc).__name__}: {exc}"
-                    )
-                finally:
-                    release_workflow_job(st.session_state)
-
-        comparison = workflow_state.get("validation_result")
-        if workflow_state.get("validation_error"):
-            st.error(f"Validation error: {workflow_state['validation_error']}")
-        if comparison is not None:
-            st.caption(
-                f"VALIDATION only · {comparison.validation_rows:,} rows · "
-                f"{format_date(comparison.validation_start)} to "
-                f"{format_date(comparison.validation_end)} · deterministic PPO · "
-                "Random seed 42"
-            )
-            st.dataframe(
-                validation_metrics_table(comparison),
-                hide_index=True,
-                width="stretch",
-            )
-            portfolio_history, drawdown_history = validation_chart_frames(comparison)
-            st.markdown("**Validation portfolio value**")
-            st.line_chart(
-                portfolio_history,
-                x="Date",
-                y="Portfolio Value",
-                color="Strategy",
-            )
-            st.markdown("**Validation drawdown**")
-            st.line_chart(
-                drawdown_history,
-                x="Date",
-                y="Drawdown",
-                color="Strategy",
-            )
-            decision = comparison.candidate_decision
-            decision_message = (
-                f"{status_label(decision.status)} · "
-                f"criteria {decision.criteria_version}"
-            )
-            if decision.status == "validation_pass":
-                st.success(decision_message)
-            elif decision.status == "validation_fail":
-                st.warning(decision_message)
-            elif decision.status == "insufficient_validation_data":
-                st.info(decision_message)
-            else:
-                st.error(decision_message)
-            st.markdown("**Decision reasons**")
-            for reason in decision.reasons:
-                st.markdown(f"- {reason}")
-            if comparison.warnings:
-                with st.expander("Validation metric warnings"):
-                    for warning in comparison.warnings:
-                        st.markdown(f"- {warning}")
-            st.info(
-                "A validation pass does not equal production promotion. A validation "
-                "failure is an analytical decision, not evidence that the pipeline is broken."
-            )
-
-    st.subheader("G. Candidate persistence")
-    with st.container(border=True):
-        comparison = workflow_state.get("validation_result")
-        persisted_bundle = workflow_state.get("persisted_bundle")
-        if persisted_bundle is not None:
-            st.success(
-                f"Candidate already saved as {persisted_bundle.model_id} "
-                f"(version {persisted_bundle.model_version})."
-            )
-            st.caption(
-                f"Validation: {status_label(persisted_bundle.validation_status)} · "
-                f"lifecycle: {status_label(persisted_bundle.model_status)} · "
-                f"promotion: {status_label(persisted_bundle.promotion_status)}"
-            )
-        elif comparison is None:
-            st.info("Complete validation before candidate persistence is considered.")
-        elif comparison.candidate_decision.status != "validation_pass":
-            st.info(
-                "Production candidate saving is unavailable because this result did "
-                f"not receive validation_pass ({comparison.candidate_decision.status})."
             )
         else:
-            try:
-                preview = preview_candidate_version(
-                    model_registry,
-                    workflow_identity.symbol,
-                )
-                st.write(
-                    f"Expected next identity: **{preview.model_id}** · version "
-                    f"**{preview.model_version}**. Final allocation occurs atomically "
-                    "when Save candidate is pressed."
-                )
-            except (ValueError, PPOPersistenceError) as exc:
-                preview = None
-                st.error(f"Candidate version preview failed: {exc}")
-            persistence_gate = persistence_availability(
-                st.session_state,
-                workflow_identity,
+            st.caption("No compatible recurrent TRAIN contract is available.")
+        detail_progress = (
+            "Not applicable"
+            if pd.isna(detail["progress_percent"])
+            else f"{float(detail['progress_percent']):.1f}%"
+        )
+        with st.container(horizontal=True):
+            st.metric("Progress", detail_progress, border=True)
+            st.metric("Runtime", _duration(detail["runtime_seconds"]), border=True)
+            st.metric("Attempts", int(detail["attempts"]), border=True)
+            st.metric("Device", safe_display_value(detail["effective_device"]), border=True)
+        diagnostics = latest_job_diagnostics(snapshot.store, selected_symbol)
+        if diagnostics:
+            keys = (
+                "explained_variance", "approx_kl", "clip_fraction", "entropy_loss",
+                "value_loss", "policy_gradient_loss",
             )
-            if st.button(
-                "Save candidate",
-                type="primary",
-                icon=":material/save:",
-                key="persist_ppo_candidate",
-                disabled=not persistence_gate.allowed or preview is None,
-            ):
-                claim = claim_workflow_job(
-                    st.session_state,
-                    workflow_identity,
-                    "persisting",
-                )
-                if not claim.allowed:
-                    st.error(claim.reason)
-                else:
-                    workflow_state["persistence_error"] = None
-                    try:
-                        bundle = run_persistence_action(
-                            workflow_state["training_result"],
-                            comparison,
-                            workflow_identity,
-                        )
-                        mark_candidate_persisted(
-                            st.session_state,
-                            workflow_identity,
-                            comparison,
-                            bundle,
-                        )
-                    except RegistryCommitPendingError as exc:
-                        workflow_state["persistence_error"] = str(exc)
-                    except (PPOPersistenceError, OSError, ValueError) as exc:
-                        workflow_state["persistence_error"] = (
-                            f"{type(exc).__name__}: {exc}"
-                        )
-                    finally:
-                        release_workflow_job(st.session_state)
-                    if workflow_state.get("persisted_bundle") is not None:
-                        st.rerun()
-            if workflow_state.get("persistence_error"):
-                st.error(
-                    "Candidate persistence did not complete safely: "
-                    f"{workflow_state['persistence_error']}"
-                )
-        st.caption(
-            "No Promote to Production action is available. A saved model remains a "
-            "candidate until a later, separately authorized promotion workflow."
+            st.markdown("**Training diagnostics**")
+            st.dataframe(
+                pd.DataFrame(
+                    {"Metric": keys, "Value": [diagnostics.get(key) for key in keys]}
+                ),
+                hide_index=True,
+            )
+        validation = load_validation_metrics(snapshot.store, selected_symbol)
+        st.markdown("**Validation and artifacts**")
+        st.write(
+            {
+                "validation_status": detail["validation_status"],
+                "validation_partition": validation.get("evaluation_partition"),
+                "validation_artifact": snapshot.store.read_job(
+                    selected_symbol
+                ).validation_metrics_reference,
+                "model_path": detail["model_path"],
+                "model_artifact_status": detail["model_artifact_status"],
+                "registry_entry": (
+                    "present"
+                    if "symbol" in models.columns
+                    and not models.loc[models["symbol"].eq(selected_symbol)].empty
+                    else "absent"
+                ),
+            }
+        )
+        st.caption("No TEST observations or returns are loaded by this detail view.")
+
+    st.subheader("Logs and advanced state")
+    with st.expander("Latest orchestration events", icon=":material/history:"):
+        events = recent_orchestration_events(snapshot.store)
+        if events.empty:
+            st.caption("No persisted orchestration events.")
+        else:
+            st.dataframe(events, hide_index=True, key="training_recent_events")
+    with st.expander("Bounded controller log", icon=":material/description:"):
+        log_path = snapshot.store.run_directory / "logs" / "production_controller.log"
+        st.code(bounded_log_tail(log_path) or "No controller log output yet.", language="text")
+    with st.expander("Controller and manifest provenance", icon=":material/info:"):
+        st.json(
+            {
+                "controller": {
+                    "state": snapshot.controller.state,
+                    "pid": snapshot.controller.pid,
+                    "alive": snapshot.controller.alive,
+                    "started_at": snapshot.controller.started_at,
+                    "updated_at": snapshot.controller.updated_at,
+                    "message": snapshot.controller.message,
+                },
+                "run": {
+                    "run_id": snapshot.manifest.run_id,
+                    "identity_policy": snapshot.manifest.identity_policy,
+                    "identity_snapshot": snapshot.manifest.identity_snapshot,
+                    "universe_hash": snapshot.manifest.universe_hash,
+                    "trainable_symbol_hash": snapshot.manifest.trainable_symbol_hash,
+                    "TEST_loaded": snapshot.manifest.test_partition_loaded,
+                },
+            }
         )
 
-    if any(
-        workflow_state.get(key) is not None
-        for key in ("training_result", "validation_result", "persisted_bundle")
-    ):
-        if st.button(
-            "Discard current in-memory workflow",
-            icon=":material/delete_sweep:",
-            key="discard_current_ppo_workflow",
-        ):
-            reset_workflow_results(st.session_state)
-            st.rerun()
-
-st.subheader("H. Model registry / history")
-model_history = registry_history_table(model_registry)
 st.caption(
-    f"Registry schema: {MODEL_REGISTRY_SCHEMA_VERSION} · "
-    "candidate history only; production promotion is not enabled."
+    "Training controls never evaluate TEST, mutate the frozen plan, or promote "
+    "models automatically. Closing this browser does not stop a detached run."
 )
-if model_history.empty:
-    st.info("No PPO model versions are registered yet.")
-else:
-    st.dataframe(model_history, hide_index=True, width="stretch")

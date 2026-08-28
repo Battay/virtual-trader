@@ -1,0 +1,4586 @@
+{
+  "classification_policy_version": "instrument_audit_authoritative_first_v1",
+  "execution_training_policy": "TRAINABLE_MEMBERS_OF_FROZEN_RESEARCH_UNIVERSE_V1",
+  "identity_count": 508,
+  "identity_policy": "CURRENT_AUTHORITATIVE_COMMON_EQUITY",
+  "identity_role": "FROZEN_RESEARCH_UNIVERSE",
+  "listing_snapshot_date": "2026-08-02",
+  "manifest_version": "frozen_research_common_equity_identity_v1",
+  "members": [
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "786 Investments Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "786"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al-Abbas Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "AABS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Agro Allianz Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "AAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al-Abid Silk Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "AASM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ali Asghar Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "AATM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Allied Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "ABL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Abbott Laboratories (Pakistan) Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "ABOT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Abson Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "ABSON"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Attock Cement Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "ACPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Adam Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "ADAMS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Artistic Denim Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ADMM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Agha Steel Ind.Ltd",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "AGHA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Askari General Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "AGIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Agriauto Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "AGIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Agritech Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FERTILIZER",
+      "security_type": "ordinary_equity",
+      "symbol": "AGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "AGP Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "AGP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Abdullah Shah Ghazi Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "AGSML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al-Ghazi Tractors Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "AGTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Arif Habib Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FERTILIZER",
+      "security_type": "ordinary_equity",
+      "symbol": "AHCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Arif Habib Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "AHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ahmad Hassan Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "AHTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Adamjee Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "AICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Air Link Communication Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "AIRLINK"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Askari Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "AKBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "AKD Hospitality Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "AKDHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "AKD Securities Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "AKDSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al-Khair Gadoon Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "AKGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Askari Life Assurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "ALAC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Adamjee Life Assurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "ALIFE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al-Noor Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "ALNRS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Altern Energy Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "ALTN"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Apna Microfinance Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "AMBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al-Mal Securities & Services Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "AMSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Amtex Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "AMTEX"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Azgard Nine Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ANL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Azgard Nine Non-Voting Ordinary Shares",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ANLNV"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Annoor Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "ANNT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ansari Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "ANSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "AN Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ANTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Attock Petroleum Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "APL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Apollo Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "APOT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Arctic Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "ARCTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "ARM Green Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "ARMG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Arpak International Investments Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "ARPAK"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Archroma Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "ARPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Aruj Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ARUJ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Al Shaheer Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "ASC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ashfaq Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "ASHT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Asia Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "ASIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Aisha Steel Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "ASL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Amreli Steels Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "ASTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Asim Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "ASTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Atlas Battery Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "ATBA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Atlas Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "ATIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Atlas Honda Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "ATLH"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Attock Refinery Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "REFINERY",
+      "security_type": "ordinary_equity",
+      "symbol": "ATRL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Avanceon Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "AVN"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Allawasaya Tex. & Finishing Mills Ltd",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "AWTX"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Azmat Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "AZMT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bank Alfalah Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "BAFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Baba Farid Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "BAFS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bank AL Habib Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "BAHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bawany Air Products Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "BAPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bata Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEATHER & TANNERIES",
+      "security_type": "ordinary_equity",
+      "symbol": "BATA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Big Bird Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "BBFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bolan Castings Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "BCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Beco Steel Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "BECO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bela Automotives Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "BELA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Berger Paints Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "BERG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Barkat Frisian Agro Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "BFAGRO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "BF Biosciences Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "BFBIO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Baluchistan Glass Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "BGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bhanero Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "BHAT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Biafo Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "BIFO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Business & Industrial Insurance Company",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "BIIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "BankIslami Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "BIPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Blue-Ex Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TRANSPORT",
+      "security_type": "ordinary_equity",
+      "symbol": "BLUEX"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bank Makramah Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "BML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bunnys Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "BNL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bannu Woollen Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "WOOLLEN",
+      "security_type": "ordinary_equity",
+      "symbol": "BNWM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Bank of Khyber",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "BOK"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Bank of Punjab",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "BOP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Burshane LPG (Pakistan) Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "BPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "B.R.R Guardian Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PROPERTY",
+      "security_type": "ordinary_equity",
+      "symbol": "BRRG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Blessed Textiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "BTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Buxly Paints Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "BUXL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Bestway Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "BWCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Baluchistan Wheels Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "BWHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Crescent Cotton Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "CCM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Century Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "CENI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Century Paper & Board Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "CEPB"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Crescent Fibres Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "CFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Chashma Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "CHAS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Chenab Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "CHBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Cherat Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "CHCC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Crescent Jute Products Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "JUTE",
+      "security_type": "ordinary_equity",
+      "symbol": "CJPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Clover Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "CLOV"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Cordoba Logistics & Ventures Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TRANSPORT",
+      "security_type": "ordinary_equity",
+      "symbol": "CLVL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Cnergyico PK Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "REFINERY",
+      "security_type": "ordinary_equity",
+      "symbol": "CNERGY"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Colgate-Palmolive (Pakistan) Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "COLG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Citi Pharma Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "CPHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Cherat Packaging Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "CPPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Crescent Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "CRTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Crescent Steel & Allied Products Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "CSAP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Crescent Star Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "CSIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Colony Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "CTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Data Agro Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "DAAG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dadex Eternit Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "DADX"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dadabhoy Cement Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "DBCI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dadabhoy Sack Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "DBSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "DCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dadabhoy Construction Technology Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "DCTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dawood Equities Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "DEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Farooque Motors Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "DFML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Farooque Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DFSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "D.G. Khan Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "DGKC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Diamond Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "DIIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Din Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DINT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Khalid Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DKTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dawood Lawrencepur Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "DLL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "D.M. Corporation Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DMC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Mushtaq Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DMTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dandot Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "DNCC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Descon Oxychem Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "DOL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Salman Fibre Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "DSFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "D.S. Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DSIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dost Steels Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "DSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Automotive Engineering Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "DWAE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "DWSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dewan Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "DWTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Dynea Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "DYNO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ecopack Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "ECOP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Engro Fertilizers Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FERTILIZER",
+      "security_type": "ordinary_equity",
+      "symbol": "EFERT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "EFU General Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "EFUG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "EFU Life Assurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "EFUL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Elahi Cotton Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "ELCM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ellcot Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "ELSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Emco Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "EMCO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "English Leasing Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "ENGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Engro Holdings Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "ENGROH"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Engro Polymer & Chemicals Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "EPCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Engro Powergen Qadirpur Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "EPQL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Escorts Investment Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "ESBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "East West Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "EWIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Exide Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "EXIDE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Faysal Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "FABL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fatima Enterprises Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "FAEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Faisal Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "FASM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fatima Fertilizer Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FERTILIZER",
+      "security_type": "ordinary_equity",
+      "symbol": "FATIMA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fauji Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "FCCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "First Capital Equities Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "FCEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Frieslandcampina Engro Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "FCEPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "First Credit and Investment Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "FCIBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fast Cables Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "FCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "First Capital Securities Corporation",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "FCSC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "First Dawood Properties Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "FDPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fecto Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "FECTC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ferozsons Laboratories Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "FEROZ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fauji Fertilizer Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FERTILIZER",
+      "security_type": "ordinary_equity",
+      "symbol": "FFC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fauji Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "FFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fateh Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEATHER & TANNERIES",
+      "security_type": "ordinary_equity",
+      "symbol": "FIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Flying Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "FLYNG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Feroze1888 Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "FML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "First National Equities Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "FNEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Frontier Ceramics Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "FRCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Faran Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "FRSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fateh Sports Wear Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "FSWL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fateh Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "FTHM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Fazal Cloth Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "FZCM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gadoon Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "GADT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghandhara Automobiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "GAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gammon Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "GAMON"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gatron (Industries) Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "GATI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gul Ahmed Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "GATM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Chemical Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "GCIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Chemworld Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "GCWL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Dairies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "GDL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/gem/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mughal Energy Limited(GEM)",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "gem_equity",
+      "symbol": "GEMMEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/gem/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nets International Communication Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "gem_equity",
+      "symbol": "GEMNETS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/gem/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Pakistan Credit Rating Agency Ltd",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "gem_equity",
+      "symbol": "GEMPACRA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/gem/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak Agro Packaging Limited(GEM)",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "gem_equity",
+      "symbol": "GEMPAPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghazi Fabrics International Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "GFIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Global Glass Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "GGGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Global Holdings Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "GGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Glass Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "GHGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghandhara Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "GHNI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Good Luck Industries Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "GIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "GlaxoSmithKline Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "GLAXO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Globe Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "GLOT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "GOC (Pak) Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "GOC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Grays Leasing Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "GRYL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gulshan Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "GSPM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghandhara Tyre & Rubber Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "GTYR"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gulistan Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "GUSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gulistan Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "GUTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ghani Value Glass Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "GVGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Gharibwal Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "GWLC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Habib Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "HABSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Haydari Construction Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "HADC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hala Enterprises Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "HAEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hafiz Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "HAFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hajra Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "HAJT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Haleon Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "HALEON"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hascol Petroleum Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "HASCOL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hamid Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "HATM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Habib Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "HBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Honda Atlas Cars (Pakistan) Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "HCAR"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Habib Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "HICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hinopak Motors Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "HINO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Highnoon Laboratories Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "HINOON"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hira Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "HIRAT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hakkim Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "HKKT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Habib Metropolitan Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "HMB"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Haji Mohammad Ismail Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "HMIM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hoechst Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "HPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Habib Rice Product Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "HRPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Huffaz Seamless Pipe Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "HSPI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hi-Tech Lubricants Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "HTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Hub Power Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "HUBC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Hum Network Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "HUMNL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Husein Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PROPERTY",
+      "security_type": "ordinary_equity",
+      "symbol": "HUSI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Haseeb Waqas Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "HWQS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ibrahim Fibres Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "IBFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "IBL HealthCare Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "IBLHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "ICC Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "ICCI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Invest Capital Investment Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "ICIBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ittehad Chemicals Limted",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "ICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ideal Dynamics Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "IDEAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Idrees Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "IDRT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Indus Dyeing & Manufacturing Co. Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "IDYM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "IGI Holdings Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "IGIHL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "IGI Life Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "IGIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Interloop Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ILP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Image Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "APPAREL",
+      "security_type": "ordinary_equity",
+      "symbol": "IMAGE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Imperial Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "IML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Intermarket Securities Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "IMS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Indus Motor Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "INDU"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "International Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "INIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "International Knitwear Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "APPAREL",
+      "security_type": "ordinary_equity",
+      "symbol": "INKL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "International Packaging Films Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "IPAK"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ismail Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "ISIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "International Steels Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "ISL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Itanz Technologies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "ITANZ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ittefaq Iron Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "ITTEFAQ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "J.A. Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "JATM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Janana De Malucho Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "JDMT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "JDW Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "JDWS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Jubilee General Insurance Company Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "JGICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "J.K. Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "JKSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Jubilee Life Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "JLICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "JS Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "JSBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Jahangir Siddiqui & Co. Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "JSCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "JS Global Capital Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "JSGCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "JS Investments Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "JSIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Jauharabad Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "JSML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Jubilee Spinning & Weaving Mills Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "JUBS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Javedan Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PROPERTY",
+      "security_type": "ordinary_equity",
+      "symbol": "JVDC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kaiser Arts & Krafts Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "KAKL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kot Addu Power Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "KAPCO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Karam Ceramics Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "KCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "K-Electric Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "KEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Khyber Tobacco Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TOBACCO",
+      "security_type": "ordinary_equity",
+      "symbol": "KHTC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Khyber Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "KHYT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohinoor Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "KML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohat Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "KOHC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohinoor Energy Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "KOHE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohinoor Power Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "KOHP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohat Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "KOHTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohinoor Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "KOIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohinoor Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "KOSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Khairpur Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "KPUS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "KSB Pumps Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "KSBP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Khalid Siraj Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "KSTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Kohinoor Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "KTML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Lucky Core Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "LCI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Leather Up Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEATHER & TANNERIES",
+      "security_type": "ordinary_equity",
+      "symbol": "LEUL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Liven Pharma Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "LIVEN"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Loads Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "LOADS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Lotte Chemical Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "LOTCHEM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Leiner Pak Gelatine Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "LPGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Lalpir Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "LPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "LSE Capital Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "LSECL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "LSE Financial Services Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "LSEFSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "LSE Ventures Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "LSEVL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Lucky Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "LUCK"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "MACPAC Films Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "MACFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Macter International Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "MACTER"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mari Energies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS EXPLORATION COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "MARI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "MCB Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "MCB"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "MCB Investment Management Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "MCBIM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Media Times Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "MDTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Meezan Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "MEBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mehmood Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "MEHT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Merit Packaging Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "MERIT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mitchells Fruit Farms Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "MFFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Matco Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "MFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mohammad Farooq Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "MFTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mirpurkhas Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "MIRKS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Maple Leaf Cement Factory Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "MLCF"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mohib Exports Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "MOHE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Maqbool Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "MQTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mehran Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "MRNS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Metropolitan Steel Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "MSCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Masood Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "APPAREL",
+      "security_type": "ordinary_equity",
+      "symbol": "MSOT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Millat Tractors Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "MTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mubarak Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "MUBT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mughal Iron & Steel Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "MUGHAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mughal Iron & Steel Industries Ltd(C)",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "MUGHALC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Murree Brewery Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "MUREB"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Mandviwala Mauser Plastic Industries",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "MWMP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "National Fibres Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "NAFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nagina Cotton Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "NAGC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "National Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "NATF"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nadeem Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "NATM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "National Bank of Pakistan",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "NBP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nishat Chunian Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "NCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nazir Cotton Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "NCML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nishat Chunian Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "NCPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nestle Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "NESTLE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "NetSol Technologies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "NETSOL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Next Capital Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "NEXT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nimir Industrial Chemicals Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "NICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nina Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "NINA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nirala MSR Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "NMFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nishat Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "NML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Noon Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "NONS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nishat Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "NPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "National Refinery Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "REFINERY",
+      "security_type": "ordinary_equity",
+      "symbol": "NRL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Nimir Resins Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "NRSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The National Silk & Rayon Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "NSRM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Oilboy Energy Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "OBOY"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Octopus Digital Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "OCTOPUS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Oil & Gas Development Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS EXPLORATION COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "OGDC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "OLP Financial Services Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "OLPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Olympia Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "OML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Otsuka Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "OTSU"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Aluminium Beverage Cans Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "PABC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pace (Pakistan) Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PROPERTY",
+      "security_type": "ordinary_equity",
+      "symbol": "PACE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak Elektron Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "PAEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak Datacom Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "PAKD"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak Leather Crafts Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEATHER & TANNERIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PAKL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Oxygen Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "PAKOXY"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak Qatar Family Takaful Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PAKQATAR"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Reinsurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PAKRI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Tobacco Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TOBACCO",
+      "security_type": "ordinary_equity",
+      "symbol": "PAKT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pervez Ahmed Consultancy Services Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "PASL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Paramount Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "PASM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Cables Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "PCAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Engineering Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "ENGINEERING",
+      "security_type": "ordinary_equity",
+      "symbol": "PECO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak-Gulf Leasing Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PGLC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Hotels Developers Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "PHDL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "PIA Holding Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "PIAHCLA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "PIA Holding Company LimitedB",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "PIAHCLB"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan International Bulk Terminal",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TRANSPORT",
+      "security_type": "ordinary_equity",
+      "symbol": "PIBTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Industrial & Commercial Leasing",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan International Container",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TRANSPORT",
+      "security_type": "ordinary_equity",
+      "symbol": "PICT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "PICIC Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Premier Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PINL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pioneer Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "PIOC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Pakistan General Insurance Co. Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PKGI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakgen Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "PKGP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Packages Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "PKGS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Premier Sugar Mills",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PMRS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan National Shipping Corporation",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TRANSPORT",
+      "security_type": "ordinary_equity",
+      "symbol": "PNSC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Oilfields Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS EXPLORATION COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "POL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Punjab Oil Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "VANASPATI & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "POML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Power Cement Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "POWER"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Petroleum Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS EXPLORATION COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Paper Products Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "PPP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan PVC Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "PPVC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pak Qatar General Takaful Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PQGTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "At-Tahur Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "PREMA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Premium Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "PRET"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Prudential Investment Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "PRIB"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Progressive Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "PRIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Refinery Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "REFINERY",
+      "security_type": "ordinary_equity",
+      "symbol": "PRL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Prosperity Weaving Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "PRWM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Services Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "PSEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan State Oil Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PSO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Stock Exchange Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "PSX"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Synthetics Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "PSYL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Pakistan Telecommunication Company Ltd",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "PTC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Panther Tyres Ltd.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "PTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Quantum Data Technologies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "QTECH"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Quetta Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "QUET"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Quice Food Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "QUICE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Redco Textiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "REDCO"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Regal Ceramics Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "REGAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Reliance Weaving Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "REWM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Reliance Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "RICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Rafhan Maize Products Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "RMPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Roshan Packages Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "RPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Ruby Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "RUBY"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Rupali Polyester Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "RUPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Saif Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SAIF"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Salman Noman Enterprises Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SANE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sanghar Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SANSM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sapphire Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "SAPT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sardar Chemical Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "SARC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sindh Abadgars Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SASML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sazgar Engineering Works Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE ASSEMBLER",
+      "security_type": "ordinary_equity",
+      "symbol": "SAZEW"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Samba Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "SBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Standard Chartered Bank (Pak) Ltd",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "SCBPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Schon Textiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "SCHT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sadoon Textile Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "SDOT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Searle Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PHARMACEUTICALS",
+      "security_type": "ordinary_equity",
+      "symbol": "SEARL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sitara Energy Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "SEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Select Technologies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "SELECT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Security Papers Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "SEPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Service Industries Textiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SERT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Safa Textiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "SFAT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sapphire Fibres Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "SFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "SG.Allied Businesses Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SYNTHETIC & RAYON",
+      "security_type": "ordinary_equity",
+      "symbol": "SGABL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Service GlobalFootwear Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEATHER & TANNERIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SGF"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "S.G. Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "SGPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shaffi Chemical Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "SHCI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shadman Cotton Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SHCM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shadab Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SHDT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shezan International Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "SHEZ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shifa International Hospitals Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "SHFA"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shahtaj Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SHJS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shaheen Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "SHNI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shahmurad Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SHSML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Security Investment Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "SIBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Siemens (Pakistan) Engineering",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "SIEM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sitara Chemical Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "SITC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sakrand Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SKRS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Security Leasing Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SLCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Secure Logistics-Trax Group Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TRANSPORT",
+      "security_type": "ordinary_equity",
+      "symbol": "SLGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "SME Leasing Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SLL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Service Long March Tyres Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SLM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sally Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SLYT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Safe Mix Concrete Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "SMCPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shakarganj Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sana Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SNAI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Soneri Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "SNBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sui Northern Gas Pipelines Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SNGP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "LSE SPAC-I Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "SPAC1"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "LSE SPAC-II Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "SPAC2"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Saudi Pak Consultancy Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEASING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SPCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "SPEL Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PAPER, BOARD & PACKAGING",
+      "security_type": "ordinary_equity",
+      "symbol": "SPEL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sitara Peroxide Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "SPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sitara Petroleum Service Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SPSL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Saif Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "SPWL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Service Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "LEATHER & TANNERIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SRVI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sui Southern Gas Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SSGC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Silver Star Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "SSIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Saritow Spinning Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SSML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "S.S.Oil Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "VANASPATI & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SSOM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shabbir Tiles & Ceramics Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "STCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shahtaj Textile Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "STJT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Supernet Technologies Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "STL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shams Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "STML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Siddiqsons Tin Plate Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "STPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Stylers International Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "APPAREL",
+      "security_type": "ordinary_equity",
+      "symbol": "STYLERS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Suhail Jute Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "JUTE",
+      "security_type": "ordinary_equity",
+      "symbol": "SUHJ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Suraj Ghee Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "VANASPATI & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "SURAJ"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Suraj Cotton Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "SURC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Sunrays Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SUTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Standard Worldwide Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "SWL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Symmetry Group Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "SYM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Systems Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "SYS"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Shahzad Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "SZTM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Taj Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "TAJT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Tata Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE SPINNING",
+      "security_type": "ordinary_equity",
+      "symbol": "TATM"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Treet Battery Limited.",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "TBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Tariq Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "TCORP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Telecard Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "TELE"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Tariq Glass Industries Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "GLASS & CERAMICS",
+      "security_type": "ordinary_equity",
+      "symbol": "TGL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Thal Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "AUTOMOBILE PARTS & ACCESSORIES",
+      "security_type": "ordinary_equity",
+      "symbol": "THALL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Thatta Cement Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "THCCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Thal Industries Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "TICL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Organic Meat Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "TOMCL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Towellers Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "TOWL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "TPL Corp Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "TPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "TPL Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "TPLI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "TPL Life Insurance Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "TPLL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "TPL Properties Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "PROPERTY",
+      "security_type": "ordinary_equity",
+      "symbol": "TPLP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "TPL Trakker Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "TPLT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Treet Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "TREET"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "TRG Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "TRG"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Trust Investment Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "TRIBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Tri-Pack Films Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "TRIPF"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Trust Securities & Brokerage Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INV. BANKS / INV. COS. / SECURITIES COS.",
+      "security_type": "ordinary_equity",
+      "symbol": "TSBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Tandlianwala Sugar Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "SUGAR & ALLIED INDUSTRIES",
+      "security_type": "ordinary_equity",
+      "symbol": "TSML"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Tri-Star Power Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "POWER GENERATION & DISTRIBUTION",
+      "security_type": "ordinary_equity",
+      "symbol": "TSPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "United Brands Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "UBDL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "United Bank Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "COMMERCIAL BANKS",
+      "security_type": "ordinary_equity",
+      "symbol": "UBL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "UDL International Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "UDLI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "United Distributors Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "MISCELLANEOUS",
+      "security_type": "ordinary_equity",
+      "symbol": "UDPL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The United Insurance Company",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "UNIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Unity Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "UNITY"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Unilever Pakistan Foods Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "UPFL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Usman Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "USMT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "The Universal Insurance Company Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "INSURANCE",
+      "security_type": "ordinary_equity",
+      "symbol": "UVIC"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Wafi Energy Pakistan Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "OIL & GAS MARKETING COMPANIES",
+      "security_type": "ordinary_equity",
+      "symbol": "WAFI"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Wahdat Poultry Farm Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "WAHDAT"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Wah Noble Chemicals Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CHEMICAL",
+      "security_type": "ordinary_equity",
+      "symbol": "WAHN"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Waves Corporation Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "WAVES"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Waves Home Appliances Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CABLE & ELECTRICAL GOODS",
+      "security_type": "ordinary_equity",
+      "symbol": "WAVESAPP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Worldcall Telecom Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "WTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Yousaf Weaving Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "YOUW"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Zahidjee Textile Mills Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE COMPOSITE",
+      "security_type": "ordinary_equity",
+      "symbol": "ZAHID"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Zarea Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "ZAL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/dc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Zeal Pak Cement Factory Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "CEMENT",
+      "security_type": "ordinary_equity",
+      "symbol": "ZELP"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "ZIL Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "FOOD & PERSONAL CARE PRODUCTS",
+      "security_type": "ordinary_equity",
+      "symbol": "ZIL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Zephyr Textiles Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TEXTILE WEAVING",
+      "security_type": "ordinary_equity",
+      "symbol": "ZTL"
+    },
+    {
+      "authoritative_source": "https://dps.psx.com.pk/listings-table/main/nc",
+      "classification_basis": "OFFICIAL_LISTING_DERIVED",
+      "company_name": "Zuma Resources Limited",
+      "instrument_category": "COMMON_EQUITY",
+      "sector": "TECHNOLOGY & COMMUNICATION",
+      "security_type": "ordinary_equity",
+      "symbol": "ZUMA"
+    }
+  ],
+  "research_limitation": "Current-authoritative common-equity snapshot frozen on 2026-08-02; survivorship-biased for historical research and not a point-in-time historical universe.",
+  "universe_hash": "571f32af6de4d864ded90bbc06e814cf309fdffe4f61151102895a93ec588ef5",
+  "universe_version": "current_common_equity_universe_v1"
+}

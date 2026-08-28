@@ -195,6 +195,11 @@ class TrainingRunManifest:
     resume_capability: str
     created_at: str
     test_partition_loaded: bool = False
+    identity_policy: str = ""
+    identity_snapshot: str = ""
+    execution_training_policy: str = ""
+    trainable_symbol_count: int = 0
+    trainable_symbol_hash: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != TRAINING_RUN_SCHEMA_VERSION:
@@ -210,6 +215,28 @@ class TrainingRunManifest:
             )
         if self.test_partition_loaded:
             raise TrainingJobStateError("TEST cannot enter orchestration metadata")
+        provenance = (
+            self.identity_policy,
+            self.identity_snapshot,
+            self.execution_training_policy,
+            self.trainable_symbol_hash,
+        )
+        if any(provenance) or self.trainable_symbol_count:
+            if not all(provenance):
+                raise TrainingJobStateError(
+                    "training run identity provenance must be complete"
+                )
+            if self.trainable_symbol_count != self.eligible_count:
+                raise TrainingJobStateError(
+                    "trainable-symbol count must match eligible job count"
+                )
+            if len(self.trainable_symbol_hash) != 64 or any(
+                character not in "0123456789abcdef"
+                for character in self.trainable_symbol_hash
+            ):
+                raise TrainingJobStateError(
+                    "trainable_symbol_hash must be a lowercase SHA-256"
+                )
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)

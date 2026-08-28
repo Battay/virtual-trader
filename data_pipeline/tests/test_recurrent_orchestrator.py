@@ -149,6 +149,27 @@ def test_run_and_job_identifiers_are_deterministic_and_every_identity_is_kept(
     assert [job.status for job in first_jobs] == [QUEUED, QUEUED, INELIGIBLE, INELIGIBLE]
     assert all(job.requested_timesteps == 512 for job in first_jobs)
     assert first_manifest.test_partition_loaded is False
+    assert first_manifest.identity_policy == discovery.identity_policy
+    assert first_manifest.identity_snapshot == "2026-08-02"
+    assert first_manifest.trainable_symbol_count == 2
+    assert first_manifest.trainable_symbol_hash == discovery.trainable_symbol_hash
+
+
+def test_resumed_run_rejects_incompatible_identity_hash(
+    discovery_fixture, tmp_path: Path
+) -> None:
+    discovery, _, _ = discovery_fixture
+    store = create_training_run(
+        discovery,
+        config=RecurrentPPOConfig(total_timesteps=512),
+        runs_root=tmp_path / "runs",
+        validation_enabled=False,
+    )
+    original = store.read_job("AAA")
+    store.write_job(replace(original, universe_hash="f" * 64))
+
+    with pytest.raises(RecurrentOrchestratorError, match="identity hash/version"):
+        store.list_jobs()
 
 
 def test_state_machine_accepts_only_explicit_legal_transitions(discovery_fixture) -> None:

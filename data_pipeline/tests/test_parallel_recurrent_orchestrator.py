@@ -279,6 +279,7 @@ def _run_parallel(
     max_jobs: int,
     process_worker: object = _fake_process_worker,
     cancellation_requested: object | None = None,
+    stop_after_current_requested: object | None = None,
 ):
     return execute_queued_jobs(
         store,
@@ -292,6 +293,7 @@ def _run_parallel(
         registry_path=registry,
         device_resolver=lambda _: TorchDeviceResolution("cpu", "cpu", False, False),
         cancellation_requested=cancellation_requested,
+        stop_after_current_requested=stop_after_current_requested,
     )
 
 
@@ -445,6 +447,32 @@ def test_parallel_interrupt_joins_workers_and_marks_launched_job(tmp_path: Path)
     ]
 
 
+def test_stop_after_current_finishes_active_jobs_without_launching_more(
+    tmp_path: Path,
+) -> None:
+    store, config, loader, registry = _store(tmp_path, ("AAA", "BBB", "CCC"))
+    calls = 0
+
+    def stop_after_initial_launch() -> bool:
+        nonlocal calls
+        calls += 1
+        return calls >= 2
+
+    outcomes = _run_parallel(
+        store,
+        config,
+        loader,
+        registry,
+        workers=2,
+        max_jobs=3,
+        stop_after_current_requested=stop_after_initial_launch,
+    )
+
+    assert [job.status for job in outcomes] == [COMPLETED, COMPLETED]
+    assert [job.status for job in store.list_jobs()] == [COMPLETED, COMPLETED, QUEUED]
+    assert store.read_active_workers() == {}
+
+
 def test_run_lock_and_cpu_only_parallel_contract(tmp_path: Path) -> None:
     store, config, loader, registry = _store(tmp_path, ("AAA",))
     with store.execution_lock():
@@ -539,6 +567,11 @@ def test_parallel_job_configuration_hash_is_unchanged_by_worker_count(
             "universe_version": manifest.universe_version,
             "universe_hash": manifest.universe_hash,
             "source_inventory_hash": manifest.source_inventory_hash,
+            "identity_policy": manifest.identity_policy,
+            "identity_snapshot": manifest.identity_snapshot,
+            "execution_training_policy": manifest.execution_training_policy,
+            "trainable_symbol_count": manifest.trainable_symbol_count,
+            "trainable_symbol_hash": manifest.trainable_symbol_hash,
             "agent_version": manifest.agent_version,
             "hyperparameters_hash": manifest.hyperparameters_hash,
             "requested_timesteps": manifest.requested_timesteps,

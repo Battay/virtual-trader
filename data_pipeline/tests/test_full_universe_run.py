@@ -7,7 +7,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from data_pipeline.src.identity_universe_policy import (
+    CURRENT_OPERATIONAL_IDENTITY,
+    FROZEN_RESEARCH_TRAINING_POLICY,
+    FROZEN_RESEARCH_UNIVERSE,
+    FROZEN_RESEARCH_UNIVERSE_HASH,
+)
 from reinforcement_learning.training.full_universe_run import (
+    FullUniverseRunError,
     FullUniverseTrainingSpec,
     build_full_universe_plan,
     dry_run_progress_summary,
@@ -57,10 +64,13 @@ def _discovery() -> RecurrentUniverseDiscovery:
     return RecurrentUniverseDiscovery(
         records=records,
         universe_version="current_common_equity_universe_v1",
-        universe_hash="b" * 64,
+        universe_hash=FROZEN_RESEARCH_UNIVERSE_HASH,
         identity_count=508,
         category_counts={ELIGIBLE_TRAINABLE: 435, UNSUPPORTED: 73},
         source_inventory_hash="c" * 64,
+        identity_policy=FROZEN_RESEARCH_UNIVERSE,
+        identity_snapshot="2026-08-02",
+        execution_training_policy=FROZEN_RESEARCH_TRAINING_POLICY,
     )
 
 
@@ -72,6 +82,9 @@ def test_full_plan_accounts_for_508_with_435_trainable_and_73_explicit_exclusion
     assert identity["identity_count"] == 508
     assert identity["trainable_count"] == 435
     assert identity["ineligible_count"] == 73
+    assert identity["identity_policy"] == FROZEN_RESEARCH_UNIVERSE
+    assert identity["identity_snapshot"] == "2026-08-02"
+    assert identity["trainable_symbol_hash"]
     assert plan["trainability"].value_counts().to_dict() == {
         "eligible": 435,
         "ineligible": 73,
@@ -92,6 +105,19 @@ def test_full_plan_is_deterministic_and_paths_are_isolated() -> None:
     assert first["model_path"].is_unique
     assert first["model_path"].str.match(r"models/S\d{3}/attempt_000/model\.zip").all()
     assert first_identity["execution_authorized"] is False
+
+
+def test_current_operational_identity_cannot_replace_frozen_full_run() -> None:
+    current = _discovery()
+    current = RecurrentUniverseDiscovery(
+        **{
+            **current.__dict__,
+            "identity_policy": CURRENT_OPERATIONAL_IDENTITY,
+        }
+    )
+
+    with pytest.raises(FullUniverseRunError, match="frozen research identity"):
+        build_full_universe_plan(current, spec=FullUniverseTrainingSpec())
 
 
 def test_dry_run_does_not_create_artifacts_or_invent_eta(tmp_path: Path) -> None:

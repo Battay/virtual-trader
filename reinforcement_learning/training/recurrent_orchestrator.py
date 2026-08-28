@@ -44,6 +44,10 @@ from data_pipeline.src.equity_universe import (
     deterministic_universe_identity,
 )
 from data_pipeline.src.instrument_audit import COMMON_EQUITY, OFFICIAL_LISTING_DERIVED
+from data_pipeline.src.identity_universe_policy import (
+    CURRENT_OPERATIONAL_IDENTITY,
+    CURRENT_OPERATIONAL_TRAINING_POLICY,
+)
 from feature_engineering.schemas import FEATURE_VERSION
 from feature_engineering.storage import atomic_write_json, safe_path_component
 from reinforcement_learning.canonical_recurrent_artifacts import (
@@ -135,6 +139,9 @@ class RecurrentUniverseDiscovery:
     identity_count: int
     category_counts: Mapping[str, int]
     source_inventory_hash: str
+    identity_policy: str = CURRENT_OPERATIONAL_IDENTITY
+    identity_snapshot: str = "current"
+    execution_training_policy: str = CURRENT_OPERATIONAL_TRAINING_POLICY
 
     @property
     def eligible_count(self) -> int:
@@ -143,6 +150,15 @@ class RecurrentUniverseDiscovery:
     @property
     def ineligible_count(self) -> int:
         return self.identity_count - self.eligible_count
+
+    @property
+    def trainable_symbol_hash(self) -> str:
+        symbols = sorted(
+            self.records.loc[
+                self.records["category"].eq(ELIGIBLE_TRAINABLE), "symbol"
+            ].astype(str)
+        )
+        return canonical_hash({"symbols": symbols})
 
 
 def _identity_universe_hash(identity: pd.DataFrame) -> str:
@@ -248,8 +264,10 @@ def discover_recurrent_training_universe(
     metadata_loader: Callable[..., object] = (
         load_training_recurrent_contract_metadata
     ),
+    identity_policy: str | None = None,
+    execution_training_policy: str | None = None,
 ) -> RecurrentUniverseDiscovery:
-    """Account for every frozen identity without loading a market partition."""
+    """Account for every identity without loading a market partition."""
 
     universe = (
         load_authoritative_current_equity_identity()
@@ -273,6 +291,25 @@ def discover_recurrent_training_universe(
     universe = universe.sort_values("symbol", kind="mergesort").reset_index(drop=True)
     if universe["symbol"].eq("").any() or universe["symbol"].duplicated().any():
         raise RecurrentOrchestratorError("identity symbols must be unique and nonempty")
+    snapshots = sorted(set(universe["snapshot_date"].astype(str)))
+    if len(snapshots) != 1:
+        raise RecurrentOrchestratorError("identity must have one snapshot date")
+    resolved_identity_policy = (
+        str(identity_policy).strip()
+        if identity_policy is not None
+        else str(universe.attrs.get("identity_role", CURRENT_OPERATIONAL_IDENTITY))
+    )
+    resolved_training_policy = (
+        str(execution_training_policy).strip()
+        if execution_training_policy is not None
+        else str(
+            universe.attrs.get(
+                "execution_training_policy", CURRENT_OPERATIONAL_TRAINING_POLICY
+            )
+        )
+    )
+    if not resolved_identity_policy or not resolved_training_policy:
+        raise RecurrentOrchestratorError("identity/training policy cannot be blank")
     evidence = _readiness_evidence(readiness_evidence_path)
     recovery_evidence = load_canonical_recovery_evidence()
     records: list[dict[str, object]] = []
@@ -364,6 +401,9 @@ def discover_recurrent_training_universe(
         identity_count=len(universe),
         category_counts=counts,
         source_inventory_hash=source_inventory,
+        identity_policy=resolved_identity_policy,
+        identity_snapshot=snapshots[0],
+        execution_training_policy=resolved_training_policy,
     )
 
 
@@ -380,6 +420,11 @@ def _run_identity(
         "universe_version": discovery.universe_version,
         "universe_hash": discovery.universe_hash,
         "source_inventory_hash": discovery.source_inventory_hash,
+        "identity_policy": discovery.identity_policy,
+        "identity_snapshot": discovery.identity_snapshot,
+        "execution_training_policy": discovery.execution_training_policy,
+        "trainable_symbol_count": discovery.eligible_count,
+        "trainable_symbol_hash": discovery.trainable_symbol_hash,
         "agent_version": RECURRENT_TRAINER_VERSION,
         "hyperparameters_hash": hyperparameters_hash,
         "requested_timesteps": config.total_timesteps,
@@ -506,6 +551,11 @@ def build_training_run(
         requested_device=config.device,
         hyperparameters_hash=hyperparameters_hash,
         source_inventory_hash=discovery.source_inventory_hash,
+        identity_policy=discovery.identity_policy,
+        identity_snapshot=discovery.identity_snapshot,
+        execution_training_policy=discovery.execution_training_policy,
+        trainable_symbol_count=discovery.eligible_count,
+        trainable_symbol_hash=discovery.trainable_symbol_hash,
         validation_enabled=validation_enabled,
         worker_limit=1,
         resume_capability=RESUME_CAPABILITY,
@@ -537,6 +587,7 @@ class TrainingRunStore:
     ) -> None:
         if self.run_directory.exists() and any(self.run_directory.iterdir()):
             raise FileExistsError(f"training run already exists: {self.run_directory}")
+        self._validate_inventory(manifest, jobs)
         for name in (
             JOBS_DIRECTORY_NAME,
             MODELS_DIRECTORY_NAME,
@@ -594,9 +645,38 @@ class TrainingRunStore:
             for path in sorted(self.jobs_directory.glob("*.json"))
         ]
         manifest = self.read_manifest()
+        self._validate_inventory(manifest, jobs)
+        return tuple(sorted(jobs, key=lambda item: item.symbol))
+
+    @staticmethod
+    def _validate_inventory(
+        manifest: TrainingRunManifest,
+        jobs: Sequence[TrainingJobRecord],
+    ) -> None:
+        """Fail closed when persisted jobs no longer match run identity provenance."""
+
         if len(jobs) != manifest.identity_count or len({job.symbol for job in jobs}) != len(jobs):
             raise RecurrentOrchestratorError("persisted job inventory does not reconcile")
-        return tuple(sorted(jobs, key=lambda item: item.symbol))
+        if any(
+            job.run_id != manifest.run_id
+            or job.universe_version != manifest.universe_version
+            or job.universe_hash != manifest.universe_hash
+            for job in jobs
+        ):
+            raise RecurrentOrchestratorError(
+                "persisted job identity hash/version is incompatible with the run"
+            )
+        trainable = sorted(job.symbol for job in jobs if job.trainability == "eligible")
+        if len(trainable) != manifest.eligible_count:
+            raise RecurrentOrchestratorError(
+                "persisted trainable-symbol count is incompatible with the run"
+            )
+        if manifest.trainable_symbol_hash and canonical_hash(
+            {"symbols": trainable}
+        ) != manifest.trainable_symbol_hash:
+            raise RecurrentOrchestratorError(
+                "persisted trainable-symbol hash is incompatible with the run"
+            )
 
     def resolve_artifact(self, relative_path: str) -> Path:
         value = Path(relative_path)
@@ -1421,6 +1501,7 @@ def _execute_queued_jobs_processes(
     registry_path: Path,
     process_worker: Callable[[Mapping[str, object], object], None] | None,
     cancellation_requested: Callable[[], bool] | None,
+    stop_after_current_requested: Callable[[], bool] | None,
     device_resolver: Callable[[str], TorchDeviceResolution],
 ) -> tuple[TrainingJobRecord, ...]:
     """Run bounded spawned CPU workers while the parent owns shared state."""
@@ -1718,6 +1799,11 @@ def _execute_queued_jobs_processes(
         while pending or active:
             if cancellation_requested is not None and cancellation_requested():
                 raise KeyboardInterrupt
+            if (
+                stop_after_current_requested is not None
+                and stop_after_current_requested()
+            ):
+                stop_launching = True
             while pending and len(active) < workers and not stop_launching:
                 launch(pending.pop(0))
             if not active:
@@ -1952,6 +2038,7 @@ def execute_queued_jobs(
     registry_path: Path = MODEL_REGISTRY_PATH,
     process_worker: Callable[[Mapping[str, object], object], None] | None = None,
     cancellation_requested: Callable[[], bool] | None = None,
+    stop_after_current_requested: Callable[[], bool] | None = None,
     force_process_workers: bool = False,
 ) -> tuple[TrainingJobRecord, ...]:
     """Process at most ``max_jobs`` with a distinct bounded worker count."""
@@ -1998,6 +2085,7 @@ def execute_queued_jobs(
             registry_path=Path(registry_path),
             process_worker=process_worker,
             cancellation_requested=cancellation_requested,
+            stop_after_current_requested=stop_after_current_requested,
             device_resolver=device_resolver,
         )
 
