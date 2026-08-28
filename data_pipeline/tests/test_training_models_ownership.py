@@ -27,6 +27,9 @@ def test_training_page_uses_frozen_recurrent_production_authority() -> None:
     assert "TRAINABLE_MEMBERS_OF_FROZEN_RESEARCH_UNIVERSE_V1" not in source
     assert "total_timesteps =" not in source
     assert "RecurrentPPOConfig(" not in source
+    assert "prepare_selected_run(confirmed_symbols)" in source
+    assert "build_global_model_coverage()" in source
+    assert "SELECTED" in source
 
 
 def test_training_page_has_native_top_spacing_and_unambiguous_frozen_labels() -> None:
@@ -85,6 +88,8 @@ def test_page_actions_are_explicit_detached_and_test_has_no_execution_route() ->
     assert '"Confirm start/continue"' in source
     assert '"Confirm stop after current jobs"' in source
     assert '"Confirm active interruption"' in source
+    assert "I confirm this exact SELECTED membership" in source
+    assert "Retrain selected trained symbols" in source
     assert "run_training_action" not in source
     assert "train_recurrent_single_symbol" not in source
     assert "load_rl_partition" not in source

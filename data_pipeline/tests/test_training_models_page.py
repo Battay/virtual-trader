@@ -17,6 +17,7 @@ from reinforcement_learning.training.production_control import (
     RunProgress,
     RunSnapshot,
 )
+from reinforcement_learning.training.selective_training import CoverageSummary
 
 
 PAGE_PATH = Path(__file__).resolve().parents[2] / "app_pages" / "6_Training_and_Models.py"
@@ -160,6 +161,63 @@ def _patch_page_backend(
     monkeypatch.setattr(
         f"{module}.recent_orchestration_events", lambda *_: pd.DataFrame()
     )
+    coverage = pd.DataFrame(
+        [
+            {
+                "symbol": "AAA",
+                "company_name": "AAA Limited",
+                "sector": "COMMERCIAL BANKS",
+                "coverage_status": "TRAINED",
+                "trained": True,
+                "latest_progress_percent": 100.0,
+                "actual_timesteps": 100_000,
+                "requested_timesteps": 100_000,
+                "model_status": "verified",
+                "validation_status": "completed",
+                "latest_run_id": "run-production",
+                "latest_run_kind": PRODUCTION_RUN_KIND,
+                "latest_attempt": 0,
+                "latest_successful_run": "run-production",
+                "model_path": "models/AAA/model.zip",
+                "currently_training": False,
+                "currently_validating": False,
+            },
+            {
+                "symbol": "BBB",
+                "company_name": "BBB Limited",
+                "sector": "CEMENT",
+                "coverage_status": "UNTRAINED",
+                "trained": False,
+                "latest_progress_percent": 0.0,
+                "actual_timesteps": 0,
+                "requested_timesteps": 0,
+                "model_status": "not_created",
+                "validation_status": "not_requested",
+                "latest_run_id": "",
+                "latest_run_kind": "",
+                "latest_attempt": 0,
+                "latest_successful_run": "",
+                "model_path": None,
+                "currently_training": False,
+                "currently_validating": False,
+            },
+        ]
+    )
+    monkeypatch.setattr(
+        "reinforcement_learning.training.selective_training.build_global_model_coverage",
+        lambda: (
+            coverage,
+            CoverageSummary(
+                eligible=2,
+                trained=1,
+                untrained=1,
+                training=0,
+                validating=0,
+                failed=0,
+                interrupted=0,
+            ),
+        ),
+    )
 
 
 def test_page_loads_in_pre_run_state_without_creating_a_run(
@@ -178,6 +236,30 @@ def test_page_loads_in_pre_run_state_without_creating_a_run(
     assert "frozen 508-identity research snapshot" in captions
     assert "current operational identity universe is outside this run" in captions
     assert list(tmp_path.iterdir()) == before
+
+
+def test_selective_ui_has_persistent_coverage_and_no_default_selection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _patch_page_backend(monkeypatch, tmp_path, None)
+
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    assert not app.exception
+    metrics = {item.label: item.value for item in app.metric}
+    assert metrics["Eligible symbols"] == "2"
+    assert metrics["Trained"] == "1"
+    assert metrics["Untrained"] == "1"
+    selector = next(
+        item
+        for item in app.multiselect
+        if item.label == "Selected symbols in this filtered view"
+    )
+    assert selector.value == []
+    train_button = next(
+        item for item in app.button if item.label == "Train selected symbols"
+    )
+    assert train_button.disabled
 
 
 @pytest.mark.parametrize(

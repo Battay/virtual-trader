@@ -23,6 +23,18 @@ from reinforcement_learning.training.production_control import (
     requeue_jobs,
     symbol_contract_summary,
 )
+from reinforcement_learning.training.selective_training import (
+    GLOBAL_COVERAGE_STATUSES,
+    SELECTED_RUN_KIND,
+    TRAINED,
+    UNTRAINED,
+    SelectiveTrainingError,
+    build_global_model_coverage,
+    filter_symbol_coverage,
+    load_selected_run_metadata,
+    prepare_selected_run,
+    selected_membership_hash,
+)
 
 
 def _duration(seconds: object) -> str:
@@ -71,6 +83,18 @@ def _filtered_jobs(
         )
         filtered = filtered.loc[matched]
     return filtered.reset_index(drop=True)
+
+
+def _set_visible_selection(symbols: tuple[str, ...]) -> None:
+    selected = set(st.session_state.get("selective_training_symbols", ()))
+    selected.update(symbols)
+    st.session_state["selective_training_symbols"] = sorted(selected)
+    st.session_state["selective_visible_symbols"] = list(symbols)
+
+
+def _clear_symbol_selection() -> None:
+    st.session_state["selective_training_symbols"] = []
+    st.session_state["selective_visible_symbols"] = []
 
 
 st.space("medium")
@@ -163,6 +187,218 @@ with st.container(border=True):
         "agents/hour; this is an estimate, not a completion guarantee."
     )
 
+st.subheader("Model coverage and selective training")
+st.caption(
+    "Coverage is reconstructed from valid persisted recurrent jobs, hash-verified "
+    "models, and VALIDATION artifacts across all run history. Registry rows alone "
+    "do not establish TRAINED status."
+)
+try:
+    coverage, coverage_summary = build_global_model_coverage()
+except (OSError, ValueError, RuntimeError) as exc:
+    coverage = pd.DataFrame()
+    coverage_summary = None
+    st.error(f"Global model coverage failed closed: {type(exc).__name__}: {exc}")
+
+if coverage_summary is not None:
+    with st.container(horizontal=True):
+        st.metric("Eligible symbols", coverage_summary.eligible, border=True)
+        st.metric("Trained", coverage_summary.trained, border=True)
+        st.metric("Untrained", coverage_summary.untrained, border=True)
+        st.metric("Currently training", coverage_summary.training, border=True)
+    with st.container(horizontal=True):
+        st.metric("Validating", coverage_summary.validating, border=True)
+        st.metric("Failed", coverage_summary.failed, border=True)
+        st.metric("Interrupted", coverage_summary.interrupted, border=True)
+
+    with st.container(border=True):
+        st.markdown("**Choose exact frozen-eligible symbols**")
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            coverage_statuses = st.multiselect(
+                "Coverage status",
+                list(GLOBAL_COVERAGE_STATUSES),
+                key="selective_coverage_status_filter",
+            )
+            coverage_sectors = st.multiselect(
+                "Sector",
+                sorted(coverage["sector"].dropna().astype(str).unique()),
+                key="selective_sector_filter",
+            )
+            coverage_search = st.text_input(
+                "Search symbol/company", key="selective_symbol_search"
+            )
+        filtered_coverage = filter_symbol_coverage(
+            coverage,
+            statuses=coverage_statuses,
+            sectors=coverage_sectors,
+            search=coverage_search,
+        )
+        visible_symbols = tuple(filtered_coverage["symbol"].astype(str))
+        selected_symbols = set(
+            str(value)
+            for value in st.session_state.get("selective_training_symbols", ())
+        )
+        visible_default = sorted(selected_symbols.intersection(visible_symbols))
+        previous_visible = tuple(
+            st.session_state.get("selective_visible_options", ())
+        )
+        if previous_visible != visible_symbols:
+            st.session_state["selective_visible_options"] = list(visible_symbols)
+            st.session_state["selective_visible_symbols"] = visible_default
+        chosen_visible = st.multiselect(
+            "Selected symbols in this filtered view",
+            list(visible_symbols),
+            key="selective_visible_symbols",
+            placeholder="Choose symbols; no symbol is selected by default",
+        )
+        selected_symbols.difference_update(visible_symbols)
+        selected_symbols.update(chosen_visible)
+        selected_symbols.intersection_update(set(coverage["symbol"].astype(str)))
+        st.session_state["selective_training_symbols"] = sorted(selected_symbols)
+        with st.container(horizontal=True):
+            st.button(
+                f"Select visible ({len(visible_symbols)})",
+                icon=":material/select_all:",
+                on_click=_set_visible_selection,
+                args=(visible_symbols,),
+                disabled=not visible_symbols,
+            )
+            st.button(
+                "Clear selection",
+                icon=":material/deselect:",
+                on_click=_clear_symbol_selection,
+                disabled=not selected_symbols,
+            )
+            st.caption(
+                f"{len(selected_symbols)} selected · {len(filtered_coverage)} visible"
+            )
+        shown_coverage = filtered_coverage.copy(deep=True)
+        shown_coverage.insert(
+            0, "selected", shown_coverage["symbol"].isin(selected_symbols)
+        )
+        st.dataframe(
+            shown_coverage.loc[
+                :,
+                [
+                    "selected",
+                    "symbol",
+                    "company_name",
+                    "sector",
+                    "coverage_status",
+                    "latest_progress_percent",
+                    "model_status",
+                    "validation_status",
+                    "latest_run_kind",
+                    "latest_run_id",
+                    "latest_attempt",
+                ],
+            ],
+            hide_index=True,
+            column_config={
+                "selected": st.column_config.CheckboxColumn("Selected"),
+                "symbol": st.column_config.TextColumn("Symbol", pinned=True),
+                "latest_progress_percent": st.column_config.ProgressColumn(
+                    "Latest progress", min_value=0, max_value=100, format="%.1f%%"
+                ),
+            },
+            key="selective_symbol_coverage_table",
+        )
+
+        confirmed_symbols = tuple(sorted(selected_symbols))
+        selected_rows = coverage.loc[coverage["symbol"].isin(confirmed_symbols)]
+        trained_selected = tuple(
+            sorted(selected_rows.loc[selected_rows["trained"], "symbol"].astype(str))
+        )
+        default_members = tuple(
+            symbol for symbol in confirmed_symbols if symbol not in trained_selected
+        )
+        st.markdown("**Train selected symbols**")
+        if confirmed_symbols:
+            st.write(
+                f"Requested: **{len(confirmed_symbols)}** · default new-training "
+                f"membership: **{len(default_members)}** · already TRAINED and skipped: "
+                f"**{len(trained_selected)}**"
+            )
+            if default_members:
+                membership_hash = selected_membership_hash(default_members)
+                st.caption(
+                    f"Effective membership hash: `{membership_hash}`"
+                )
+                with st.expander(
+                    f"Exact effective membership ({len(default_members)})",
+                    icon=":material/list:",
+                ):
+                    st.code("\n".join(default_members), language="text")
+            st.caption(
+                "100,000 timesteps each · RecurrentPPO / MlpLstmPolicy · CPU · "
+                "4 workers / 2 threads each · VALIDATION after TRAIN · TEST sealed"
+            )
+        else:
+            st.caption("No symbols selected. Selection never defaults to all 435.")
+        selective_confirmed = st.checkbox(
+            "I confirm this exact SELECTED membership and training contract.",
+            key="confirm_selected_training",
+        )
+        if st.button(
+            "Train selected symbols",
+            type="primary",
+            icon=":material/play_arrow:",
+            disabled=(not default_members or not selective_confirmed),
+        ):
+            try:
+                store, metadata, _ = prepare_selected_run(confirmed_symbols)
+                launch_production_controller(store)
+                st.session_state["training_control_run_id"] = metadata.run_id
+                st.toast(
+                    f"SELECTED run launched for {len(metadata.selected_symbols)} symbols.",
+                    icon=":material/check_circle:",
+                )
+                st.rerun()
+            except (OSError, ValueError, ProductionControlError, SelectiveTrainingError) as exc:
+                st.error(f"Selected launch failed safely: {type(exc).__name__}: {exc}")
+        with st.expander(
+            "Explicit retraining of already TRAINED symbols",
+            icon=":material/replay:",
+        ):
+            st.warning(
+                "Retraining creates a new isolated attempt/version. It never "
+                "overwrites the previously verified model."
+            )
+            if trained_selected:
+                retrain_hash = selected_membership_hash(trained_selected)
+                st.caption(
+                    f"Retraining membership: {len(trained_selected)} · hash "
+                    f"`{retrain_hash}` · 100,000 timesteps each · CPU 4 × 2 threads"
+                )
+                st.code("\n".join(trained_selected), language="text")
+            retrain_confirmed = st.checkbox(
+                "I explicitly authorize a new attempt for the selected TRAINED symbols.",
+                key="confirm_selected_retraining",
+            )
+            if st.button(
+                "Retrain selected trained symbols",
+                icon=":material/restart_alt:",
+                disabled=(not trained_selected or not retrain_confirmed),
+            ):
+                try:
+                    store, metadata, _ = prepare_selected_run(
+                        trained_selected, retrain_trained=True
+                    )
+                    launch_production_controller(store)
+                    st.session_state["training_control_run_id"] = metadata.run_id
+                    st.toast(
+                        f"New retraining attempt launched for {len(metadata.selected_symbols)} symbols.",
+                        icon=":material/check_circle:",
+                    )
+                    st.rerun()
+                except (
+                    OSError,
+                    ValueError,
+                    ProductionControlError,
+                    SelectiveTrainingError,
+                ) as exc:
+                    st.error(f"Retraining failed safely: {type(exc).__name__}: {exc}")
+
 st.subheader("Run selection and controls")
 if catalog:
     options = {entry.run_id: entry for entry in catalog}
@@ -177,6 +413,11 @@ if catalog:
         list(options),
         format_func=lambda run_id: (
             f"[{options[run_id].run_kind}] {run_id} — {options[run_id].status}"
+            + (
+                f" · {options[run_id].selected_count} selected"
+                if options[run_id].selected_count is not None
+                else ""
+            )
         ),
         key="training_control_run_id",
         persist_state="session",
@@ -225,16 +466,29 @@ with st.container(border=True):
             f"**{snapshot.run_kind}** · `{snapshot.manifest.run_id}` · "
             f"controller `{snapshot.controller.state}`"
         )
-        if snapshot.run_kind != PRODUCTION_RUN_KIND:
+        if snapshot.run_kind not in {PRODUCTION_RUN_KIND, SELECTED_RUN_KIND}:
             st.warning(
                 "Benchmark, smoke, and legacy runs are read-only here and cannot "
                 "be resumed as the production run."
             )
         else:
-            st.write(
-                "Start confirmation: 435 eligible agents · 100,000 timesteps each · "
-                "4 workers · 2 CPU threads/worker · CPU · validation enabled · TEST sealed."
-            )
+            if snapshot.run_kind == SELECTED_RUN_KIND:
+                selected_metadata = load_selected_run_metadata(
+                    snapshot.store.run_directory
+                )
+                st.write(
+                    f"Start confirmation: {len(selected_metadata.selected_symbols)} "
+                    "selected agents · 100,000 timesteps each · 4 workers · "
+                    "2 CPU threads/worker · CPU · validation enabled · TEST sealed."
+                )
+                st.caption(
+                    f"Immutable selected hash: `{selected_metadata.selected_symbol_hash}`"
+                )
+            else:
+                st.write(
+                    "Start confirmation: 435 eligible agents · 100,000 timesteps each · "
+                    "4 workers · 2 CPU threads/worker · CPU · validation enabled · TEST sealed."
+                )
             with st.container(horizontal=True, vertical_alignment="bottom"):
                 if st.button(
                     "Refresh status", icon=":material/refresh:", key="refresh_training_status"
@@ -346,6 +600,14 @@ if snapshot is not None:
         st.success(
             "TRAIN and VALIDATION complete. TEST remains sealed.",
             icon=":material/verified:",
+        )
+
+    if snapshot.run_kind == SELECTED_RUN_KIND:
+        selected_metadata = load_selected_run_metadata(snapshot.store.run_directory)
+        st.caption(
+            f"SELECTED membership: {len(selected_metadata.selected_symbols)} · "
+            f"hash `{selected_metadata.selected_symbol_hash}` · "
+            f"attempt version {selected_metadata.attempt_version}"
         )
 
     st.subheader("Active jobs")
@@ -661,6 +923,28 @@ if snapshot is not None:
                 },
             }
         )
+
+if catalog:
+    st.subheader("Run history")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "run_type": entry.run_kind,
+                    "run_id": entry.run_id,
+                    "status": entry.status,
+                    "created_at": entry.created_at,
+                    "identity_count": entry.identity_count,
+                    "eligible_count": entry.eligible_count,
+                    "selected_count": entry.selected_count,
+                    "selected_symbol_hash": entry.selected_symbol_hash,
+                }
+                for entry in catalog
+            ]
+        ),
+        hide_index=True,
+        key="training_run_history",
+    )
 
 st.caption(
     "Training controls never evaluate TEST, mutate the frozen plan, or promote "

@@ -76,7 +76,7 @@ from .recurrent_trainer import RECURRENT_TRAINER_VERSION
 
 
 PRODUCTION_CONTROL_VERSION = "recurrent_production_control_v1"
-PRODUCTION_RUN_KIND = "PRODUCTION"
+PRODUCTION_RUN_KIND = "FULL_PRODUCTION"
 BENCHMARK_RUN_KIND = "BENCHMARK"
 SMOKE_RUN_KIND = "SMOKE"
 LEGACY_RUN_KIND = "LEGACY"
@@ -151,6 +151,8 @@ class RunCatalogEntry:
     identity_count: int
     eligible_count: int
     universe_hash: str
+    selected_count: int | None = None
+    selected_symbol_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -402,6 +404,18 @@ def classify_run(manifest: TrainingRunManifest, run_directory: Path) -> str:
         _validate_production_manifest(manifest)
         return PRODUCTION_RUN_KIND
     except ProductionControlError:
+        from .selective_training import (
+            SELECTED_RUN_KIND,
+            selected_metadata_path,
+            validate_selected_run,
+        )
+
+        if selected_metadata_path(run_directory).is_file():
+            try:
+                validate_selected_run(TrainingRunStore(run_directory))
+            except (OSError, ValueError, RuntimeError):
+                return LEGACY_RUN_KIND
+            return SELECTED_RUN_KIND
         name = Path(run_directory).name.lower()
         if manifest.requested_timesteps <= 1_024 or "smoke" in name:
             return SMOKE_RUN_KIND
@@ -716,16 +730,27 @@ def list_run_catalog(*, runs_root: Path = TRAINING_RUNS_DIR) -> tuple[RunCatalog
             RecurrentOrchestratorError,
         ):
             continue
+        kind = classify_run(manifest, store.run_directory)
+        selected_count = None
+        selected_symbol_hash = None
+        if kind == "SELECTED":
+            from .selective_training import load_selected_run_metadata
+
+            selected = load_selected_run_metadata(store.run_directory)
+            selected_count = len(selected.selected_symbols)
+            selected_symbol_hash = selected.selected_symbol_hash
         entries.append(
             RunCatalogEntry(
                 run_id=manifest.run_id,
                 run_directory=store.run_directory,
-                run_kind=classify_run(manifest, store.run_directory),
+                run_kind=kind,
                 created_at=manifest.created_at,
                 status=progress.system_status,
                 identity_count=manifest.identity_count,
                 eligible_count=manifest.eligible_count,
                 universe_hash=manifest.universe_hash,
+                selected_count=selected_count,
+                selected_symbol_hash=selected_symbol_hash,
             )
         )
     return tuple(sorted(entries, key=lambda item: (item.created_at, item.run_id), reverse=True))
@@ -748,13 +773,26 @@ def launch_production_controller(
     popen: Callable[..., object] = subprocess.Popen,
     python_executable: str = sys.executable,
 ) -> ControllerStatus:
-    """Launch one detached controller; duplicate live launch is fail-closed."""
+    """Launch one qualified full or selected controller, fail-closed."""
 
     manifest = store.read_manifest()
-    _validate_production_manifest(manifest)
+    kind = classify_run(manifest, store.run_directory)
+    if kind == PRODUCTION_RUN_KIND:
+        _validate_production_manifest(manifest)
+    elif kind == "SELECTED":
+        from .selective_training import SelectiveTrainingError, validate_selected_run
+
+        try:
+            validate_selected_run(store, executable=True)
+        except SelectiveTrainingError as exc:
+            raise ProductionControlError(str(exc)) from exc
+    else:
+        raise ProductionControlError(
+            "only FULL_PRODUCTION or SELECTED runs may launch from this controller"
+        )
     jobs = store.list_jobs()
     if not any(job.status == QUEUED for job in jobs):
-        raise ProductionControlError("production run has no queued jobs to start")
+        raise ProductionControlError("training run has no queued jobs to start")
     state_path, lock_path, stop_path, log_path = _controller_paths(store.run_directory)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as handle:
@@ -763,14 +801,14 @@ def launch_production_controller(
             current = controller_status(store.run_directory)
             if current.alive:
                 raise ProductionControlError(
-                    f"production controller is already running with PID {current.pid}"
+                    f"training controller is already running with PID {current.pid}"
                 )
             stop_path.unlink(missing_ok=True)
             _write_controller_state(
                 store,
                 state="LAUNCHING",
                 pid=None,
-                message="Preparing detached production controller launch.",
+                message=f"Preparing detached {kind} controller launch.",
                 started_at=utc_now(),
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -799,7 +837,7 @@ def launch_production_controller(
                     "started_at": utc_now(),
                     "updated_at": utc_now(),
                     "completed_at": None,
-                    "message": "Detached production controller launched.",
+                    "message": f"Detached {kind} controller launched.",
                     "command": _controller_command(store, python_executable),
                     "log_path": str(log_path.relative_to(store.run_directory)),
                     "test_partition_loaded": False,
@@ -1021,7 +1059,18 @@ def bounded_log_tail(path: Path, *, maximum_bytes: int = 24_000) -> str:
 
 def _execute_controller(store: TrainingRunStore) -> int:
     manifest = store.read_manifest()
-    _validate_production_manifest(manifest)
+    kind = classify_run(manifest, store.run_directory)
+    if kind == PRODUCTION_RUN_KIND:
+        _validate_production_manifest(manifest)
+    elif kind == "SELECTED":
+        from .selective_training import SelectiveTrainingError, validate_selected_run
+
+        try:
+            validate_selected_run(store, executable=True)
+        except SelectiveTrainingError as exc:
+            raise ProductionControlError(str(exc)) from exc
+    else:
+        raise ProductionControlError("run is not authorized for detached execution")
     # The parent persists the child PID immediately after ``Popen`` returns.
     # Waiting for that hand-off prevents a fast child from writing RUNNING and
     # then being overwritten by the parent's STARTING record.
@@ -1040,7 +1089,7 @@ def _execute_controller(store: TrainingRunStore) -> int:
         store,
         state="RUNNING",
         pid=os.getpid(),
-        message="Production recurrent orchestration is running.",
+        message=f"{kind} recurrent orchestration is running.",
         started_at=status.started_at or utc_now(),
     )
     _, _, stop_path, _ = _controller_paths(store.run_directory)
@@ -1075,7 +1124,7 @@ def _execute_controller(store: TrainingRunStore) -> int:
             store,
             state=final_state,
             pid=os.getpid(),
-            message="Detached production controller finished its current invocation.",
+            message=f"Detached {kind} controller finished its current invocation.",
             started_at=status.started_at,
             completed_at=utc_now(),
         )
