@@ -17,6 +17,7 @@ from data_pipeline.src.config import (
     PROCESSED_SYMBOLS_DIR,
     INDICES_MASTER_PATH,
 )
+from data_pipeline.src.market_schema import with_legacy_date_alias
 from market_intelligence.feature_joiner import build_index_context, join_market_context
 
 from .indicators import calculate_features
@@ -49,7 +50,7 @@ def load_ai_sources(
     """Load machine-friendly source data while preserving symbol strings."""
     master = pd.read_csv(Path(master_path), dtype={"symbol": "string"})
     registry = pd.read_csv(Path(registry_path), dtype={"symbol": "string"})
-    return master, registry
+    return with_legacy_date_alias(master), registry
 
 
 def _prepare_feature_rows(

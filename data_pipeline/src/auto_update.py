@@ -48,16 +48,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Failed: {len(result.update_result.failed_dates)}")
     if result.master_result is not None:
         print(f"Master file: {result.master_result.output_path}")
-    print(
-        "Stages: "
-        f"market={'ok' if result.market_update_succeeded else 'not completed'}, "
-        f"indices={'ok' if result.index_refresh_succeeded else 'cached/partial'}, "
-        f"master={'ok' if result.master_rebuild_succeeded else 'not completed'}, "
-        f"listings={'ok' if result.listing_refresh_succeeded else 'not completed'}, "
-        f"registry={'ok' if result.registry_rebuild_succeeded else 'not completed'}"
-    )
+    if result.native_result is not None:
+        print(f"Native rows added: {result.native_result.rows_added}")
+        print(f"Daily Parquets written: {result.native_result.daily_parquets_written}")
+        print(f"Native latest date: {result.native_result.latest_date}")
+    if result.status == "no_update_needed":
+        print("Stages: market=current, native=current, downstream rebuilds=not required")
+    else:
+        print(
+            "Stages: "
+            f"market={'ok' if result.market_update_succeeded else 'not completed'}, "
+            f"native={'ok' if result.native_update_succeeded else 'not completed'}, "
+            f"indices={'ok' if result.index_refresh_succeeded else 'not requested/partial'}, "
+            f"master={'ok' if result.master_rebuild_succeeded else 'not requested'}, "
+            f"listings={'ok' if result.listing_refresh_succeeded else 'not requested'}, "
+            f"registry={'ok' if result.registry_rebuild_succeeded else 'not requested'}"
+        )
     print(f"Cached listings used: {'yes' if result.cached_listings_used else 'no'}")
     print(f"Cached indices used: {'yes' if result.cached_indices_used else 'no'}")
+    if result.audit is not None:
+        print(f"Started: {result.audit.started_at}")
+        print(f"Finished: {result.audit.finished_at}")
+        print(f"AI rebuild: {result.audit.ai_rebuild_status}")
+        for warning in result.audit.source_evidence_inconsistencies:
+            print(f"Source evidence warning: {warning}")
     return result.exit_code
 
 

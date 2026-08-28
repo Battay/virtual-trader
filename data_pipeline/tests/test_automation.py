@@ -21,7 +21,11 @@ from data_pipeline.src.company_registry import RegistryBuildResult
 from data_pipeline.src.csv_store import MasterBuildResult
 from data_pipeline.src.main import CollectionResult
 from data_pipeline.src.official_listings import ListingsRefreshResult
-from data_pipeline.src.updater import IncrementalUpdateResult
+from data_pipeline.src.native_market_pipeline import (
+    NativeMarketBuildResult,
+    NativeMarketPaths,
+)
+from data_pipeline.src.updater import IncrementalUpdateResult, SourceEvidenceInventory
 from market_intelligence.refresh_indices import IndexRefreshResult
 
 
@@ -99,6 +103,44 @@ def _index_result(path: Path) -> IndexRefreshResult:
     )
 
 
+def _evidence() -> SourceEvidenceInventory:
+    return SourceEvidenceInventory((), (), (), (), (), ())
+
+
+def _native_result(path: Path, *, latest: date = date(2026, 7, 28)) -> NativeMarketBuildResult:
+    paths = NativeMarketPaths(
+        master_csv=path / "master.csv",
+        symbol_csv_dir=path / "symbols",
+        daily_parquet_dir=path / "daily",
+        consolidated_parquet=path / "market.parquet",
+        state_json=path / "state.json",
+    )
+    return NativeMarketBuildResult(
+        operation="incremental",
+        source_files=1,
+        source_dates=(latest.isoformat(),),
+        rows_read=2,
+        rows_accepted=2,
+        rows_rejected=0,
+        duplicate_count=0,
+        master_rows=10,
+        consolidated_rows=10,
+        symbol_count=2,
+        earliest_date="2026-07-01",
+        latest_date=latest.isoformat(),
+        sector_matched_symbols=2,
+        schema_version="native_market_record_v1",
+        content_hash="content",
+        source_set_hash="sources",
+        consolidated_sha256="sha",
+        status="completed",
+        paths=paths,
+        rows_added=2,
+        daily_parquets_written=1,
+        symbol_csvs_written=2,
+    )
+
+
 def test_metadata_save_and_load_is_atomic(tmp_path: Path) -> None:
     path = tmp_path / "metadata" / "automation.json"
     config = AutomationConfig(
@@ -161,7 +203,7 @@ def test_disabled_scheduled_runner_does_nothing(tmp_path: Path) -> None:
     assert calls == []
 
 
-def test_enabled_runner_calls_updater_then_master_builder(tmp_path: Path) -> None:
+def test_enabled_runner_uses_native_orchestration_without_optional_ai(tmp_path: Path) -> None:
     config_path = tmp_path / "automation.json"
     save_automation_config(
         AutomationConfig(
@@ -188,6 +230,10 @@ def test_enabled_runner_calls_updater_then_master_builder(tmp_path: Path) -> Non
         calls.append(("registry", kwargs))
         return _registry_result(tmp_path / "registry.csv")
 
+    def native_updater(paths: object, **kwargs: Any) -> NativeMarketBuildResult:
+        calls.append(("native", kwargs))
+        return _native_result(tmp_path / "native")
+
     now = datetime(2026, 7, 27, 20, 30, tzinfo=timezone.utc)
     result = run_scheduled_update(
         config_path=config_path,
@@ -197,13 +243,15 @@ def test_enabled_runner_calls_updater_then_master_builder(tmp_path: Path) -> Non
         master_builder=builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,
+        evidence_discoverer=lambda **kwargs: _evidence(),
+        native_updater=native_updater,
         now=now,
     )
 
     assert [name for name, _ in calls] == [
         "updater",
-        "builder",
         "listings",
+        "native",
         "registry",
     ]
     updater_arguments = calls[0][1]
@@ -213,7 +261,8 @@ def test_enabled_runner_calls_updater_then_master_builder(tmp_path: Path) -> Non
     assert result.status == "success"
     assert result.exit_code == 0
     assert result.market_update_succeeded is True
-    assert result.master_rebuild_succeeded is True
+    assert result.master_rebuild_succeeded is False
+    assert result.native_update_succeeded is True
     assert result.listing_refresh_succeeded is True
     assert result.registry_rebuild_succeeded is True
     assert result.cached_listings_used is False
@@ -262,10 +311,12 @@ def test_scheduled_runner_treats_skipped_dates_as_success(tmp_path: Path) -> Non
         registry_builder=lambda **kwargs: _registry_result(
             tmp_path / "registry.csv"
         ),
+        evidence_discoverer=lambda **kwargs: _evidence(),
+        native_updater=lambda paths, **kwargs: _native_result(tmp_path / "native"),
         now=datetime(2026, 7, 26, 12, 15, tzinfo=timezone.utc),
     )
 
-    assert result.status == "success"
+    assert result.status == "partial_success"
     assert result.exit_code == 0
     assert result.update_result is not None
     assert result.update_result.skipped_dates == (date(2026, 7, 26),)
@@ -292,13 +343,14 @@ def test_cached_listing_fallback_is_recorded_as_success(tmp_path: Path) -> None:
             tmp_path / "registry.csv",
             cached=True,
         ),
+        evidence_discoverer=lambda **kwargs: _evidence(),
+        native_updater=lambda paths, **kwargs: _native_result(tmp_path / "native"),
         now=datetime(2026, 7, 27, 20, 30, tzinfo=timezone.utc),
     )
 
     assert result.status == "success"
     assert result.exit_code == 0
     assert result.cached_listings_used is True
-    assert "cached listings" in result.message
 
 
 def test_overlapping_lock_is_prevented(tmp_path: Path) -> None:

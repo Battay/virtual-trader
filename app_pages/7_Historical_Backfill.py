@@ -26,17 +26,23 @@ from dashboard.presentation import format_date, format_integer, safe_display_val
 from data_pipeline.src.backfill import (
     BackfillPlan,
     BackfillProgress,
-    BackfillStateError,
     create_backfill_plan,
     load_backfill_state,
     run_backfill,
+)
+from data_pipeline.src.automation import (
+    AutomationProgress,
+    reconcile_native_source_csvs,
 )
 from data_pipeline.src.config import (
     BACKFILL_STATE_PATH,
     RAW_CSV_DIR,
 )
 from data_pipeline.src.data_products import rebuild_data_products
-from data_pipeline.src.updater import discover_available_raw_dates
+from data_pipeline.src.updater import (
+    discover_available_raw_dates,
+    discover_source_evidence,
+)
 
 
 def _plan_frame(plan: BackfillPlan) -> pd.DataFrame:
@@ -342,17 +348,49 @@ if (
         st.session_state["backfill_result"] = result
         saved_state = result.state
         clear_backfill_preview(st.session_state)
+        source_inventory = discover_source_evidence()
+        pending_dates = set(source_inventory.local_csv_dates).intersection(
+            source_inventory.accepted_source_dates
+        ).difference(source_inventory.native_manifest_dates)
+        native_paths = tuple(
+            outcome.output_path
+            for outcome in result.outcomes
+            if outcome.status == "successful"
+            and outcome.output_path is not None
+            and outcome.trading_date in pending_dates
+        )
+        native_reconciliation = None
+        if native_paths:
+            def show_native_progress(event: AutomationProgress) -> None:
+                run_status.write(
+                    f"{event.stage.replace('_', ' ').title()}: {event.message}"
+                )
+
+            native_reconciliation = reconcile_native_source_csvs(
+                native_paths,
+                reference_date=max(
+                    outcome.trading_date
+                    for outcome in result.outcomes
+                    if outcome.output_path is not None
+                ),
+                progress_callback=show_native_progress,
+            )
+            st.session_state["backfill_native_result"] = native_reconciliation
         final_state = result.state.status if result.state else "unknown"
         run_status.update(
             label=(
                 result.pause_reason
                 if result.circuit_breaker_triggered
-                else f"Backfill batch finished: {final_state}"
+                else (
+                    f"Backfill and native update finished: {final_state}"
+                    if native_reconciliation is not None
+                    else f"Backfill batch finished: {final_state}"
+                )
             ),
             state="error" if result.circuit_breaker_triggered else "complete",
             expanded=True,
         )
-    except (BackfillStateError, OSError, ValueError) as exc:
+    except Exception as exc:
         run_status.update(label="Backfill batch failed", state="error", expanded=True)
         st.error(str(exc))
 
@@ -434,6 +472,29 @@ if latest_result is not None:
             _outcome_frame(latest_result.outcomes),
             hide_index=True,
             width="stretch",
+        )
+
+native_backfill_result = st.session_state.get("backfill_native_result")
+if native_backfill_result is not None:
+    st.success(
+        "Successful backfill CSVs were reconciled into the canonical native "
+        "market artifacts."
+    )
+    with st.container(horizontal=True):
+        st.metric(
+            "Native rows added",
+            native_backfill_result.native.rows_added,
+            border=True,
+        )
+        st.metric(
+            "Daily Parquets written",
+            native_backfill_result.native.daily_parquets_written,
+            border=True,
+        )
+        st.metric(
+            "Native latest date",
+            native_backfill_result.native.latest_date or "—",
+            border=True,
         )
 
 if saved_state and (saved_state.temporary_skips or saved_state.failed_dates):

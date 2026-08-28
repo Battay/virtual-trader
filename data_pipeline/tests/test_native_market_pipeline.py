@@ -26,6 +26,7 @@ from data_pipeline.src.native_market_pipeline import (
     full_rebuild,
     incremental_update,
     normalize_market_records,
+    rebuild_generated_artifacts,
     sha256_file,
 )
 from data_pipeline.src.parquet_market_data import load_market_data
@@ -101,7 +102,7 @@ def _write_listings(path: Path) -> Path:
 
 def _paths(root: Path) -> NativeMarketPaths:
     return NativeMarketPaths(
-        master_csv=root / "processed/master/psx_market_master.csv",
+        master_csv=root / "master/psx_master.csv",
         symbol_csv_dir=root / "processed/market_symbols",
         daily_parquet_dir=root / "parquet/daily",
         consolidated_parquet=root / "parquet/market.parquet",
@@ -200,6 +201,22 @@ def test_full_rebuild_generates_all_artifacts_without_symbol_loss(
     metadata = pq.ParquetFile(targets.consolidated_parquet).schema_arrow.metadata
     assert metadata[b"schema_version"].decode() == NATIVE_MARKET_SCHEMA_VERSION
     assert metadata[b"sector_context"].decode() == SECTOR_CONTEXT
+    csv_round_trip = pd.read_csv(
+        targets.master_csv, dtype={"symbol": "string"}, float_precision="round_trip"
+    )
+    csv_round_trip["market_date"] = pd.to_datetime(csv_round_trip["market_date"])
+    for column in ("sector_current", "sector_source", "sector_snapshot_date"):
+        csv_round_trip[column] = csv_round_trip[column].astype("string")
+    parquet_round_trip = pq.read_table(targets.consolidated_parquet).to_pandas()
+    parquet_round_trip["market_date"] = pd.to_datetime(
+        parquet_round_trip["market_date"]
+    )
+    parquet_round_trip["symbol"] = parquet_round_trip["symbol"].astype("string")
+    for column in ("sector_current", "sector_source", "sector_snapshot_date"):
+        parquet_round_trip[column] = parquet_round_trip[column].astype("string")
+    assert canonical_content_hash(csv_round_trip) == canonical_content_hash(
+        parquet_round_trip
+    )
 
 
 def test_duplicate_source_keys_are_rejected(tmp_path: Path) -> None:
@@ -262,6 +279,9 @@ def test_full_and_incremental_complete_source_set_are_equivalent(
 
     assert full.content_hash == incremental.content_hash
     assert full.source_set_hash == incremental.source_set_hash
+    assert incremental.rows_added == 2
+    assert incremental.daily_parquets_written == 1
+    assert incremental.symbol_csvs_written == 2
     assert compare_parquet_core(
         full_paths.consolidated_parquet, incremental_paths.consolidated_parquet
     ).passed
@@ -329,6 +349,36 @@ def test_source_files_remain_unchanged(tmp_path: Path) -> None:
     )
 
     assert (sha256_file(source), source.stat().st_mtime_ns) == before
+
+
+def test_explicit_artifact_rebuild_preserves_source_identity(tmp_path: Path) -> None:
+    sources = tmp_path / "sources"
+    _fixture_sources(sources)
+    listings = _write_listings(tmp_path / "listings.csv")
+    targets = _paths(tmp_path / "outputs")
+    initial = full_rebuild(
+        source_csv_dir=sources,
+        listings_path=listings,
+        paths=targets,
+    )
+    source_bytes = {
+        path.name: path.read_bytes() for path in sorted(sources.glob("*.csv"))
+    }
+
+    rebuilt = rebuild_generated_artifacts(
+        listings_path=listings,
+        paths=targets,
+    )
+
+    assert rebuilt.operation == "artifact_rebuild"
+    assert rebuilt.source_set_hash == initial.source_set_hash
+    assert rebuilt.content_hash == initial.content_hash
+    assert rebuilt.rows_added == 0
+    assert rebuilt.daily_parquets_written == 2
+    assert rebuilt.symbol_csvs_written == 3
+    assert source_bytes == {
+        path.name: path.read_bytes() for path in sorted(sources.glob("*.csv"))
+    }
 
 
 def test_full_rebuild_refuses_to_regress_existing_source_set(tmp_path: Path) -> None:

@@ -7,19 +7,35 @@ import logging
 import os
 from pathlib import Path
 import tempfile
-from typing import Callable, Literal
+from typing import Callable, Literal, Sequence
 from zoneinfo import ZoneInfo
 
 from .config import (
     AUTOMATION_CONFIG_PATH,
     AUTOMATION_LOCK_PATH,
     AUTO_UPDATE_LOG_PATH,
+    BACKFILL_STATE_PATH,
+    CURRENT_LISTINGS_PATH,
+    NATIVE_MARKET_PIPELINE_STATE_PATH,
+    LOCAL_PSX_MARKET_PARQUET_PATH,
     PROJECT_TIMEZONE,
+    RAW_CSV_DIR,
 )
+from .backfill import load_backfill_state
 from .company_registry import RegistryBuildResult, build_company_registry
 from .csv_store import MasterBuildResult, build_master_dataset
 from .official_listings import ListingsRefreshResult, refresh_official_listings
-from .updater import IncrementalUpdateResult, run_incremental_update
+from .native_market_pipeline import (
+    NativeMarketBuildResult,
+    incremental_update as run_native_incremental_update,
+    rebuild_generated_artifacts,
+)
+from .updater import (
+    IncrementalUpdateResult,
+    SourceEvidenceInventory,
+    discover_source_evidence,
+    run_incremental_update,
+)
 from market_intelligence.refresh_indices import IndexRefreshResult, refresh_indices
 from feature_engineering.dataset_builder import build_master_ai_dataset, build_symbol_datasets
 
@@ -28,12 +44,133 @@ LOGGER = logging.getLogger(__name__)
 KARACHI_TIMEZONE = PROJECT_TIMEZONE
 SCHEDULED_TIME = "17:15"
 DEFAULT_LOCK_STALE_AFTER = timedelta(hours=6)
-RunStatus = Literal["disabled", "success", "failed", "already_running"]
+STALE_RECOVERY_MESSAGE = (
+    "Recovered an abandoned automation run with no live lock owner"
+)
+RunStatus = Literal[
+    "disabled",
+    "success",
+    "partial_success",
+    "failed",
+    "no_update_needed",
+    "already_running",
+]
 Updater = Callable[..., IncrementalUpdateResult]
 MasterBuilder = Callable[..., MasterBuildResult]
 ListingRefresher = Callable[..., ListingsRefreshResult]
 RegistryBuilder = Callable[..., RegistryBuildResult]
 IndexRefresher = Callable[..., IndexRefreshResult]
+NativeUpdater = Callable[..., NativeMarketBuildResult]
+NativeRebuilder = Callable[..., NativeMarketBuildResult]
+EvidenceDiscoverer = Callable[..., SourceEvidenceInventory]
+ProgressCallback = Callable[["AutomationProgress"], None]
+
+
+@dataclass(frozen=True)
+class AutomationProgress:
+    """Truthful stage event shared by CLI, scheduler logging, and Streamlit."""
+
+    stage: str
+    message: str
+
+
+@dataclass(frozen=True)
+class AutomationRunAudit:
+    """Durable details for the latest finalized orchestration run."""
+
+    started_at: str
+    finished_at: str | None
+    target_end_date: str
+    missing_dates_discovered: tuple[str, ...] = ()
+    dates_attempted: tuple[str, ...] = ()
+    dates_downloaded: tuple[str, ...] = ()
+    dates_skipped: tuple[str, ...] = ()
+    dates_failed: tuple[tuple[str, str], ...] = ()
+    native_update_status: str = "not_started"
+    native_rows_added: int = 0
+    native_rows_replaced: int = 0
+    daily_parquets_created: int = 0
+    consolidated_parquet_latest_date: str | None = None
+    ai_rebuild_status: str = "not_requested"
+    source_evidence_inconsistencies: tuple[str, ...] = ()
+    stale_run_recovered: bool = False
+    failure_reason: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        values = asdict(self)
+        values["dates_failed"] = {
+            value: reason for value, reason in self.dates_failed
+        }
+        return values
+
+    @classmethod
+    def from_dict(cls, values: object) -> "AutomationRunAudit | None":
+        if not isinstance(values, dict):
+            return None
+
+        def strings(name: str) -> tuple[str, ...]:
+            raw = values.get(name, [])
+            return tuple(str(value) for value in raw) if isinstance(raw, list) else ()
+
+        failed_raw = values.get("dates_failed", {})
+        failed = (
+            tuple(sorted((str(key), str(value)) for key, value in failed_raw.items()))
+            if isinstance(failed_raw, dict)
+            else ()
+        )
+        return cls(
+            started_at=str(values.get("started_at") or ""),
+            finished_at=(str(values["finished_at"]) if values.get("finished_at") else None),
+            target_end_date=str(values.get("target_end_date") or ""),
+            missing_dates_discovered=strings("missing_dates_discovered"),
+            dates_attempted=strings("dates_attempted"),
+            dates_downloaded=strings("dates_downloaded"),
+            dates_skipped=strings("dates_skipped"),
+            dates_failed=failed,
+            native_update_status=str(values.get("native_update_status") or "not_started"),
+            native_rows_added=int(values.get("native_rows_added", 0)),
+            native_rows_replaced=int(values.get("native_rows_replaced", 0)),
+            daily_parquets_created=int(values.get("daily_parquets_created", 0)),
+            consolidated_parquet_latest_date=(
+                str(values["consolidated_parquet_latest_date"])
+                if values.get("consolidated_parquet_latest_date")
+                else None
+            ),
+            ai_rebuild_status=str(values.get("ai_rebuild_status") or "not_requested"),
+            source_evidence_inconsistencies=strings("source_evidence_inconsistencies"),
+            stale_run_recovered=bool(values.get("stale_run_recovered", False)),
+            failure_reason=(str(values["failure_reason"]) if values.get("failure_reason") else None),
+        )
+
+
+@dataclass(frozen=True)
+class SourceDateDisposition:
+    """Auditable decision controlling automatic retries for one source date."""
+
+    trading_date: date
+    classification: str
+    reason: str
+    evidence: str
+    retry_automatically: bool
+    recorded_at: str
+
+    def to_dict(self) -> dict[str, object]:
+        values = asdict(self)
+        values["trading_date"] = self.trading_date.isoformat()
+        return values
+
+    @classmethod
+    def from_dict(cls, values: object) -> "SourceDateDisposition":
+        if not isinstance(values, dict):
+            raise ValueError("source-date disposition must be an object")
+        return cls(
+            trading_date=date.fromisoformat(str(values["trading_date"])),
+            classification=str(values["classification"]),
+            reason=str(values["reason"]),
+            evidence=str(values["evidence"]),
+            retry_automatically=bool(values["retry_automatically"]),
+            recorded_at=str(values["recorded_at"]),
+        )
 
 
 @dataclass(frozen=True)
@@ -49,6 +186,9 @@ class AutomationConfig:
     last_status: str = "never_run"
     last_message: str = "Automation has not run yet"
     rebuild_ai_datasets: bool = False
+    deferred_empty_dates: tuple[date, ...] = ()
+    source_date_dispositions: tuple[SourceDateDisposition, ...] = ()
+    last_run: AutomationRunAudit | None = None
 
     def to_dict(self) -> dict[str, object]:
         values = asdict(self)
@@ -57,6 +197,13 @@ class AutomationConfig:
             if self.bootstrap_start_date is not None
             else None
         )
+        values["deferred_empty_dates"] = [
+            value.isoformat() for value in self.deferred_empty_dates
+        ]
+        values["source_date_dispositions"] = [
+            value.to_dict() for value in self.source_date_dispositions
+        ]
+        values["last_run"] = self.last_run.to_dict() if self.last_run else None
         return values
 
 
@@ -80,6 +227,18 @@ class AutomationRunResult:
     cached_indices_used: bool = False
     index_refresh_succeeded: bool = False
     ai_rebuild_succeeded: bool = False
+    native_result: NativeMarketBuildResult | None = None
+    native_update_succeeded: bool = False
+    audit: AutomationRunAudit | None = None
+
+
+@dataclass(frozen=True)
+class NativeSourceReconciliationResult:
+    """Native artifacts and metadata refreshed from validated source CSVs."""
+
+    native: NativeMarketBuildResult
+    listings: ListingsRefreshResult
+    registry: RegistryBuildResult
 
 
 class UpdateAlreadyRunning(RuntimeError):
@@ -124,6 +283,19 @@ def _config_from_dict(values: object) -> AutomationConfig:
     rebuild_ai = values.get("rebuild_ai_datasets", False)
     if not isinstance(rebuild_ai, bool):
         raise ValueError("rebuild_ai_datasets must be a boolean")
+    deferred_raw = values.get("deferred_empty_dates", [])
+    if not isinstance(deferred_raw, list):
+        raise ValueError("deferred_empty_dates must be a list")
+    deferred_dates = tuple(sorted(date.fromisoformat(str(value)) for value in deferred_raw))
+    dispositions_raw = values.get("source_date_dispositions", [])
+    if not isinstance(dispositions_raw, list):
+        raise ValueError("source_date_dispositions must be a list")
+    dispositions = tuple(
+        sorted(
+            (SourceDateDisposition.from_dict(value) for value in dispositions_raw),
+            key=lambda value: value.trading_date,
+        )
+    )
 
     def optional_string(field: str) -> str | None:
         value = values.get(field)
@@ -141,6 +313,9 @@ def _config_from_dict(values: object) -> AutomationConfig:
         last_status=optional_string("last_status") or "never_run",
         last_message=optional_string("last_message") or "Automation has not run yet",
         rebuild_ai_datasets=rebuild_ai,
+        deferred_empty_dates=deferred_dates,
+        source_date_dispositions=dispositions,
+        last_run=AutomationRunAudit.from_dict(values.get("last_run")),
     )
 
 
@@ -209,6 +384,27 @@ class UpdateLock:
         self.stale_after = stale_after
         self.acquired = False
         self._payload: bytes | None = None
+        self.recovered_stale = False
+
+    def _owner_pid(self) -> int | None:
+        try:
+            values = json.loads(self.path.read_text(encoding="utf-8"))
+            pid = values.get("pid") if isinstance(values, dict) else None
+            return int(pid) if pid is not None else None
+        except (OSError, UnicodeError, ValueError, json.JSONDecodeError):
+            return None
+
+    def _owner_is_dead(self) -> bool:
+        pid = self._owner_pid()
+        if pid is None:
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            return False
+        return False
 
     def _is_stale(self, now: datetime) -> bool:
         try:
@@ -218,7 +414,7 @@ class UpdateLock:
             )
         except FileNotFoundError:
             return False
-        return now - modified > self.stale_after
+        return self._owner_is_dead() or now - modified > self.stale_after
 
     def acquire(self, now: datetime | None = None) -> None:
         current_time = karachi_now(now)
@@ -238,6 +434,7 @@ class UpdateLock:
                         self.path.unlink()
                     except FileNotFoundError:
                         pass
+                    self.recovered_stale = True
                     continue
                 raise UpdateAlreadyRunning(
                     f"Another automation run holds lock {self.path}"
@@ -274,6 +471,50 @@ class UpdateLock:
         self.release()
 
 
+def recover_stale_automation_state(
+    *,
+    config_path: Path = AUTOMATION_CONFIG_PATH,
+    lock_path: Path = AUTOMATION_LOCK_PATH,
+    now: datetime | None = None,
+) -> AutomationConfig:
+    """Finalize an abandoned running state when no live lock owner remains."""
+
+    config = load_automation_config(config_path)
+    if config.last_status != "running":
+        return config
+    current_time = karachi_now(now)
+    lock = UpdateLock(lock_path)
+    lock_exists = Path(lock_path).exists()
+    stale = not lock_exists or lock._is_stale(current_time)
+    if not stale:
+        return config
+    if lock_exists:
+        try:
+            Path(lock_path).unlink()
+        except FileNotFoundError:
+            pass
+    message = STALE_RECOVERY_MESSAGE
+    prior_audit = config.last_run
+    recovered_audit = (
+        replace(
+            prior_audit,
+            finished_at=current_time.isoformat(timespec="seconds"),
+            stale_run_recovered=True,
+            failure_reason=message,
+        )
+        if prior_audit is not None
+        else None
+    )
+    recovered = replace(
+        config,
+        last_status="failed",
+        last_message=message,
+        last_run=recovered_audit,
+    )
+    save_automation_config(recovered, config_path)
+    return recovered
+
+
 def configure_auto_update_logging(path: Path = AUTO_UPDATE_LOG_PATH) -> None:
     """Attach one file handler for standalone automation diagnostics."""
     log_path = Path(path)
@@ -294,7 +535,140 @@ def configure_auto_update_logging(path: Path = AUTO_UPDATE_LOG_PATH) -> None:
     root_logger.setLevel(logging.INFO)
 
 
-def _run_enabled_update(
+def _emit_progress(
+    callback: ProgressCallback | None, stage: str, message: str
+) -> None:
+    LOGGER.info("Automation stage %s: %s", stage, message)
+    if callback is not None:
+        callback(AutomationProgress(stage=stage, message=message))
+
+
+def _known_non_request_dates(
+    *,
+    backfill_state_path: Path,
+    deferred_dates: Sequence[date],
+    source_dispositions: Sequence[SourceDateDisposition] = (),
+) -> tuple[date, ...]:
+    excluded = set(deferred_dates)
+    excluded.update(
+        value.trading_date
+        for value in source_dispositions
+        if not value.retry_automatically
+    )
+    state = load_backfill_state(backfill_state_path)
+    if state is not None:
+        excluded.update(state.non_trading_dates)
+        excluded.update(value for value, _ in state.temporary_skips)
+        excluded.update(value for value, _ in state.failed_dates)
+    return tuple(sorted(excluded))
+
+
+def _reconcile_native_sources_unlocked(
+    source_csvs: Sequence[Path],
+    *,
+    reference_date: date,
+    refreshed_at: datetime,
+    listing_refresher: ListingRefresher,
+    native_updater: NativeUpdater,
+    registry_builder: RegistryBuilder,
+    progress_callback: ProgressCallback | None,
+) -> NativeSourceReconciliationResult:
+    """Apply validated source CSVs to every native artifact without fetching."""
+
+    paths = tuple(Path(path) for path in source_csvs)
+    if not paths:
+        raise ValueError("At least one validated source CSV is required")
+    _emit_progress(
+        progress_callback,
+        "refreshing_listings",
+        "Refreshing authoritative listing and sector metadata",
+    )
+    listings = listing_refresher(refreshed_at=refreshed_at)
+    _emit_progress(
+        progress_callback,
+        "updating_native_market",
+        f"Updating native artifacts from {len(paths):,} source CSV file(s)",
+    )
+    native = native_updater(
+        paths,
+        listings_path=listings.current_snapshot_path,
+        progress_callback=(
+            lambda stage, message: _emit_progress(
+                progress_callback, stage, message
+            )
+        ),
+    )
+    registry = registry_builder(
+        listing_data=listings.data,
+        reference_date=reference_date,
+        registry_updated_at=refreshed_at,
+        cached_listings_used=listings.used_cache,
+    )
+    return NativeSourceReconciliationResult(native, listings, registry)
+
+
+def reconcile_native_source_csvs(
+    source_csvs: Sequence[Path],
+    *,
+    reference_date: date,
+    lock_path: Path = AUTOMATION_LOCK_PATH,
+    listing_refresher: ListingRefresher = refresh_official_listings,
+    native_updater: NativeUpdater = run_native_incremental_update,
+    registry_builder: RegistryBuilder = build_company_registry,
+    progress_callback: ProgressCallback | None = None,
+    now: datetime | None = None,
+) -> NativeSourceReconciliationResult:
+    """Public lock-protected native ingestion for backfill/local recovery."""
+
+    refreshed_at = karachi_now(now)
+    lock = UpdateLock(Path(lock_path))
+    lock.acquire(refreshed_at)
+    try:
+        return _reconcile_native_sources_unlocked(
+            source_csvs,
+            reference_date=reference_date,
+            refreshed_at=refreshed_at,
+            listing_refresher=listing_refresher,
+            native_updater=native_updater,
+            registry_builder=registry_builder,
+            progress_callback=progress_callback,
+        )
+    finally:
+        lock.release()
+
+
+def rebuild_canonical_market_artifacts(
+    *,
+    lock_path: Path = AUTOMATION_LOCK_PATH,
+    listings_path: Path = CURRENT_LISTINGS_PATH,
+    native_rebuilder: NativeRebuilder = rebuild_generated_artifacts,
+    progress_callback: ProgressCallback | None = None,
+    now: datetime | None = None,
+) -> NativeMarketBuildResult:
+    """Explicitly regenerate the canonical native artifacts without fetching."""
+
+    current_time = karachi_now(now)
+    lock = UpdateLock(Path(lock_path))
+    lock.acquire(current_time)
+    try:
+        _emit_progress(
+            progress_callback,
+            "validating_native_source_state",
+            "Validating native Parquet and source-manifest provenance",
+        )
+        return native_rebuilder(
+            listings_path=Path(listings_path),
+            progress_callback=(
+                lambda stage, message: _emit_progress(
+                    progress_callback, stage, message
+                )
+            ),
+        )
+    finally:
+        lock.release()
+
+
+def run_update_orchestration(
     config: AutomationConfig,
     *,
     end_date: date,
@@ -306,7 +680,18 @@ def _run_enabled_update(
     listing_refresher: ListingRefresher,
     registry_builder: RegistryBuilder,
     now: datetime | None,
+    native_updater: NativeUpdater = run_native_incremental_update,
+    evidence_discoverer: EvidenceDiscoverer = discover_source_evidence,
+    symbol_ai_builder: Callable[..., object] = build_symbol_datasets,
+    master_ai_builder: Callable[..., object] = build_master_ai_dataset,
+    progress_callback: ProgressCallback | None = None,
+    raw_csv_dir: Path = RAW_CSV_DIR,
+    native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
+    native_parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
+    backfill_state_path: Path = BACKFILL_STATE_PATH,
 ) -> AutomationRunResult:
+    """Run the one canonical manual/scheduled/CLI market update workflow."""
+
     attempt_time = karachi_now(now)
     lock = UpdateLock(lock_path)
     try:
@@ -318,105 +703,256 @@ def _run_enabled_update(
             exit_code=0,
         )
 
+    initial_audit = AutomationRunAudit(
+        started_at=attempt_time.isoformat(timespec="seconds"),
+        finished_at=None,
+        target_end_date=end_date.isoformat(),
+    )
     attempted_config = replace(
         config,
         last_attempt_at=attempt_time.isoformat(timespec="seconds"),
         last_status="running",
         last_message=f"Updating through {end_date.isoformat()}",
+        last_run=initial_audit,
     )
     update_result: IncrementalUpdateResult | None = None
     master_result: MasterBuildResult | None = None
     listings_result: ListingsRefreshResult | None = None
     registry_result: RegistryBuildResult | None = None
     index_result: IndexRefreshResult | None = None
+    native_result: NativeMarketBuildResult | None = None
+    inventory: SourceEvidenceInventory | None = None
+    ai_status = "not_requested"
+    stale_recovered = (
+        lock.recovered_stale
+        or config.last_status == "running"
+        or (
+            config.last_status == "failed"
+            and config.last_message == STALE_RECOVERY_MESSAGE
+            and config.last_run is not None
+            and config.last_run.stale_run_recovered
+        )
+    )
     try:
         save_automation_config(attempted_config, config_path)
+        _emit_progress(
+            progress_callback,
+            "checking_stored_dates",
+            "Checking local CSV evidence and the trusted native source manifest",
+        )
+        inventory = evidence_discoverer(
+            csv_dir=raw_csv_dir,
+            native_state_path=native_state_path,
+            parquet_path=native_parquet_path,
+        )
+        excluded_dates = _known_non_request_dates(
+            backfill_state_path=backfill_state_path,
+            deferred_dates=config.deferred_empty_dates,
+            source_dispositions=config.source_date_dispositions,
+        )
         update_result = updater(
             end_date=end_date,
             bootstrap_start_date=config.bootstrap_start_date,
+            csv_dir=raw_csv_dir,
+            available_source_dates=inventory.accepted_source_dates,
+            local_source_dates=inventory.local_csv_dates,
+            external_source_dates=inventory.external_manifest_dates,
+            excluded_dates=excluded_dates,
+            source_evidence_inconsistencies=inventory.inconsistencies,
+            progress_callback=(
+                lambda stage, message: _emit_progress(
+                    progress_callback, stage, message
+                )
+            ),
         )
-        index_result = index_refresher()
-        if not index_result.has_usable_data:
-            raise RuntimeError("Official index refresh failed and no cached index data is available")
-        master_result = master_builder()
-
-        if update_result.failed_dates:
-            failed_text = ", ".join(
-                f"{failed_date.isoformat()}: {reason}"
-                for failed_date, reason in update_result.failed_dates
-            )
-            message = f"Update completed with failed dates: {failed_text}"
-            final_config = replace(
-                attempted_config,
-                last_status="failed",
-                last_message=message,
-            )
-            save_automation_config(final_config, config_path)
-            LOGGER.error(message)
-            return AutomationRunResult(
-                status="failed",
-                message=message,
-                exit_code=1,
-                update_result=update_result,
-                master_result=master_result,
-                index_result=index_result,
-                market_update_succeeded=False,
-                master_rebuild_succeeded=True,
-                cached_indices_used=index_result.cached_data_used,
-                index_refresh_succeeded=not bool(index_result.failed_indices),
-            )
-
-        listings_result = listing_refresher(refreshed_at=attempt_time)
-        registry_result = registry_builder(
-            listing_data=listings_result.data,
-            reference_date=end_date,
-            registry_updated_at=attempt_time,
-            cached_listings_used=listings_result.used_cache,
+        manifest_dates = set(inventory.native_manifest_dates)
+        pending_local_dates = (
+            set(inventory.local_csv_dates)
+            .intersection(inventory.accepted_source_dates)
+            .difference(manifest_dates)
+            .difference(excluded_dates)
         )
-        ai_rebuilt = False
-        if config.rebuild_ai_datasets:
-            build_symbol_datasets()
-            build_master_ai_dataset()
-            ai_rebuilt = True
-        listing_mode = "cached listings" if listings_result.used_cache else "live listings"
-        message = (
-            f"Update succeeded: {len(update_result.successful_dates)} successful, "
-            f"{len(update_result.skipped_dates)} skipped; "
-            f"master has {master_result.total_rows} rows; {listing_mode}; "
-            f"registry has {registry_result.total_registry_symbols} symbols"
+        pending_paths = [
+            Path(raw_csv_dir) / f"market_{value.isoformat()}.csv"
+            for value in sorted(pending_local_dates)
+        ]
+        native_inputs = tuple(
+            dict.fromkeys([*pending_paths, *update_result.output_csv_paths])
+        )
+
+        if not update_result.missing_dates and not native_inputs:
+            status: RunStatus = "no_update_needed"
+            message = "No update needed; all request dates have accepted source evidence or a recorded non-request disposition"
+        else:
+            if native_inputs:
+                reconciled = _reconcile_native_sources_unlocked(
+                    native_inputs,
+                    reference_date=end_date,
+                    refreshed_at=attempt_time,
+                    listing_refresher=listing_refresher,
+                    native_updater=native_updater,
+                    registry_builder=registry_builder,
+                    progress_callback=progress_callback,
+                )
+                listings_result = reconciled.listings
+                native_result = reconciled.native
+                registry_result = reconciled.registry
+
+                if config.rebuild_ai_datasets:
+                    ai_status = "running"
+                    _emit_progress(
+                        progress_callback,
+                        "rebuilding_ai_datasets",
+                        "Rebuilding legacy feature/AI products after native success",
+                    )
+                    index_result = index_refresher()
+                    if not index_result.has_usable_data:
+                        raise RuntimeError(
+                            "Official index refresh failed and no cached index data is available"
+                        )
+                    master_result = master_builder()
+                    symbol_ai_builder()
+                    master_ai_builder()
+                    ai_status = "success"
+
+            if update_result.failed_dates and (
+                update_result.successful_dates or native_result is not None
+            ):
+                status = "partial_success"
+            elif update_result.failed_dates:
+                status = "failed"
+            elif update_result.skipped_dates:
+                status = "partial_success"
+            else:
+                status = "success"
+            message = (
+                f"Update {status.replace('_', ' ')}: "
+                f"{len(update_result.successful_dates)} downloaded, "
+                f"{len(update_result.skipped_dates)} skipped, "
+                f"{len(update_result.failed_dates)} failed; "
+                f"native rows added={native_result.rows_added if native_result else 0}"
+            )
+
+        finish_time = karachi_now(now)
+        final_audit = replace(
+            initial_audit,
+            finished_at=finish_time.isoformat(timespec="seconds"),
+            missing_dates_discovered=tuple(
+                value.isoformat() for value in update_result.missing_dates
+            ),
+            dates_attempted=tuple(
+                value.isoformat() for value in update_result.missing_dates
+            ),
+            dates_downloaded=tuple(
+                value.isoformat() for value in update_result.successful_dates
+            ),
+            dates_skipped=tuple(
+                value.isoformat() for value in update_result.skipped_dates
+            ),
+            dates_failed=tuple(
+                (value.isoformat(), reason)
+                for value, reason in update_result.failed_dates
+            ),
+            native_update_status=(
+                "success"
+                if native_result is not None
+                else ("not_needed" if not native_inputs else "not_started")
+            ),
+            native_rows_added=native_result.rows_added if native_result else 0,
+            native_rows_replaced=native_result.rows_replaced if native_result else 0,
+            daily_parquets_created=(
+                native_result.daily_parquets_written if native_result else 0
+            ),
+            consolidated_parquet_latest_date=(
+                native_result.latest_date if native_result else None
+            ),
+            ai_rebuild_status=ai_status,
+            source_evidence_inconsistencies=inventory.inconsistencies,
+            stale_run_recovered=stale_recovered,
+        )
+        deferred = tuple(
+            sorted(set(config.deferred_empty_dates).union(update_result.skipped_dates))
         )
         final_config = replace(
             attempted_config,
-            last_success_at=attempt_time.isoformat(timespec="seconds"),
-            last_status="success",
+            last_success_at=(
+                finish_time.isoformat(timespec="seconds")
+                if status in {"success", "no_update_needed"}
+                else config.last_success_at
+            ),
+            last_status=status,
             last_message=message,
+            deferred_empty_dates=deferred,
+            last_run=final_audit,
         )
         save_automation_config(final_config, config_path)
-        LOGGER.info(message)
+        _emit_progress(progress_callback, "complete", message)
         return AutomationRunResult(
-            status="success",
+            status=status,
             message=message,
-            exit_code=0,
+            exit_code=0 if status in {"success", "partial_success", "no_update_needed"} else 1,
             update_result=update_result,
             master_result=master_result,
             listings_result=listings_result,
             registry_result=registry_result,
             index_result=index_result,
-            market_update_succeeded=True,
-            master_rebuild_succeeded=True,
-            listing_refresh_succeeded=True,
-            registry_rebuild_succeeded=True,
-            cached_listings_used=listings_result.used_cache,
-            cached_indices_used=index_result.cached_data_used,
-            index_refresh_succeeded=not bool(index_result.failed_indices),
-            ai_rebuild_succeeded=ai_rebuilt,
+            market_update_succeeded=not bool(update_result.failed_dates),
+            master_rebuild_succeeded=master_result is not None,
+            listing_refresh_succeeded=listings_result is not None,
+            registry_rebuild_succeeded=registry_result is not None,
+            cached_listings_used=(listings_result.used_cache if listings_result else False),
+            cached_indices_used=(index_result.cached_data_used if index_result else False),
+            index_refresh_succeeded=(bool(index_result) and not bool(index_result.failed_indices)),
+            ai_rebuild_succeeded=ai_status == "success",
+            native_result=native_result,
+            native_update_succeeded=native_result is not None or not native_inputs,
+            audit=final_audit,
         )
     except Exception as exc:
         message = f"Automation failed: {type(exc).__name__}: {exc}"
+        finish_time = karachi_now(now)
+        failed_audit = replace(
+            initial_audit,
+            finished_at=finish_time.isoformat(timespec="seconds"),
+            missing_dates_discovered=(
+                tuple(value.isoformat() for value in update_result.missing_dates)
+                if update_result is not None
+                else ()
+            ),
+            dates_attempted=(
+                tuple(value.isoformat() for value in update_result.missing_dates)
+                if update_result is not None
+                else ()
+            ),
+            dates_downloaded=(
+                tuple(value.isoformat() for value in update_result.successful_dates)
+                if update_result is not None
+                else ()
+            ),
+            dates_skipped=(
+                tuple(value.isoformat() for value in update_result.skipped_dates)
+                if update_result is not None
+                else ()
+            ),
+            dates_failed=(
+                tuple((value.isoformat(), reason) for value, reason in update_result.failed_dates)
+                if update_result is not None
+                else ()
+            ),
+            native_update_status=("success" if native_result is not None else "failed"),
+            native_rows_added=native_result.rows_added if native_result else 0,
+            daily_parquets_created=(native_result.daily_parquets_written if native_result else 0),
+            consolidated_parquet_latest_date=(native_result.latest_date if native_result else None),
+            ai_rebuild_status=("failed" if ai_status == "running" else ai_status),
+            source_evidence_inconsistencies=(inventory.inconsistencies if inventory else ()),
+            stale_run_recovered=stale_recovered,
+            failure_reason=message,
+        )
         failed_config = replace(
             attempted_config,
             last_status="failed",
             last_message=message,
+            last_run=failed_audit,
         )
         try:
             save_automation_config(failed_config, config_path)
@@ -443,6 +979,9 @@ def _run_enabled_update(
             ),
             cached_indices_used=(index_result.cached_data_used if index_result else False),
             index_refresh_succeeded=(bool(index_result) and not bool(index_result.failed_indices)),
+            native_result=native_result,
+            native_update_succeeded=native_result is not None,
+            audit=failed_audit,
         )
     finally:
         lock.release()
@@ -457,17 +996,28 @@ def run_scheduled_update(
     master_builder: MasterBuilder = build_master_dataset,
     listing_refresher: ListingRefresher = refresh_official_listings,
     registry_builder: RegistryBuilder = build_company_registry,
+    native_updater: NativeUpdater = run_native_incremental_update,
+    evidence_discoverer: EvidenceDiscoverer = discover_source_evidence,
+    symbol_ai_builder: Callable[..., object] = build_symbol_datasets,
+    master_ai_builder: Callable[..., object] = build_master_ai_dataset,
+    progress_callback: ProgressCallback | None = None,
+    raw_csv_dir: Path = RAW_CSV_DIR,
+    native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
+    native_parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
+    backfill_state_path: Path = BACKFILL_STATE_PATH,
     now: datetime | None = None,
 ) -> AutomationRunResult:
     """Run the configured scheduled update, or exit cleanly when disabled."""
-    config = load_automation_config(config_path)
+    config = recover_stale_automation_state(
+        config_path=Path(config_path), lock_path=Path(lock_path), now=now
+    )
     if not config.enabled:
         return AutomationRunResult(
             status="disabled",
             message="Automatic daily fetching is disabled",
             exit_code=0,
         )
-    return _run_enabled_update(
+    return run_update_orchestration(
         config,
         end_date=karachi_today(now),
         config_path=Path(config_path),
@@ -477,6 +1027,15 @@ def run_scheduled_update(
         master_builder=master_builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,
+        native_updater=native_updater,
+        evidence_discoverer=evidence_discoverer,
+        symbol_ai_builder=symbol_ai_builder,
+        master_ai_builder=master_ai_builder,
+        progress_callback=progress_callback,
+        raw_csv_dir=raw_csv_dir,
+        native_state_path=native_state_path,
+        native_parquet_path=native_parquet_path,
+        backfill_state_path=backfill_state_path,
         now=now,
     )
 
@@ -492,14 +1051,25 @@ def run_manual_update(
     master_builder: MasterBuilder = build_master_dataset,
     listing_refresher: ListingRefresher = refresh_official_listings,
     registry_builder: RegistryBuilder = build_company_registry,
+    native_updater: NativeUpdater = run_native_incremental_update,
+    evidence_discoverer: EvidenceDiscoverer = discover_source_evidence,
+    symbol_ai_builder: Callable[..., object] = build_symbol_datasets,
+    master_ai_builder: Callable[..., object] = build_master_ai_dataset,
+    progress_callback: ProgressCallback | None = None,
+    raw_csv_dir: Path = RAW_CSV_DIR,
+    native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
+    native_parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
+    backfill_state_path: Path = BACKFILL_STATE_PATH,
     now: datetime | None = None,
 ) -> AutomationRunResult:
     """Run one explicit update cycle regardless of the enabled setting."""
-    config = load_automation_config(config_path)
+    config = recover_stale_automation_state(
+        config_path=Path(config_path), lock_path=Path(lock_path), now=now
+    )
     if bootstrap_start_date is not None:
         config = replace(config, bootstrap_start_date=bootstrap_start_date)
     requested_end_date = end_date if end_date is not None else karachi_today(now)
-    return _run_enabled_update(
+    return run_update_orchestration(
         config,
         end_date=requested_end_date,
         config_path=Path(config_path),
@@ -509,5 +1079,14 @@ def run_manual_update(
         master_builder=master_builder,
         listing_refresher=listing_refresher,
         registry_builder=registry_builder,
+        native_updater=native_updater,
+        evidence_discoverer=evidence_discoverer,
+        symbol_ai_builder=symbol_ai_builder,
+        master_ai_builder=master_ai_builder,
+        progress_callback=progress_callback,
+        raw_csv_dir=raw_csv_dir,
+        native_state_path=native_state_path,
+        native_parquet_path=native_parquet_path,
+        backfill_state_path=backfill_state_path,
         now=now,
     )

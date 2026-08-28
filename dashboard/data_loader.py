@@ -9,6 +9,7 @@ from typing import Literal
 import pandas as pd
 
 from data_pipeline.src.config import MASTER_CSV_PATH, RAW_CSV_DIR
+from data_pipeline.src.market_schema import MarketSchemaError, with_legacy_date_alias
 
 
 MARKET_COLUMNS = (
@@ -151,6 +152,13 @@ def _combine_csv_paths(
         ) as exc:
             errors.append(f"Could not read {path}: {exc}")
             continue
+
+        if "market_date" in frame.columns:
+            try:
+                frame = with_legacy_date_alias(frame)
+            except MarketSchemaError as exc:
+                errors.append(f"Could not normalize {path}: {exc}")
+                continue
 
         if "date" in frame.columns:
             frame["date"] = pd.to_datetime(frame["date"], errors="coerce")

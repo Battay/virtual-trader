@@ -27,10 +27,45 @@ from .config import (
     PROCESSED_MASTER_PATH,
     PROCESSED_SYMBOLS_DIR,
 )
-from .csv_store import build_master_dataset
+from .csv_store import MasterBuildResult
+from .market_schema import with_legacy_date_alias
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def inspect_canonical_market_master(
+    master_path: Path = MASTER_CSV_PATH,
+) -> MasterBuildResult:
+    """Validate and summarize the canonical master without rebuilding it."""
+
+    path = Path(master_path)
+    market = with_legacy_date_alias(
+        pd.read_csv(path, dtype={"symbol": "string"})
+    )
+    required_sector = {"sector_current", "sector_source", "sector_snapshot_date"}
+    missing = sorted(required_sector.difference(market.columns))
+    if missing:
+        raise ValueError(
+            "Canonical market master is missing sector provenance: "
+            + ", ".join(missing)
+        )
+    dates = pd.to_datetime(market["date"], errors="coerce")
+    if dates.isna().any():
+        raise ValueError("Canonical market master contains invalid dates")
+    duplicate_count = int(market.duplicated(["market_date", "symbol"]).sum())
+    if duplicate_count:
+        raise ValueError("Canonical market master contains duplicate keys")
+    return MasterBuildResult(
+        output_path=path,
+        total_rows=len(market),
+        unique_symbols=int(market["symbol"].nunique()),
+        earliest_date=dates.min().date() if not dates.empty else None,
+        latest_date=dates.max().date() if not dates.empty else None,
+        duplicate_count=0,
+        source_files=0,
+        errors=(),
+    )
 
 
 @dataclass(frozen=True)
@@ -99,7 +134,9 @@ def refresh_chronological_splits(
 def _default_readiness_builder(
     minimum_usable_rows: int,
 ) -> pd.DataFrame:
-    market = pd.read_csv(MASTER_CSV_PATH, dtype={"symbol": "string"})
+    market = with_legacy_date_alias(
+        pd.read_csv(MASTER_CSV_PATH, dtype={"symbol": "string"})
+    )
     registry = pd.read_csv(COMPANY_REGISTRY_PATH, dtype={"symbol": "string"})
     return build_training_readiness_report(
         market,
@@ -112,7 +149,7 @@ def rebuild_data_products(
     *,
     raw_dates_added: int = 0,
     minimum_usable_rows: int = AI_MINIMUM_USABLE_ROWS,
-    master_builder: Callable[[], Any] = build_master_dataset,
+    master_builder: Callable[[], Any] = inspect_canonical_market_master,
     registry_builder: Callable[[], Any] = build_company_registry,
     master_ai_builder: Callable[[], Any] = build_master_ai_dataset,
     symbol_ai_builder: Callable[..., Any] = build_symbol_datasets,

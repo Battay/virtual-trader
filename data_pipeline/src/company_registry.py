@@ -28,6 +28,7 @@ from .official_listings import (
     refresh_official_listings,
     write_dataframe_atomically,
 )
+from .market_schema import MarketSchemaError, with_legacy_date_alias
 
 
 LOGGER = logging.getLogger(__name__)
@@ -145,6 +146,10 @@ def _read_master_history(path: Path) -> pd.DataFrame:
     except (OSError, UnicodeError, ValueError, pd.errors.ParserError) as exc:
         raise RegistryError(f"Could not read master dataset {master_path}: {exc}") from exc
 
+    try:
+        data = with_legacy_date_alias(data)
+    except MarketSchemaError as exc:
+        raise RegistryError(f"Master dataset {master_path} is invalid: {exc}") from exc
     missing = [column for column in ("symbol", "date") if column not in data]
     if missing:
         raise RegistryError(

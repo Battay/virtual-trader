@@ -14,13 +14,14 @@ from dashboard.presentation import (
     humanize_enum,
 )
 from data_pipeline.src.automation import (
+    AutomationProgress,
     AutomationRunResult,
-    load_automation_config,
+    rebuild_canonical_market_artifacts,
+    recover_stale_automation_state,
     run_manual_update,
     save_automation_config,
 )
 from data_pipeline.src.config import MASTER_CSV_PATH
-from data_pipeline.src.csv_store import MasterBuildResult, build_master_dataset
 from data_pipeline.src.launchd import (
     get_launch_agent_status,
     install_launch_agent,
@@ -28,6 +29,7 @@ from data_pipeline.src.launchd import (
     uninstall_launch_agent,
 )
 from data_pipeline.src.updater import discover_available_raw_dates
+from data_pipeline.src.market_schema import MarketSchemaError, with_legacy_date_alias
 
 
 def _display_value(value: object | None) -> str:
@@ -40,6 +42,10 @@ def _latest_master_date() -> tuple[date | None, tuple[str, ...]]:
     data, errors = load_csv_preview((MASTER_CSV_PATH,))
     if data is None or data.empty:
         return None, errors
+    try:
+        data = with_legacy_date_alias(data)
+    except MarketSchemaError as exc:
+        return None, (*errors, f"Master dataset date schema is invalid: {exc}")
     if "date" not in data:
         return None, (*errors, f"Master dataset has no date column: {MASTER_CSV_PATH}")
     parsed_dates = pd.to_datetime(data["date"], errors="coerce").dropna()
@@ -48,9 +54,9 @@ def _latest_master_date() -> tuple[date | None, tuple[str, ...]]:
 
 
 def _show_update_result(result: AutomationRunResult) -> None:
-    if result.status == "success":
+    if result.status in {"success", "no_update_needed"}:
         st.success(result.message)
-    elif result.status == "already_running":
+    elif result.status in {"already_running", "partial_success"}:
         st.warning(result.message)
     else:
         st.error(result.message)
@@ -72,29 +78,55 @@ def _show_update_result(result: AutomationRunResult) -> None:
         st.write("Failed dates:")
         for failed_date, reason in update.failed_dates:
             st.write(f"- {format_date(failed_date)}: {reason}")
-    st.write(
-        "Update stages: "
-        f"market={'complete' if result.market_update_succeeded else 'incomplete'}, "
-        f"master={'complete' if result.master_rebuild_succeeded else 'incomplete'}, "
-        f"listings={'complete' if result.listing_refresh_succeeded else 'incomplete'}, "
-        f"registry={'complete' if result.registry_rebuild_succeeded else 'incomplete'}"
-    )
+    if result.status == "no_update_needed":
+        st.write(
+            "Update stages: market=current, native=current, downstream rebuilds="
+            "not required"
+        )
+    else:
+        st.write(
+            "Update stages: "
+            f"market={'complete' if result.market_update_succeeded else 'incomplete'}, "
+            f"native={'complete' if result.native_update_succeeded else 'incomplete'}, "
+            f"master={'complete' if result.master_rebuild_succeeded else 'not requested'}, "
+            f"listings={'complete' if result.listing_refresh_succeeded else 'not requested'}, "
+            f"registry={'complete' if result.registry_rebuild_succeeded else 'not requested'}"
+        )
     if result.cached_listings_used:
         st.warning(
             "The registry was rebuilt with cached official listings because the "
             "live PSX listing source was unavailable."
         )
+    if result.native_result is not None:
+        native_metrics = st.columns(4)
+        native_metrics[0].metric(
+            "Native rows added", result.native_result.rows_added, border=True
+        )
+        native_metrics[1].metric(
+            "Rows replaced", result.native_result.rows_replaced, border=True
+        )
+        native_metrics[2].metric(
+            "Daily Parquets written",
+            result.native_result.daily_parquets_written,
+            border=True,
+        )
+        native_metrics[3].metric(
+            "Native latest date",
+            result.native_result.latest_date or "No data",
+            border=True,
+        )
+    if result.audit is not None:
+        for warning in result.audit.source_evidence_inconsistencies:
+            st.warning(warning)
 
 
-def _show_master_result(result: MasterBuildResult) -> None:
-    st.success(f"Master dataset rebuilt at {result.output_path}")
+def _show_master_result(result) -> None:
+    st.success(f"Canonical market artifacts rebuilt at {result.paths.master_csv}")
     metrics = st.columns(4)
-    metrics[0].metric("Rows", result.total_rows, border=True)
-    metrics[1].metric("Symbols", result.unique_symbols, border=True)
-    metrics[2].metric("Source files", result.source_files, border=True)
-    metrics[3].metric("Duplicates handled", result.duplicate_count, border=True)
-    for error in result.errors:
-        st.warning(error)
+    metrics[0].metric("Rows", result.master_rows, border=True)
+    metrics[1].metric("Symbols", result.symbol_count, border=True)
+    metrics[2].metric("Daily Parquets", result.daily_parquets_written, border=True)
+    metrics[3].metric("Duplicate keys", result.duplicate_count, border=True)
 
 
 st.title("Automation")
@@ -103,7 +135,7 @@ flash_message = st.session_state.pop("automation_flash_message", None)
 if flash_message is not None:
     st.success(flash_message)
 
-config = load_automation_config()
+config = recover_stale_automation_state()
 available_dates = discover_available_raw_dates()
 latest_raw_date = available_dates[-1] if available_dates else None
 latest_master_date, master_load_errors = _latest_master_date()
@@ -148,6 +180,24 @@ st.write(f"Last attempt: {_display_value(config.last_attempt_at)}")
 st.write(f"Last successful run: {_display_value(config.last_success_at)}")
 st.write(f"Last status: {humanize_enum(config.last_status)}")
 st.write(f"Last message: {config.last_message}")
+if config.source_date_dispositions:
+    with st.expander("Source-date dispositions"):
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Date": value.trading_date.isoformat(),
+                        "Classification": humanize_enum(value.classification),
+                        "Reason": value.reason,
+                        "Automatic retry": value.retry_automatically,
+                        "Evidence": value.evidence,
+                    }
+                    for value in config.source_date_dispositions
+                ]
+            ),
+            hide_index=True,
+            width="stretch",
+        )
 
 st.info(
     "The Mac must be awake at 5:15 PM Pakistan time. Saving an enabled "
@@ -212,25 +262,50 @@ if action_columns[0].button(
     width="stretch",
 ):
     try:
-        with st.spinner(
-            "Fetching missing dates, refreshing listings, and rebuilding datasets..."
-        ):
-            update_result = run_manual_update()
+        with st.status(
+            "Checking stored dates...", expanded=True, state="running"
+        ) as update_status:
+            def show_progress(event: AutomationProgress) -> None:
+                update_status.update(label=event.message)
+                update_status.write(f"**{humanize_enum(event.stage)}:** {event.message}")
+
+            update_result = run_manual_update(progress_callback=show_progress)
+            final_state = "error" if update_result.status == "failed" else "complete"
+            update_status.update(
+                label=update_result.message,
+                state=final_state,
+                expanded=update_result.status in {"failed", "partial_success"},
+            )
         _show_update_result(update_result)
     except Exception as exc:
         st.error(f"Incremental update could not be completed: {exc}")
 
 if action_columns[1].button(
-    "Rebuild master dataset",
+    "Rebuild canonical market artifacts",
     icon=":material/build:",
     width="stretch",
 ):
     try:
-        with st.spinner("Rebuilding the master dataset from daily raw CSVs..."):
-            master_result = build_master_dataset()
+        with st.status(
+            "Validating native source state...", expanded=True
+        ) as rebuild_status:
+            def show_rebuild_progress(event: AutomationProgress) -> None:
+                rebuild_status.update(label=event.message)
+                rebuild_status.write(
+                    f"**{humanize_enum(event.stage)}:** {event.message}"
+                )
+
+            master_result = rebuild_canonical_market_artifacts(
+                progress_callback=show_rebuild_progress
+            )
+            rebuild_status.update(
+                label="Canonical market artifacts rebuilt",
+                state="complete",
+                expanded=False,
+            )
         _show_master_result(master_result)
     except Exception as exc:
-        st.error(f"Master rebuild could not be completed: {exc}")
+        st.error(f"Canonical market rebuild could not be completed: {exc}")
 
 st.subheader("macOS scheduler")
 is_macos = platform.system() == "Darwin"

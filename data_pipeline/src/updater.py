@@ -2,14 +2,22 @@
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+import json
 import logging
 from pathlib import Path
 import re
+from typing import Callable, Sequence
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from .client import PsxClient
-from .config import RAW_CSV_DIR
+from .config import (
+    LOCAL_PSX_MARKET_PARQUET_PATH,
+    NATIVE_MARKET_PIPELINE_STATE_PATH,
+    RAW_CSV_DIR,
+)
 from .main import (
     CollectionResult,
     DateProcessor,
@@ -22,6 +30,7 @@ from .main import (
 
 LOGGER = logging.getLogger(__name__)
 DAILY_CSV_PATTERN = re.compile(r"market_(\d{4}-\d{2}-\d{2})\.csv")
+UpdateProgressCallback = Callable[[str, str], None]
 
 
 class BootstrapStartDateRequired(ValueError):
@@ -37,6 +46,10 @@ class IncrementalUpdateResult:
     latest_stored_date: date | None
     missing_dates: tuple[date, ...]
     collection: CollectionResult
+    local_source_dates_before: tuple[date, ...] = ()
+    external_source_dates_before: tuple[date, ...] = ()
+    excluded_non_request_dates: tuple[date, ...] = ()
+    source_evidence_inconsistencies: tuple[str, ...] = ()
 
     @property
     def successful_dates(self) -> tuple[date, ...]:
@@ -57,6 +70,34 @@ class IncrementalUpdateResult:
     @property
     def total_processed(self) -> int:
         return self.collection.total_processed
+
+
+@dataclass(frozen=True)
+class SourceEvidenceInventory:
+    """Date-level source provenance independent from analytical Parquet rows."""
+
+    local_csv_dates: tuple[date, ...]
+    native_manifest_dates: tuple[date, ...]
+    external_manifest_dates: tuple[date, ...]
+    parquet_dates: tuple[date, ...]
+    parquet_only_dates: tuple[date, ...]
+    inconsistencies: tuple[str, ...]
+    local_weekend_dates: tuple[date, ...] = ()
+
+    @property
+    def accepted_source_dates(self) -> tuple[date, ...]:
+        # A legacy automation bug could create a date-stamped CSV for a weekend
+        # when the endpoint returned a non-empty table.  A filename plus injected
+        # date is not sufficient evidence that a weekend was a PSX trading date.
+        return tuple(
+            sorted(
+                value
+                for value in set(self.local_csv_dates).union(
+                    self.native_manifest_dates
+                )
+                if value.weekday() < 5
+            )
+        )
 
 
 def _date_from_daily_filename(path: Path) -> date | None:
@@ -110,13 +151,126 @@ def discover_available_raw_dates(csv_dir: Path = RAW_CSV_DIR) -> tuple[date, ...
     return tuple(sorted(set(available)))
 
 
+def _date_from_source_name(value: object) -> date | None:
+    return _date_from_daily_filename(Path(str(value)))
+
+
+def discover_source_evidence(
+    *,
+    csv_dir: Path = RAW_CSV_DIR,
+    native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
+    parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
+) -> SourceEvidenceInventory:
+    """Inventory CSV evidence while keeping Parquet-only dates diagnostic.
+
+    A native manifest date counts as evidence because it records the originating
+    CSV name/hash. A date found only in Parquet does not count as source evidence.
+    """
+
+    local = discover_available_raw_dates(csv_dir)
+    manifest_dates: set[date] = set()
+    external_dates: set[date] = set()
+    state_source_hash: str | None = None
+    state_content_hash: str | None = None
+    state_path = Path(native_state_path)
+    if state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state_source_hash = str(state.get("source_set_hash") or "") or None
+            state_content_hash = str(state.get("canonical_content_hash") or "") or None
+            for item in state.get("source_files", []):
+                if not isinstance(item, dict):
+                    continue
+                source_date = _date_from_source_name(item.get("name"))
+                if source_date is None:
+                    continue
+                manifest_dates.add(source_date)
+                origin = str(item.get("origin") or "")
+                name = str(item.get("name") or "")
+                if origin == "external_validated_csv" or (
+                    not origin and not name.startswith("data/raw/csv/")
+                ):
+                    external_dates.add(source_date)
+        except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+            LOGGER.warning("Ignoring invalid native source manifest %s: %s", state_path, exc)
+
+    parquet_dates: set[date] = set()
+    parquet_trusted = False
+    parquet_file_path = Path(parquet_path)
+    if parquet_file_path.is_file():
+        try:
+            parquet_file = pq.ParquetFile(parquet_file_path)
+            metadata = parquet_file.schema_arrow.metadata or {}
+            parquet_source_hash = metadata.get(b"source_set_hash", b"").decode()
+            parquet_content_hash = metadata.get(b"canonical_content_hash", b"").decode()
+            parquet_trusted = bool(
+                state_source_hash
+                and state_content_hash
+                and parquet_source_hash == state_source_hash
+                and parquet_content_hash == state_content_hash
+            )
+            date_values = pq.read_table(
+                parquet_file_path, columns=["market_date"]
+            ).column("market_date").unique().to_pylist()
+            parquet_dates = {value for value in date_values if isinstance(value, date)}
+        except (OSError, ValueError, pa.ArrowException) as exc:
+            LOGGER.warning("Could not inspect native Parquet source dates: %s", exc)
+
+    inconsistencies: list[str] = []
+    local_weekends = {value for value in local if value.weekday() >= 5}
+    if local_weekends:
+        inconsistencies.append(
+            f"{len(local_weekends)} local CSV date(s) fall on weekends and are not eligible for native ingestion"
+        )
+    if manifest_dates and not parquet_trusted:
+        inconsistencies.append(
+            "Native source manifest and consolidated Parquet hashes are not aligned"
+        )
+        # An untrusted manifest cannot suppress a source request.
+        manifest_dates.clear()
+        external_dates.clear()
+    parquet_only = parquet_dates.difference(manifest_dates).difference(local)
+    if parquet_only:
+        inconsistencies.append(
+            f"{len(parquet_only)} Parquet date(s) have no recorded CSV source evidence"
+        )
+    external_only = external_dates.difference(local)
+    if external_only:
+        inconsistencies.append(
+            f"{len(external_only)} native date(s) use external/bootstrap CSV evidence rather than the local raw store"
+        )
+    elif external_dates:
+        inconsistencies.append(
+            f"{len(external_dates)} native date(s) retain external/bootstrap CSV provenance; local counterpart files also exist"
+        )
+    local_not_native = set(local).difference(parquet_dates)
+    pending_weekdays = local_not_native.difference(local_weekends)
+    if pending_weekdays:
+        inconsistencies.append(
+            f"{len(pending_weekdays)} eligible local weekday CSV date(s) are not yet represented in native Parquet"
+        )
+    return SourceEvidenceInventory(
+        local_csv_dates=local,
+        native_manifest_dates=tuple(sorted(manifest_dates)),
+        external_manifest_dates=tuple(sorted(external_dates)),
+        parquet_dates=tuple(sorted(parquet_dates)),
+        parquet_only_dates=tuple(sorted(parquet_only)),
+        inconsistencies=tuple(inconsistencies),
+        local_weekend_dates=tuple(sorted(local_weekends)),
+    )
+
+
 def determine_missing_dates(
     available_dates: tuple[date, ...] | set[date],
     end_date: date,
     bootstrap_start_date: date | None = None,
+    *,
+    excluded_dates: Sequence[date] = (),
+    include_weekends: bool = False,
 ) -> tuple[date, ...]:
-    """Return missing calendar dates through ``end_date`` inclusively."""
+    """Return unresolved request dates through ``end_date`` inclusively."""
     available = set(available_dates)
+    excluded = set(excluded_dates)
     if bootstrap_start_date is None:
         eligible_available = [value for value in available if value <= end_date]
         if not eligible_available:
@@ -133,7 +287,11 @@ def determine_missing_dates(
     missing: list[date] = []
     current_date = start_date
     while current_date <= end_date:
-        if current_date not in available:
+        if (
+            current_date not in available
+            and current_date not in excluded
+            and (include_weekends or current_date.weekday() < 5)
+        ):
             missing.append(current_date)
         current_date += timedelta(days=1)
     return tuple(missing)
@@ -146,15 +304,36 @@ def run_incremental_update(
     csv_dir: Path = RAW_CSV_DIR,
     client: MarketClient | None = None,
     date_processor: DateProcessor = process_date,
+    available_source_dates: Sequence[date] | None = None,
+    local_source_dates: Sequence[date] | None = None,
+    external_source_dates: Sequence[date] = (),
+    excluded_dates: Sequence[date] = (),
+    source_evidence_inconsistencies: Sequence[str] = (),
+    progress_callback: UpdateProgressCallback | None = None,
 ) -> IncrementalUpdateResult:
     """Fetch only locally missing dates and continue after skips or failures."""
-    available_dates = discover_available_raw_dates(csv_dir)
+    discovered_local = (
+        tuple(local_source_dates)
+        if local_source_dates is not None
+        else discover_available_raw_dates(csv_dir)
+    )
+    available_dates = (
+        tuple(sorted(set(available_source_dates)))
+        if available_source_dates is not None
+        else discovered_local
+    )
     missing_dates = determine_missing_dates(
         available_dates,
         end_date,
         bootstrap_start_date,
+        excluded_dates=excluded_dates,
     )
-    psx_client = client if client is not None else PsxClient()
+    if progress_callback is not None:
+        progress_callback(
+            "fetching",
+            f"Fetching {len(missing_dates):,} unresolved source date(s)",
+        )
+    psx_client = (client if client is not None else PsxClient()) if missing_dates else None
 
     successful_dates: list[date] = []
     skipped_dates: list[date] = []
@@ -190,4 +369,8 @@ def run_incremental_update(
         latest_stored_date=max(stored_after) if stored_after else None,
         missing_dates=missing_dates,
         collection=collection,
+        local_source_dates_before=tuple(discovered_local),
+        external_source_dates_before=tuple(sorted(set(external_source_dates))),
+        excluded_non_request_dates=tuple(sorted(set(excluded_dates))),
+        source_evidence_inconsistencies=tuple(source_evidence_inconsistencies),
     )

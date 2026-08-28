@@ -29,6 +29,7 @@ from data_pipeline.src.config import (
     PROCESSED_SPLITS_DIR,
     PROJECT_ROOT,
 )
+from data_pipeline.src.market_schema import with_legacy_date_alias
 from data_pipeline.src.official_listings import write_dataframe_atomically
 from feature_engineering.readiness import build_training_readiness_report
 from feature_engineering.schemas import FEATURE_VERSION
@@ -1206,7 +1207,9 @@ def generate_local_sector_universes(
     timestamp = generated_at or datetime.now(timezone.utc).isoformat()
     registry = pd.read_csv(registry_file, dtype={"symbol": "string"})
     listings = pd.read_csv(listings_file, dtype={"symbol": "string"})
-    master = pd.read_csv(master_file, dtype={"symbol": "string"})
+    master = with_legacy_date_alias(
+        pd.read_csv(master_file, dtype={"symbol": "string"})
+    )
     # Read the processed file to establish local feature-version provenance; its
     # rows are not used to choose sector membership or validation performance.
     processed_versions = pd.read_csv(

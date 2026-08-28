@@ -43,6 +43,7 @@ from data_pipeline.src.config import (
     MODEL_REGISTRY_PATH,
     PROCESSED_MASTER_PATH,
 )
+from data_pipeline.src.market_schema import with_legacy_date_alias
 from market_intelligence.index_config import SUPPORTED_INDICES
 from market_intelligence.index_metrics import calculate_index_metrics
 from market_intelligence.market_breadth import calculate_market_breadth
@@ -75,7 +76,12 @@ st.title("Market Overview")
 st.caption("Official PSX indices and descriptive local market intelligence.")
 
 indices = _load_csv(INDICES_MASTER_PATH)
-equities = _load_csv(MASTER_CSV_PATH)
+equities_source = _load_csv(MASTER_CSV_PATH)
+equities = (
+    with_legacy_date_alias(equities_source)
+    if not equities_source.empty
+    else equities_source
+)
 processed = _load_csv(PROCESSED_MASTER_PATH)
 models = _load_csv(MODEL_REGISTRY_PATH)
 metrics = (

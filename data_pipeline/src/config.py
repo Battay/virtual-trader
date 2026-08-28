@@ -30,6 +30,8 @@ RAW_HTML_DIR = RAW_DATA_DIR / "html"
 RAW_CSV_DIR = RAW_DATA_DIR / "csv"
 REJECTED_DATA_DIR = DATA_DIR / "rejected"
 MASTER_DATA_DIR = DATA_DIR / "master"
+# The sole human-facing canonical market master.  It uses the native normalized
+# market contract and includes current-sector provenance.
 MASTER_CSV_PATH = MASTER_DATA_DIR / "psx_master.csv"
 COMPANY_REGISTRY_PATH = MASTER_DATA_DIR / "company_registry.csv"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
@@ -43,7 +45,12 @@ SOFT_RELATIONSHIP_REPRESENTATION_DIR = (
 PROCESSED_SYMBOLS_DIR = PROCESSED_DATA_DIR / "symbols"
 PROCESSED_MASTER_DIR = PROCESSED_DATA_DIR / "master"
 PROCESSED_MASTER_PATH = PROCESSED_MASTER_DIR / "psx_ai_master.csv"
-NATIVE_MARKET_MASTER_PATH = PROCESSED_MASTER_DIR / "psx_market_master.csv"
+# Backwards-compatible code name; it deliberately resolves to the one canonical
+# market master rather than a second generated artifact.
+NATIVE_MARKET_MASTER_PATH = MASTER_CSV_PATH
+LEGACY_MARKET_COMPAT_PATH = (
+    PROCESSED_DATA_DIR / "compatibility" / "psx_legacy_market_master.csv"
+)
 NATIVE_MARKET_SYMBOLS_DIR = PROCESSED_DATA_DIR / "market_symbols"
 PARQUET_DATA_DIR = DATA_DIR / "parquet"
 DAILY_MARKET_PARQUET_DIR = PARQUET_DATA_DIR / "daily"

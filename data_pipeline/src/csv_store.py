@@ -11,7 +11,7 @@ from typing import Sequence
 
 import pandas as pd
 
-from .config import MASTER_CSV_PATH, RAW_CSV_DIR
+from .config import LEGACY_MARKET_COMPAT_PATH, RAW_CSV_DIR
 from .main import OUTPUT_FIELDS
 
 
@@ -141,9 +141,13 @@ def _atomic_write_csv(data: pd.DataFrame, output_path: Path) -> None:
 def build_master_dataset(
     *,
     raw_csv_dir: Path = RAW_CSV_DIR,
-    output_path: Path = MASTER_CSV_PATH,
+    output_path: Path = LEGACY_MARKET_COMPAT_PATH,
 ) -> MasterBuildResult:
-    """Rebuild the persistent master CSV deterministically from daily raw CSVs."""
+    """Build the explicitly named legacy compatibility CSV.
+
+    The canonical market master is owned by ``native_market_pipeline``.  This
+    legacy utility must never overwrite it.
+    """
     raw_data, loaded_paths, errors = _read_raw_files(Path(raw_csv_dir))
     duplicate_count = int(
         raw_data.duplicated(list(BUSINESS_KEY), keep="last").sum()
@@ -185,8 +189,10 @@ def build_master_dataset(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Rebuild the master dataset from the configured raw CSV directory."""
-    parser = argparse.ArgumentParser(description="Rebuild the PSX master dataset")
+    """Rebuild the legacy compatibility dataset from daily raw CSVs."""
+    parser = argparse.ArgumentParser(
+        description="Rebuild the legacy PSX market compatibility CSV"
+    )
     parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     try:

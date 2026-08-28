@@ -62,7 +62,7 @@ def test_identifies_missing_calendar_dates_inclusively() -> None:
         date(2026, 7, 1),
     )
 
-    assert missing == (date(2026, 7, 2), date(2026, 7, 4))
+    assert missing == (date(2026, 7, 2),)
 
 
 def test_empty_store_requires_an_explicit_bootstrap_date() -> None:
@@ -128,13 +128,12 @@ def test_a_skipped_date_remains_eligible_for_a_later_retry(tmp_path: Path) -> No
 
     for _ in range(2):
         result = run_incremental_update(
-            date(2026, 7, 4),
-            bootstrap_start_date=date(2026, 7, 4),
+            date(2026, 7, 6),
+            bootstrap_start_date=date(2026, 7, 6),
             csv_dir=tmp_path,
             client=StubClient(),
             date_processor=skipped_processor,
         )
-        assert result.skipped_dates == (date(2026, 7, 4),)
+        assert result.skipped_dates == (date(2026, 7, 6),)
 
-    assert processed == [date(2026, 7, 4), date(2026, 7, 4)]
-
+    assert processed == [date(2026, 7, 6), date(2026, 7, 6)]

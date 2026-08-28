@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import hashlib
 import json
 import os
@@ -111,6 +111,7 @@ class SourceEvidence:
     name: str
     sha256: str
     size_bytes: int
+    origin: str = "unspecified"
 
 
 @dataclass(frozen=True)
@@ -154,6 +155,10 @@ class NativeMarketBuildResult:
     consolidated_sha256: str
     status: str
     paths: NativeMarketPaths = field(repr=False, compare=False)
+    rows_added: int = 0
+    rows_replaced: int = 0
+    daily_parquets_written: int = 0
+    symbol_csvs_written: int = 0
     migration_comparison: MigrationComparison | None = None
     idempotent_noop: bool = False
 
@@ -176,6 +181,20 @@ def _portable_source_name(path: Path) -> str:
         return Path(path).name
 
 
+def _source_origin(path: Path) -> str:
+    resolved = Path(path).resolve()
+    try:
+        resolved.relative_to(RAW_CSV_DIR.resolve())
+        return "virtual_trader_raw_csv"
+    except ValueError:
+        pass
+    try:
+        resolved.relative_to(PROJECT_ROOT.resolve())
+        return "virtual_trader_project_source"
+    except ValueError:
+        return "external_validated_csv"
+
+
 def source_evidence(path: Path) -> SourceEvidence:
     resolved = Path(path)
     if not resolved.is_file():
@@ -184,6 +203,7 @@ def source_evidence(path: Path) -> SourceEvidence:
         name=_portable_source_name(resolved),
         sha256=sha256_file(resolved),
         size_bytes=resolved.stat().st_size,
+        origin=_source_origin(resolved),
     )
 
 
@@ -210,6 +230,20 @@ def canonical_content_hash(records: pd.DataFrame, *, core_only: bool = False) ->
     ordered["market_date"] = pd.to_datetime(ordered["market_date"]).dt.strftime(
         "%Y-%m-%d"
     )
+    ordered["symbol"] = ordered["symbol"].astype("string")
+    # CSV type inference may represent an all-integral price column as int64,
+    # while the canonical Arrow schema stores every market price as float64.
+    # Normalize logical types before hashing so equivalent values have one
+    # identity regardless of their physical CSV/Parquet representation.
+    for column in FLOAT_COLUMNS:
+        if column in ordered.columns:
+            ordered[column] = pd.to_numeric(
+                ordered[column], errors="raise"
+            ).astype("float64")
+    if "volume" in ordered.columns:
+        ordered["volume"] = pd.to_numeric(
+            ordered["volume"], errors="raise"
+        ).astype("int64")
     for column in set(columns).intersection(SECTOR_PROVENANCE_COLUMNS):
         ordered[column] = ordered[column].astype("string").fillna("<NULL>")
     row_hashes = pd.util.hash_pandas_object(
@@ -433,7 +467,10 @@ def _write_csv(records: pd.DataFrame, path: Path) -> None:
     output["market_date"] = pd.to_datetime(output["market_date"]).dt.strftime(
         "%Y-%m-%d"
     )
-    output.to_csv(path, index=False, lineterminator="\n", float_format="%.15g")
+    # Seventeen significant digits preserve an IEEE-754 float64 value across a
+    # CSV write/read round trip, keeping the canonical CSV value-equivalent to
+    # its Parquet representation.
+    output.to_csv(path, index=False, lineterminator="\n", float_format="%.17g")
 
 
 def _write_parquet(
@@ -460,6 +497,41 @@ def _symbol_file_name(symbol: str) -> str:
     return quote(str(symbol), safe="-_.") + ".csv"
 
 
+NativeProgressCallback = Callable[[str, str], None]
+
+
+def _emit_native_progress(
+    callback: NativeProgressCallback | None, stage: str, message: str
+) -> None:
+    if callback is not None:
+        callback(stage, message)
+
+
+def _clone_generated_directory(source: Path, destination: Path) -> None:
+    """Stage unchanged files efficiently without mutating their hard links."""
+
+    if not source.is_dir():
+        raise NativeMarketPipelineError(
+            f"Existing generated artifact directory is missing: {source}"
+        )
+
+    def link_or_copy(source_name: str, destination_name: str) -> str:
+        try:
+            os.link(source_name, destination_name)
+        except OSError:
+            shutil.copy2(source_name, destination_name)
+        return destination_name
+
+    shutil.copytree(source, destination, copy_function=link_or_copy)
+
+
+def _unlink_staged_file(path: Path) -> None:
+    # A staged unchanged file may be a hard link to the accepted artifact.
+    # Unlink before rewriting so the existing bundle's inode remains untouched.
+    if path.exists() or path.is_symlink():
+        path.unlink()
+
+
 def _write_generated_bundle(
     records: pd.DataFrame,
     staging_root: Path,
@@ -470,9 +542,15 @@ def _write_generated_bundle(
     operation_rows_accepted: int,
     duplicate_count: int,
     sector_matched_symbols: int,
+    rows_added: int,
+    rows_replaced: int = 0,
+    base_paths: NativeMarketPaths | None = None,
+    affected_symbols: Sequence[str] | None = None,
+    affected_dates: Sequence[date] | None = None,
+    progress_callback: NativeProgressCallback | None = None,
 ) -> tuple[NativeMarketPaths, dict[str, object]]:
     stage_paths = NativeMarketPaths(
-        master_csv=staging_root / "master" / "psx_market_master.csv",
+        master_csv=staging_root / "master" / "psx_master.csv",
         symbol_csv_dir=staging_root / "market_symbols",
         daily_parquet_dir=staging_root / "parquet" / "daily",
         consolidated_parquet=staging_root / "parquet" / "market.parquet",
@@ -480,18 +558,67 @@ def _write_generated_bundle(
     )
     source_hash = source_set_hash(sources)
     content_hash = canonical_content_hash(records)
+    _emit_native_progress(
+        progress_callback,
+        "native_market_csv",
+        f"Writing native master CSV with {len(records):,} canonical rows",
+    )
     _write_csv(records, stage_paths.master_csv)
-    for symbol, group in records.groupby("symbol", sort=True, observed=True):
-        _write_csv(group.reset_index(drop=True), stage_paths.symbol_csv_dir / _symbol_file_name(str(symbol)))
-    for market_date, group in records.groupby("market_date", sort=True, observed=True):
+
+    selected_symbols = (
+        tuple(sorted(set(str(value) for value in affected_symbols)))
+        if affected_symbols is not None
+        else tuple(sorted(records["symbol"].astype(str).unique()))
+    )
+    selected_dates = (
+        tuple(sorted(set(affected_dates)))
+        if affected_dates is not None
+        else tuple(sorted(pd.to_datetime(records["market_date"]).dt.date.unique()))
+    )
+    if base_paths is not None:
+        _clone_generated_directory(
+            base_paths.symbol_csv_dir, stage_paths.symbol_csv_dir
+        )
+        _clone_generated_directory(
+            base_paths.daily_parquet_dir, stage_paths.daily_parquet_dir
+        )
+    _emit_native_progress(
+        progress_callback,
+        "native_symbol_csvs",
+        f"Updating {len(selected_symbols):,} affected per-symbol CSVs",
+    )
+    symbol_groups = records.loc[
+        records["symbol"].astype(str).isin(selected_symbols)
+    ].groupby("symbol", sort=True, observed=True)
+    for symbol, group in symbol_groups:
+        output_path = stage_paths.symbol_csv_dir / _symbol_file_name(str(symbol))
+        _unlink_staged_file(output_path)
+        _write_csv(group.reset_index(drop=True), output_path)
+    _emit_native_progress(
+        progress_callback,
+        "native_daily_parquets",
+        f"Writing {len(selected_dates):,} affected daily Parquet files",
+    )
+    date_mask = pd.to_datetime(records["market_date"]).dt.date.isin(selected_dates)
+    date_groups = records.loc[date_mask].groupby(
+        "market_date", sort=True, observed=True
+    )
+    for market_date, group in date_groups:
         date_text = pd.Timestamp(market_date).date().isoformat()
         daily_content_hash = canonical_content_hash(group.reset_index(drop=True))
+        output_path = stage_paths.daily_parquet_dir / f"market_{date_text}.parquet"
+        _unlink_staged_file(output_path)
         _write_parquet(
             group.reset_index(drop=True),
-            stage_paths.daily_parquet_dir / f"market_{date_text}.parquet",
+            output_path,
             source_hash=source_hash,
             content_hash=daily_content_hash,
         )
+    _emit_native_progress(
+        progress_callback,
+        "native_consolidated_parquet",
+        "Atomically staging the consolidated market Parquet",
+    )
     _write_parquet(
         records,
         stage_paths.consolidated_parquet,
@@ -513,6 +640,10 @@ def _write_generated_bundle(
         "rows_accepted": int(operation_rows_accepted),
         "rows_rejected": 0,
         "duplicate_count": int(duplicate_count),
+        "rows_added": int(rows_added),
+        "rows_replaced": int(rows_replaced),
+        "daily_parquets_written": len(selected_dates),
+        "symbol_csvs_written": len(selected_symbols),
         "sector_snapshot_dates": sorted(
             records["sector_snapshot_date"].dropna().astype(str).unique().tolist()
         ),
@@ -694,6 +825,10 @@ def _result_from_state(
         consolidated_sha256=str(state["consolidated_sha256"]),
         status=str(state["status"]),
         paths=paths,
+        rows_added=int(state.get("rows_added", state.get("rows_accepted", 0))),
+        rows_replaced=int(state.get("rows_replaced", 0)),
+        daily_parquets_written=int(state.get("daily_parquets_written", 0)),
+        symbol_csvs_written=int(state.get("symbol_csvs_written", 0)),
         migration_comparison=comparison,
         idempotent_noop=idempotent_noop,
     )
@@ -733,6 +868,7 @@ def _full_rebuild_impl(
             operation_rows_accepted=len(enriched),
             duplicate_count=0,
             sector_matched_symbols=matched,
+            rows_added=len(enriched),
         )
         if compare_bootstrap_path is not None:
             comparison = compare_parquet_core(
@@ -827,6 +963,34 @@ def _load_existing_state(path: Path) -> dict[str, object]:
     return state
 
 
+def _state_source_evidence(state: Mapping[str, object]) -> tuple[SourceEvidence, ...]:
+    """Load source provenance while migrating pre-origin v1 state in memory."""
+
+    evidence: list[SourceEvidence] = []
+    for item in state.get("source_files", []):
+        if not isinstance(item, Mapping):
+            raise NativeMarketPipelineError("Native source manifest entry is invalid")
+        name = str(item["name"])
+        evidence.append(
+            SourceEvidence(
+                name=name,
+                sha256=str(item["sha256"]),
+                size_bytes=int(item["size_bytes"]),
+                origin=str(
+                    item.get(
+                        "origin",
+                        (
+                            "virtual_trader_raw_csv"
+                            if name.startswith("data/raw/csv/")
+                            else "external_validated_csv"
+                        ),
+                    )
+                ),
+            )
+        )
+    return tuple(sorted(evidence, key=lambda value: value.name))
+
+
 def _existing_canonical_records(path: Path) -> pd.DataFrame:
     table = pq.read_table(path, columns=list(CANONICAL_MARKET_COLUMNS))
     records = table.to_pandas()
@@ -838,6 +1002,95 @@ def _existing_canonical_records(path: Path) -> pd.DataFrame:
     for column in SECTOR_PROVENANCE_COLUMNS:
         records[column] = records[column].astype("string")
     return records.sort_values(list(BUSINESS_KEY), kind="mergesort").reset_index(drop=True)
+
+
+def _rebuild_generated_artifacts_impl(
+    *,
+    listings_path: Path = CURRENT_LISTINGS_PATH,
+    paths: NativeMarketPaths = NativeMarketPaths(),
+    before_promote: Callable[[Path, Path], None] | None = None,
+    progress_callback: NativeProgressCallback | None = None,
+) -> NativeMarketBuildResult:
+    """Regenerate native outputs from the validated canonical Parquet/state pair.
+
+    This is an explicit repair operation.  It preserves the source manifest and
+    never substitutes a local CSV for an external/bootstrap source implicitly.
+    """
+
+    if not paths.consolidated_parquet.is_file() or not paths.state_json.is_file():
+        raise NativeMarketPipelineError(
+            "Artifact rebuild requires an existing native Parquet and state"
+        )
+    state = _load_existing_state(paths.state_json)
+    metadata = pq.ParquetFile(paths.consolidated_parquet).schema_arrow.metadata or {}
+    parquet_source_hash = metadata.get(b"source_set_hash", b"").decode()
+    parquet_content_hash = metadata.get(b"canonical_content_hash", b"").decode()
+    if (
+        parquet_source_hash != str(state.get("source_set_hash") or "")
+        or parquet_content_hash != str(state.get("canonical_content_hash") or "")
+    ):
+        raise NativeMarketPipelineError(
+            "Native state and consolidated Parquet provenance are not aligned"
+        )
+    existing = _existing_canonical_records(paths.consolidated_parquet)
+    if canonical_content_hash(existing) != parquet_content_hash:
+        raise NativeMarketPipelineError(
+            "Consolidated Parquet content does not match its recorded hash"
+        )
+    listings = load_listing_snapshot(Path(listings_path))
+    core = existing.loc[:, list(CORE_MARKET_COLUMNS)]
+    enriched, matched = enrich_current_sector(core, listings)
+    sources = _state_source_evidence(state)
+    staging_parent = paths.consolidated_parquet.parent.parent
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=".native-market-stage-", dir=staging_parent)
+    )
+    try:
+        staged, rebuilt_state = _write_generated_bundle(
+            enriched,
+            staging_root,
+            sources=sources,
+            operation="artifact_rebuild",
+            rows_read=0,
+            operation_rows_accepted=0,
+            duplicate_count=0,
+            sector_matched_symbols=matched,
+            rows_added=0,
+            progress_callback=progress_callback,
+        )
+        _promote_bundle(staged, paths, before_promote=before_promote)
+        return _result_from_state(
+            rebuilt_state, paths=paths, comparison=None
+        )
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
+
+
+def rebuild_generated_artifacts(
+    *,
+    listings_path: Path = CURRENT_LISTINGS_PATH,
+    paths: NativeMarketPaths = NativeMarketPaths(),
+    before_promote: Callable[[Path, Path], None] | None = None,
+    progress_callback: NativeProgressCallback | None = None,
+) -> NativeMarketBuildResult:
+    """Run a source-preserving canonical artifact rebuild atomically."""
+
+    try:
+        return _rebuild_generated_artifacts_impl(
+            listings_path=listings_path,
+            paths=paths,
+            before_promote=before_promote,
+            progress_callback=progress_callback,
+        )
+    except Exception as exc:
+        _write_failure_audit(
+            paths=paths,
+            operation="artifact_rebuild",
+            source_paths=(),
+            error=exc,
+        )
+        raise
 
 
 def _assert_full_source_does_not_regress(
@@ -896,6 +1149,7 @@ def _incremental_update_impl(
     listings_path: Path = CURRENT_LISTINGS_PATH,
     paths: NativeMarketPaths = NativeMarketPaths(),
     before_promote: Callable[[Path, Path], None] | None = None,
+    progress_callback: NativeProgressCallback | None = None,
 ) -> NativeMarketBuildResult:
     """Merge new daily evidence and atomically rewrite the generated bundle.
 
@@ -912,9 +1166,7 @@ def _incremental_update_impl(
     old_state = _load_existing_state(paths.state_json)
     existing = _existing_canonical_records(paths.consolidated_parquet)
     combined_core, idempotent_rows = _merge_incremental_core(existing, incoming)
-    previous_sources = tuple(
-        SourceEvidence(**item) for item in old_state.get("source_files", [])
-    )
+    previous_sources = _state_source_evidence(old_state)
     by_name = {item.name: item for item in previous_sources}
     for item in incoming_sources:
         prior = by_name.get(item.name)
@@ -928,10 +1180,13 @@ def _incremental_update_impl(
     current_snapshot_dates = sorted(
         enriched["sector_snapshot_date"].dropna().astype(str).unique().tolist()
     )
+    merged_sources = tuple(sorted(by_name.values(), key=lambda item: item.name))
+    merged_source_hash = source_set_hash(merged_sources)
     if (
         idempotent_rows == len(incoming)
         and canonical_content_hash(enriched) == str(old_state["canonical_content_hash"])
         and sorted(old_state.get("sector_snapshot_dates", [])) == current_snapshot_dates
+        and merged_source_hash == str(old_state["source_set_hash"])
     ):
         return _result_from_state(
             old_state,
@@ -948,12 +1203,17 @@ def _incremental_update_impl(
         staged, state = _write_generated_bundle(
             enriched,
             staging_root,
-            sources=tuple(sorted(by_name.values(), key=lambda item: item.name)),
+            sources=merged_sources,
             operation="incremental",
             rows_read=rows_read,
             operation_rows_accepted=len(incoming) - idempotent_rows,
             duplicate_count=idempotent_rows,
             sector_matched_symbols=matched,
+            rows_added=len(incoming) - idempotent_rows,
+            base_paths=paths,
+            affected_symbols=tuple(incoming["symbol"].astype(str).unique()),
+            affected_dates=tuple(pd.to_datetime(incoming["market_date"]).dt.date.unique()),
+            progress_callback=progress_callback,
         )
         _promote_bundle(staged, paths, before_promote=before_promote)
         return _result_from_state(state, paths=paths, comparison=None)
@@ -967,6 +1227,7 @@ def incremental_update(
     listings_path: Path = CURRENT_LISTINGS_PATH,
     paths: NativeMarketPaths = NativeMarketPaths(),
     before_promote: Callable[[Path, Path], None] | None = None,
+    progress_callback: NativeProgressCallback | None = None,
 ) -> NativeMarketBuildResult:
     """Run an incremental update and retain a separate atomic failure audit."""
 
@@ -976,6 +1237,7 @@ def incremental_update(
             listings_path=listings_path,
             paths=paths,
             before_promote=before_promote,
+            progress_callback=progress_callback,
         )
     except Exception as exc:
         _write_failure_audit(
