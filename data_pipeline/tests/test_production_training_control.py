@@ -33,14 +33,19 @@ from reinforcement_learning.training.production_control import (
     PRODUCTION_RUN_KIND,
     ControllerStatus,
     ProductionControlError,
+    RunCatalogEntry,
     aggregate_training_progress,
     build_job_table,
     calculate_training_progress,
     classify_run,
     controller_status,
+    default_run_selection,
     launch_production_controller,
+    list_run_catalog,
+    load_run_snapshot,
     load_validation_metrics,
     job_training_progress,
+    latest_job_diagnostics,
     production_plan,
     recent_orchestration_events,
     recover_dead_controller,
@@ -166,8 +171,8 @@ def test_progress_states_and_eta_require_real_completed_history() -> None:
     assert prepared.system_status == "NOT_STARTED"
     assert prepared.estimated_remaining_seconds is None
     assert running.system_status == "RUNNING"
-    assert failed.system_status == "PARTIAL_FAILURE"
-    assert interrupted.system_status == "PAUSED/INTERRUPTED"
+    assert failed.system_status == "FAILED"
+    assert interrupted.system_status == "INTERRUPTED"
     assert completed.system_status == "COMPLETED"
     assert completed.progress_percent == 100.0
 
@@ -176,9 +181,145 @@ def test_progress_states_and_eta_require_real_completed_history() -> None:
         replace(_job("BBB", status=COMPLETED), started_at="2026-08-28T00:00:00+00:00", completed_at="2026-08-28T00:04:00+00:00"),
         _job("CCC"),
     )
-    evidenced = summarize_run(jobs, _controller())
+    evidenced = summarize_run(jobs, _controller(state="RUNNING", alive=True))
     assert evidenced.agents_per_hour == pytest.approx(30.0)
     assert evidenced.estimated_remaining_seconds == pytest.approx(120.0)
+
+
+def test_stopped_after_current_is_not_not_started_and_has_no_eta() -> None:
+    jobs = (
+        replace(
+            _job("DONE1", status=COMPLETED),
+            started_at="2026-08-28T00:00:00+00:00",
+            completed_at="2026-08-28T00:02:00+00:00",
+        ),
+        replace(
+            _job("DONE2", status=COMPLETED),
+            started_at="2026-08-28T00:00:00+00:00",
+            completed_at="2026-08-28T00:04:00+00:00",
+        ),
+        _job("WAITING"),
+        _job("NOPE", status=INELIGIBLE),
+    )
+    stopped = summarize_run(
+        jobs, _controller(state="STOPPED_AFTER_CURRENT", alive=False)
+    )
+
+    assert stopped.system_status == "STOPPED_AFTER_CURRENT"
+    assert stopped.completed == 2
+    assert stopped.queued == 1
+    assert stopped.ineligible == 1
+    assert stopped.active == 0
+    assert stopped.agents_per_hour == pytest.approx(30.0)
+    assert stopped.estimated_remaining_seconds is None
+
+
+def test_persisted_stopped_status_is_shared_by_controller_catalog_and_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    state_path = store.run_directory / CONTROLLER_STATE_FILENAME
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": PRODUCTION_CONTROL_VERSION,
+                "run_id": "run-small",
+                "state": "STOPPED_AFTER_CURRENT",
+                "pid": 123,
+                "started_at": NOW,
+                "updated_at": NOW,
+                "completed_at": NOW,
+                "message": "deliberate stop",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "reinforcement_learning.training.production_control._identity_lookup",
+        lambda: pd.DataFrame(
+            {"symbol": ["AAA"], "company_name": ["AAA Limited"], "sector": ["BANKS"]}
+        ),
+    )
+
+    controller = controller_status(store.run_directory)
+    catalog = list_run_catalog(runs_root=tmp_path)
+    snapshot = load_run_snapshot(store.run_directory, recover_dead=False)
+
+    assert controller.state == "STOPPED_AFTER_CURRENT"
+    assert catalog[0].status == "STOPPED_AFTER_CURRENT"
+    assert snapshot.progress.system_status == "STOPPED_AFTER_CURRENT"
+    assert snapshot.controller.state == snapshot.progress.system_status
+
+
+def test_default_run_selection_preserves_explicit_then_active_then_newest() -> None:
+    production = RunCatalogEntry(
+        run_id="production",
+        run_directory=Path("production"),
+        run_kind="FULL_PRODUCTION",
+        created_at="2026-08-28T00:00:00+00:00",
+        status="STOPPED_AFTER_CURRENT",
+        identity_count=508,
+        eligible_count=435,
+        universe_hash="a" * 64,
+    )
+    selected = replace(
+        production,
+        run_id="selected",
+        run_directory=Path("selected"),
+        run_kind="SELECTED",
+        created_at="2026-08-30T00:00:00+00:00",
+        status="COMPLETED",
+        identity_count=12,
+        eligible_count=12,
+    )
+    active = replace(
+        selected,
+        run_id="active",
+        run_directory=Path("active"),
+        created_at="2026-08-29T00:00:00+00:00",
+        status="RUNNING",
+    )
+
+    assert default_run_selection((production, selected, active), "production") == (
+        "production"
+    )
+    assert default_run_selection((production, selected, active), None) == "active"
+    stopping = replace(
+        active,
+        run_id="stopping",
+        run_directory=Path("stopping"),
+        created_at="2026-08-28T12:00:00+00:00",
+        status="STOPPING_AFTER_CURRENT",
+    )
+    assert default_run_selection((production, selected, stopping), None) == "stopping"
+    assert default_run_selection((production, selected), None) == "selected"
+    assert default_run_selection((), None) is None
+
+
+def test_latest_diagnostics_exposes_canonical_approximate_kl_without_retraining(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path, status=COMPLETED)
+    log_path = store.run_directory / "logs" / "AAA" / "attempt_000.json"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        json.dumps(
+            {
+                "training_diagnostics": {
+                    "timesteps": 100_352,
+                    "approximate_kl": 0.0166595,
+                    "clip_fraction": 0.12,
+                },
+                "test_partition_loaded": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    diagnostics = latest_job_diagnostics(store, "AAA")
+
+    assert diagnostics["approximate_kl"] == pytest.approx(0.0166595)
+    assert "approx_kl" not in diagnostics
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,10 @@ from reinforcement_learning.training.production_control import (
     RunProgress,
     RunSnapshot,
 )
-from reinforcement_learning.training.selective_training import CoverageSummary
+from reinforcement_learning.training.selective_training import (
+    SELECTED_RUN_KIND,
+    CoverageSummary,
+)
 
 
 PAGE_PATH = Path(__file__).resolve().parents[2] / "app_pages" / "6_Training_and_Models.py"
@@ -32,7 +35,7 @@ class _Store:
         return SimpleNamespace(validation_metrics_reference=None)
 
 
-def _job_table(state: str) -> pd.DataFrame:
+def _job_table(state: str, *, symbols: tuple[str, ...] = ("AAA",)) -> pd.DataFrame:
     active = state in {"TRAINING", "VALIDATING"}
     completed = state == "COMPLETED"
     failed = state == "FAILED"
@@ -52,8 +55,8 @@ def _job_table(state: str) -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "symbol": "AAA",
-                "company_name": "AAA Limited",
+                "symbol": symbol,
+                "company_name": f"{symbol} Limited",
                 "sector": "COMMERCIAL BANKS",
                 "eligibility": "eligible",
                 "state": state,
@@ -69,26 +72,37 @@ def _job_table(state: str) -> pd.DataFrame:
                 "attempts": 1,
                 "last_error": "RuntimeError: isolated failure" if failed else None,
                 "error_type": "RuntimeError" if failed else "",
-                "model_path": "models/AAA/model.zip" if completed else None,
+                "model_path": f"models/{symbol}/model.zip" if completed else None,
                 "model_artifact_status": "available" if completed else "not_created",
                 "effective_device": "cpu" if active or completed else None,
                 "worker_pid": 321 if active else None,
                 "worker_slot": 1 if active else None,
                 "cpu_threads": 2 if active else None,
             }
+            for symbol in symbols
         ]
     )
 
 
-def _snapshot(tmp_path: Path, system_status: str, job_state: str) -> RunSnapshot:
-    jobs = _job_table(job_state)
-    completed = int(job_state == "COMPLETED")
-    failed = int(job_state == "FAILED")
-    interrupted = int(job_state == "INTERRUPTED")
-    active = int(job_state in {"TRAINING", "VALIDATING"})
-    queued = int(job_state == "QUEUED")
+def _snapshot(
+    tmp_path: Path,
+    system_status: str,
+    job_state: str,
+    *,
+    run_kind: str = PRODUCTION_RUN_KIND,
+    run_id: str = "run-production",
+    symbols: tuple[str, ...] = ("AAA",),
+    controller_state: str | None = None,
+) -> RunSnapshot:
+    jobs = _job_table(job_state, symbols=symbols)
+    count = len(symbols)
+    completed = count if job_state == "COMPLETED" else 0
+    failed = count if job_state == "FAILED" else 0
+    interrupted = count if job_state == "INTERRUPTED" else 0
+    active = count if job_state in {"TRAINING", "VALIDATING"} else 0
+    queued = count if job_state == "QUEUED" else 0
     controller = ControllerStatus(
-        state="RUNNING" if active else system_status,
+        state=controller_state or ("RUNNING" if active else system_status),
         pid=123 if active else None,
         alive=bool(active),
         started_at="2026-08-28T00:00:00+00:00" if active else None,
@@ -98,7 +112,7 @@ def _snapshot(tmp_path: Path, system_status: str, job_state: str) -> RunSnapshot
         log_path="logs/production_controller.log",
     )
     manifest = SimpleNamespace(
-        run_id="run-production",
+        run_id=run_id,
         identity_policy="current_common_equity_universe_v1",
         identity_snapshot="2026-08-02",
         universe_hash="a" * 64,
@@ -107,18 +121,18 @@ def _snapshot(tmp_path: Path, system_status: str, job_state: str) -> RunSnapshot
     )
     progress = RunProgress(
         system_status=system_status,
-        eligible=1,
+        eligible=count,
         completed=completed,
         active=active,
-        training=int(job_state == "TRAINING"),
-        validating=int(job_state == "VALIDATING"),
+        training=count if job_state == "TRAINING" else 0,
+        validating=count if job_state == "VALIDATING" else 0,
         queued=queued,
         failed=failed,
         interrupted=interrupted,
         stale=0,
         ineligible=0,
-        completed_training_timesteps=int(jobs.iloc[0]["actual_timesteps"]),
-        requested_training_timesteps=100_000,
+        completed_training_timesteps=int(jobs["actual_timesteps"].sum()),
+        requested_training_timesteps=100_000 * count,
         progress_percent=float(jobs.iloc[0]["progress_percent"]),
         elapsed_seconds=240.0 if completed else None,
         agents_per_hour=15.0 if completed else None,
@@ -127,7 +141,7 @@ def _snapshot(tmp_path: Path, system_status: str, job_state: str) -> RunSnapshot
     return RunSnapshot(
         store=_Store(tmp_path),
         manifest=manifest,
-        run_kind=PRODUCTION_RUN_KIND,
+        run_kind=run_kind,
         controller=controller,
         progress=progress,
         jobs=jobs,
@@ -144,9 +158,9 @@ def _patch_page_backend(
         monkeypatch.setattr(f"{module}.list_run_catalog", lambda: ())
     else:
         entry = RunCatalogEntry(
-            run_id="run-production",
+            run_id=snapshot.manifest.run_id,
             run_directory=tmp_path,
-            run_kind=PRODUCTION_RUN_KIND,
+            run_kind=snapshot.run_kind,
             created_at="2026-08-28T00:00:00+00:00",
             status=snapshot.progress.system_status,
             identity_count=508,
@@ -209,9 +223,9 @@ def _patch_page_backend(
         lambda: (
             coverage,
             CoverageSummary(
-                eligible=2,
-                trained=1,
-                untrained=1,
+                eligible=435,
+                trained=16,
+                untrained=419,
                 training=0,
                 validating=0,
                 failed=0,
@@ -248,9 +262,9 @@ def test_selective_ui_has_persistent_coverage_and_no_default_selection(
 
     assert not app.exception
     metrics = {item.label: item.value for item in app.metric}
-    assert metrics["Eligible symbols"] == "2"
-    assert metrics["Trained"] == "1"
-    assert metrics["Untrained"] == "1"
+    assert metrics["Eligible symbols"] == "435"
+    assert metrics["Trained"] == "16"
+    assert metrics["Untrained"] == "419"
     editor = next(
         item
         for item in app.dataframe
@@ -339,8 +353,8 @@ def test_select_visible_clear_visible_and_clear_all_buttons(
         ("NOT_STARTED", "QUEUED", "Start / continue run"),
         ("RUNNING", "TRAINING", "Stop after current jobs"),
         ("RUNNING", "VALIDATING", "Stop after current jobs"),
-        ("PARTIAL_FAILURE", "FAILED", "Retry all failed"),
-        ("PAUSED/INTERRUPTED", "INTERRUPTED", "Requeue interrupted"),
+        ("FAILED", "FAILED", "Retry all failed"),
+        ("INTERRUPTED", "INTERRUPTED", "Requeue interrupted"),
         ("COMPLETED", "COMPLETED", "Refresh status"),
     ],
 )
@@ -405,3 +419,154 @@ def test_active_card_clamps_rollout_overage_but_preserves_actual_text(
     assert progress_elements[-1].text == (
         "100,352 / 100,000 timesteps · 100.0%"
     )
+
+
+def test_latest_completed_selected_run_remains_selected_and_shows_completion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    symbols = tuple(f"S{index:02d}" for index in range(12))
+    selected = _snapshot(
+        tmp_path / "selected",
+        "COMPLETED",
+        "COMPLETED",
+        run_kind=SELECTED_RUN_KIND,
+        run_id="run-selected",
+        symbols=symbols,
+        controller_state="COMPLETED",
+    )
+    production = _snapshot(
+        tmp_path / "production",
+        "STOPPED_AFTER_CURRENT",
+        "QUEUED",
+        run_id="run-production",
+        controller_state="STOPPED_AFTER_CURRENT",
+    )
+    _patch_page_backend(monkeypatch, tmp_path, selected)
+    catalog = (
+        RunCatalogEntry(
+            run_id="run-selected",
+            run_directory=selected.store.run_directory,
+            run_kind=SELECTED_RUN_KIND,
+            created_at="2026-08-30T18:05:30+00:00",
+            status="COMPLETED",
+            identity_count=12,
+            eligible_count=12,
+            universe_hash="a" * 64,
+            selected_count=12,
+            selected_symbol_hash="c" * 64,
+        ),
+        RunCatalogEntry(
+            run_id="run-production",
+            run_directory=production.store.run_directory,
+            run_kind=PRODUCTION_RUN_KIND,
+            created_at="2026-08-28T00:00:00+00:00",
+            status="STOPPED_AFTER_CURRENT",
+            identity_count=508,
+            eligible_count=435,
+            universe_hash="a" * 64,
+        ),
+    )
+    backend = "reinforcement_learning.training.production_control"
+    monkeypatch.setattr(f"{backend}.list_run_catalog", lambda: catalog)
+    monkeypatch.setattr(
+        f"{backend}.load_run_snapshot",
+        lambda path: selected if Path(path).name == "selected" else production,
+    )
+    monkeypatch.setattr(
+        "reinforcement_learning.training.selective_training.load_selected_run_metadata",
+        lambda _: SimpleNamespace(
+            selected_symbols=symbols,
+            selected_symbol_hash="c" * 64,
+            attempt_version=0,
+        ),
+    )
+
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    assert not app.exception
+    assert app.session_state["training_control_run_id"] == "run-selected"
+    assert app.selectbox(key="training_control_run_id").value == "run-selected"
+    metrics = [(item.label, item.value) for item in app.metric]
+    assert ("Run type", "SELECTED") in metrics
+    assert ("Completed", "12 / 12") in metrics
+    assert ("Failed", "0") in metrics
+    assert ("Interrupted", "0") in metrics
+    assert ("Validation completed", "12 / 12") in metrics
+    assert ("Final status", "COMPLETED") in metrics
+    rendered = "\n".join(
+        str(item.value)
+        for kind in ("caption", "success", "markdown")
+        for item in app.get(kind)
+    )
+    assert "Membership hash" in rendered
+    app.run()
+    assert app.session_state["training_control_run_id"] == "run-selected"
+    assert app.selectbox(key="training_control_run_id").value == "run-selected"
+
+
+def test_stopped_production_status_is_consistent_and_has_no_active_eta(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    snapshot = _snapshot(
+        tmp_path,
+        "STOPPED_AFTER_CURRENT",
+        "QUEUED",
+        controller_state="STOPPED_AFTER_CURRENT",
+    )
+    snapshot = replace(
+        snapshot,
+        progress=replace(
+            snapshot.progress,
+            eligible=435,
+            completed=4,
+            queued=431,
+            ineligible=73,
+            completed_training_timesteps=400_000,
+            requested_training_timesteps=43_500_000,
+            progress_percent=400_000 / 43_500_000 * 100.0,
+            elapsed_seconds=313.59,
+            agents_per_hour=45.92,
+            estimated_remaining_seconds=None,
+        ),
+    )
+    _patch_page_backend(monkeypatch, tmp_path, snapshot)
+
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    assert not app.exception
+    rendered = "\n".join(
+        str(item.value)
+        for kind in ("caption", "warning", "markdown")
+        for item in app.get(kind)
+    )
+    assert "Execution status: STOPPED_AFTER_CURRENT" in rendered
+    assert "Remaining work: 431 agents" in rendered
+    assert "ETA unavailable while run is stopped" in rendered
+    assert "Active estimated remaining time" not in rendered
+    assert "NOT_STARTED" not in rendered
+    history = next(
+        item
+        for item in app.dataframe
+        if "run_type" in item.value.columns and "status" in item.value.columns
+    )
+    assert history.value.iloc[0]["status"] == "STOPPED_AFTER_CURRENT"
+    assert app.selectbox(key="training_control_run_id").options[0].endswith(
+        "STOPPED_AFTER_CURRENT"
+    )
+
+
+def test_empty_promotion_registry_still_reports_run_isolated_model_inventory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    snapshot = _snapshot(tmp_path, "COMPLETED", "COMPLETED")
+    _patch_page_backend(monkeypatch, tmp_path, snapshot)
+
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    assert not app.exception
+    metrics = {item.label: item.value for item in app.metric}
+    assert metrics["Verified recurrent models"] == "16"
+    assert metrics["Registry-promoted models"] == "0"
+    captions = "\n".join(item.value for item in app.caption)
+    assert "optional promoted model registry contains no rows" in captions
+    assert "No model registry records exist" not in captions

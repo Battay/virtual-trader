@@ -9,6 +9,7 @@ from reinforcement_learning.training.production_control import (
     PRODUCTION_RUN_KIND,
     ProductionControlError,
     bounded_log_tail,
+    default_run_selection,
     latest_job_diagnostics,
     launch_production_controller,
     list_run_catalog,
@@ -59,6 +60,14 @@ SELECTOR_COLUMNS = (
 SELECTOR_READ_ONLY_COLUMNS = tuple(
     column for column in SELECTOR_COLUMNS if column != "selected"
 )
+TRAINING_DIAGNOSTIC_FIELDS = (
+    ("explained_variance", "explained_variance"),
+    ("approx_kl", "approximate_kl"),
+    ("clip_fraction", "clip_fraction"),
+    ("entropy_loss", "entropy_loss"),
+    ("value_loss", "value_loss"),
+    ("policy_gradient_loss", "policy_gradient_loss"),
+)
 
 
 def _duration(seconds: object) -> str:
@@ -75,9 +84,14 @@ def _status_callout(status: str, message: str) -> None:
         st.info(message, icon=":material/progress_activity:")
     elif status == "COMPLETED":
         st.success(message, icon=":material/check_circle:")
-    elif status in {"PARTIAL_FAILURE", "PAUSED/INTERRUPTED"}:
+    elif status in {
+        "STOPPED_AFTER_CURRENT",
+        "STOPPING_AFTER_CURRENT",
+        "PAUSED",
+        "INTERRUPTED",
+    }:
         st.warning(message, icon=":material/warning:")
-    elif status == "BLOCKED":
+    elif status in {"BLOCKED", "FAILED"}:
         st.error(message, icon=":material/error:")
     else:
         st.caption(message)
@@ -449,12 +463,13 @@ if coverage_summary is not None:
 st.subheader("Run selection and controls")
 if catalog:
     options = {entry.run_id: entry for entry in catalog}
-    production_ids = [
-        entry.run_id for entry in catalog if entry.run_kind == PRODUCTION_RUN_KIND
-    ]
-    default_id = production_ids[0] if production_ids else catalog[0].run_id
-    if st.session_state.get("training_control_run_id") not in options:
-        st.session_state["training_control_run_id"] = default_id
+    selected_default = default_run_selection(
+        catalog, st.session_state.get("training_control_run_id")
+    )
+    if selected_default is not None and (
+        st.session_state.get("training_control_run_id") != selected_default
+    ):
+        st.session_state["training_control_run_id"] = selected_default
     selected_run_id = st.selectbox(
         "Run",
         list(options),
@@ -511,7 +526,7 @@ with st.container(border=True):
     else:
         st.markdown(
             f"**{snapshot.run_kind}** · `{snapshot.manifest.run_id}` · "
-            f"controller `{snapshot.controller.state}`"
+            f"status `{snapshot.progress.system_status}`"
         )
         if snapshot.run_kind not in {PRODUCTION_RUN_KIND, SELECTED_RUN_KIND}:
             st.warning(
@@ -597,6 +612,37 @@ with st.container(border=True):
 
 if snapshot is not None:
     progress = snapshot.progress
+    selected_metadata = (
+        load_selected_run_metadata(snapshot.store.run_directory)
+        if snapshot.run_kind == SELECTED_RUN_KIND
+        else None
+    )
+    if selected_metadata is not None and progress.system_status == "COMPLETED":
+        validations_completed = int(
+            snapshot.jobs["validation_status"].eq("completed").sum()
+        )
+        with st.container(border=True):
+            st.markdown("**Selected run completed**")
+            with st.container(horizontal=True):
+                st.metric("Run type", SELECTED_RUN_KIND, border=True)
+                st.metric(
+                    "Completed",
+                    f"{progress.completed:,} / {progress.eligible:,}",
+                    border=True,
+                )
+                st.metric("Failed", progress.failed, border=True)
+                st.metric("Interrupted", progress.interrupted, border=True)
+            with st.container(horizontal=True):
+                st.metric(
+                    "Validation completed",
+                    f"{validations_completed:,} / {progress.eligible:,}",
+                    border=True,
+                )
+                st.metric("Elapsed", _duration(progress.elapsed_seconds), border=True)
+                st.metric("Final status", progress.system_status, border=True)
+            st.caption(
+                f"Membership hash: `{selected_metadata.selected_symbol_hash}`"
+            )
     st.subheader("Overall progress")
     _status_callout(progress.system_status, f"Execution status: {progress.system_status}")
     if (
@@ -629,28 +675,33 @@ if snapshot is not None:
         st.metric("Interrupted", progress.interrupted, border=True)
         st.metric("Ineligible", progress.ineligible, border=True)
         st.metric("Elapsed", _duration(progress.elapsed_seconds), border=True)
-    st.caption(
-        "Observed throughput: "
-        + (
-            f"{progress.agents_per_hour:.2f} agents/hour"
-            if progress.agents_per_hour is not None
-            else "not available until at least two jobs complete over one minute"
-        )
-        + " · Estimated remaining time: "
-        + (
-            _duration(progress.estimated_remaining_seconds)
-            if progress.estimated_remaining_seconds is not None
-            else "not yet defensible"
-        )
+    historical_throughput = (
+        f"{progress.agents_per_hour:.2f} agents/hour"
+        if progress.agents_per_hour is not None
+        else "unavailable until at least two completions span one minute"
     )
+    st.caption(f"Historical observed throughput: {historical_throughput}")
+    remaining_agents = max(0, progress.eligible - progress.completed)
+    if progress.system_status == "RUNNING":
+        if progress.estimated_remaining_seconds is not None:
+            st.caption(
+                "Active estimated remaining time: "
+                + _duration(progress.estimated_remaining_seconds)
+            )
+        else:
+            st.caption("Active ETA unavailable: insufficient throughput evidence.")
+    elif progress.system_status in {"STOPPED_AFTER_CURRENT", "PAUSED"}:
+        st.caption(
+            f"Remaining work: {remaining_agents:,} agents · "
+            "ETA unavailable while run is stopped."
+        )
     if progress.system_status == "COMPLETED":
         st.success(
             "TRAIN and VALIDATION complete. TEST remains sealed.",
             icon=":material/verified:",
         )
 
-    if snapshot.run_kind == SELECTED_RUN_KIND:
-        selected_metadata = load_selected_run_metadata(snapshot.store.run_directory)
+    if selected_metadata is not None:
         st.caption(
             f"SELECTED membership: {len(selected_metadata.selected_symbols)} · "
             f"hash `{selected_metadata.selected_symbol_hash}` · "
@@ -700,21 +751,15 @@ if snapshot is not None:
                         snapshot.store, active.symbol
                     )
                     if diagnostics:
-                        diagnostic_keys = (
-                            "explained_variance",
-                            "approx_kl",
-                            "clip_fraction",
-                            "entropy_loss",
-                            "value_loss",
-                            "policy_gradient_loss",
-                        )
                         st.dataframe(
                             pd.DataFrame(
                                 {
-                                    "Metric": diagnostic_keys,
+                                    "Metric": [
+                                        label for label, _ in TRAINING_DIAGNOSTIC_FIELDS
+                                    ],
                                     "Value": [
-                                        diagnostics.get(key)
-                                        for key in diagnostic_keys
+                                        diagnostics.get(source_key)
+                                        for _, source_key in TRAINING_DIAGNOSTIC_FIELDS
                                     ],
                                 }
                             ),
@@ -840,16 +885,35 @@ if snapshot is not None:
                 except ProductionControlError as exc:
                     st.error(str(exc))
 
-    st.subheader("Model registry")
+    st.subheader("Recurrent model inventory")
     try:
         models = registry_view()
     except ProductionControlError as exc:
         st.error(f"Model registry could not be verified: {exc}")
         models = pd.DataFrame(columns=["symbol", "model_family"])
+    registry_recurrent_count = (
+        int(models["model_family"].eq("RECURRENT").sum())
+        if "model_family" in models.columns
+        else 0
+    )
+    with st.container(horizontal=True):
+        st.metric(
+            "Verified recurrent models",
+            coverage_summary.trained if coverage_summary is not None else "Unavailable",
+            border=True,
+        )
+        st.metric(
+            "Registry-promoted models", registry_recurrent_count, border=True
+        )
+    st.caption(
+        "Verified models are integrity-checked run-isolated artifacts. The model "
+        "registry is an optional promotion layer and is not required for those "
+        "artifacts to exist."
+    )
     if models.empty:
         st.caption(
-            "No model registry records exist. Run-isolated recurrent artifacts are "
-            "tracked by job state and are not silently promoted or registered."
+            "The optional promoted model registry contains no rows. Verified "
+            "run-isolated recurrent models remain available in their training runs."
         )
     else:
         family = st.segmented_control(
@@ -907,14 +971,18 @@ if snapshot is not None:
             st.metric("Device", safe_display_value(detail["effective_device"]), border=True)
         diagnostics = latest_job_diagnostics(snapshot.store, selected_symbol)
         if diagnostics:
-            keys = (
-                "explained_variance", "approx_kl", "clip_fraction", "entropy_loss",
-                "value_loss", "policy_gradient_loss",
-            )
             st.markdown("**Training diagnostics**")
             st.dataframe(
                 pd.DataFrame(
-                    {"Metric": keys, "Value": [diagnostics.get(key) for key in keys]}
+                    {
+                        "Metric": [
+                            label for label, _ in TRAINING_DIAGNOSTIC_FIELDS
+                        ],
+                        "Value": [
+                            diagnostics.get(source_key)
+                            for _, source_key in TRAINING_DIAGNOSTIC_FIELDS
+                        ],
+                    }
                 ),
                 hide_index=True,
             )
@@ -953,7 +1021,8 @@ if snapshot is not None:
         st.json(
             {
                 "controller": {
-                    "state": snapshot.controller.state,
+                    "normalized_execution_status": progress.system_status,
+                    "persisted_controller_state": snapshot.controller.state,
                     "pid": snapshot.controller.pid,
                     "alive": snapshot.controller.alive,
                     "started_at": snapshot.controller.started_at,

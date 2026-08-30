@@ -95,6 +95,15 @@ CONTROLLER_LOG_FILENAME = "production_controller.log"
 CONTROLLER_ACTIVE_STATES = frozenset(
     {"STARTING", "RUNNING", "STOP_AFTER_CURRENT_REQUESTED", "INTERRUPT_REQUESTED"}
 )
+RUNNING_STATUS = "RUNNING"
+COMPLETED_STATUS = "COMPLETED"
+STOPPED_AFTER_CURRENT_STATUS = "STOPPED_AFTER_CURRENT"
+STOPPING_AFTER_CURRENT_STATUS = "STOPPING_AFTER_CURRENT"
+INTERRUPTED_STATUS = "INTERRUPTED"
+FAILED_STATUS = "FAILED"
+PAUSED_STATUS = "PAUSED"
+BLOCKED_STATUS = "BLOCKED"
+NOT_STARTED_STATUS = "NOT_STARTED"
 
 
 class ProductionControlError(RuntimeError):
@@ -567,6 +576,63 @@ def _elapsed_bounds(jobs: Sequence[TrainingJobRecord], controller: ControllerSta
     return start.timestamp(), max(0.0, (end - start).total_seconds())
 
 
+def normalize_run_status(
+    jobs: Sequence[TrainingJobRecord], controller: ControllerStatus
+) -> str:
+    """Return one persisted execution status for catalog, history, and UI."""
+
+    counts = pd.Series([job.status for job in jobs], dtype="string").value_counts()
+    eligible = sum(job.trainability == "eligible" for job in jobs)
+    completed = int(counts.get(COMPLETED, 0))
+    training = int(counts.get(TRAINING, 0))
+    validating = int(counts.get(VALIDATING, 0))
+    failed = int(counts.get(FAILED, 0))
+    interrupted = int(counts.get(INTERRUPTED, 0))
+    stale = int(counts.get(STALE, 0))
+    controller_state = str(controller.state or "").upper()
+
+    if controller.alive:
+        if controller_state == "STOP_AFTER_CURRENT_REQUESTED":
+            return STOPPING_AFTER_CURRENT_STATUS
+        if controller_state == "INTERRUPT_REQUESTED":
+            return INTERRUPTED_STATUS
+        return RUNNING_STATUS
+    if eligible > 0 and completed == eligible:
+        return COMPLETED_STATUS
+    if controller_state in {
+        "STOPPED_AFTER_CURRENT",
+        "STOPPING_AFTER_CURRENT",
+    }:
+        return STOPPED_AFTER_CURRENT_STATUS
+    if "INTERRUPT" in controller_state or interrupted:
+        return INTERRUPTED_STATUS
+    if controller_state in {"FAILED", "PARTIAL_FAILURE"} or failed:
+        return FAILED_STATUS
+    if stale or training or validating:
+        return BLOCKED_STATUS
+    if completed:
+        return PAUSED_STATUS
+    return NOT_STARTED_STATUS
+
+
+def _historical_agents_per_hour(
+    jobs: Sequence[TrainingJobRecord],
+) -> float | None:
+    completed_jobs = [
+        job
+        for job in jobs
+        if job.status == COMPLETED and job.started_at and job.completed_at
+    ]
+    if len(completed_jobs) < 2:
+        return None
+    start = min(datetime.fromisoformat(str(job.started_at)) for job in completed_jobs)
+    end = max(datetime.fromisoformat(str(job.completed_at)) for job in completed_jobs)
+    elapsed = max(0.0, (end - start).total_seconds())
+    if elapsed < 60:
+        return None
+    return len(completed_jobs) / (elapsed / 3600.0)
+
+
 def summarize_run(
     jobs: Sequence[TrainingJobRecord], controller: ControllerStatus
 ) -> RunProgress:
@@ -580,26 +646,16 @@ def summarize_run(
     stale = int(counts.get(STALE, 0))
     aggregate = aggregate_training_progress(jobs)
     _, elapsed = _elapsed_bounds(jobs, controller)
-    rate = None
+    system_status = normalize_run_status(jobs, controller)
+    rate = _historical_agents_per_hour(jobs)
     eta = None
-    if completed >= 2 and elapsed is not None and elapsed >= 60:
-        rate = completed / (elapsed / 3600.0)
-        if rate > 0 and completed < eligible:
-            eta = (eligible - completed) / rate * 3600.0
-    if controller.alive and controller.state in CONTROLLER_ACTIVE_STATES:
-        system_status = "RUNNING"
-    elif stale:
-        system_status = "BLOCKED"
-    elif failed:
-        system_status = "PARTIAL_FAILURE"
-    elif completed == eligible and eligible > 0:
-        system_status = "COMPLETED"
-    elif interrupted:
-        system_status = "PAUSED/INTERRUPTED"
-    elif training or validating:
-        system_status = "BLOCKED"
-    else:
-        system_status = "NOT_STARTED"
+    if (
+        system_status == RUNNING_STATUS
+        and rate is not None
+        and rate > 0
+        and completed < eligible
+    ):
+        eta = (eligible - completed) / rate * 3600.0
     return RunProgress(
         system_status=system_status,
         eligible=eligible,
@@ -619,6 +675,33 @@ def summarize_run(
         agents_per_hour=rate,
         estimated_remaining_seconds=eta,
     )
+
+
+def default_run_selection(
+    catalog: Sequence[RunCatalogEntry], explicit_run_id: str | None
+) -> str | None:
+    """Preserve explicit choice, else prefer active then newest persisted run."""
+
+    entries = tuple(catalog)
+    by_id = {entry.run_id: entry for entry in entries}
+    if explicit_run_id in by_id:
+        return explicit_run_id
+    active = [
+        entry
+        for entry in entries
+        if entry.status in {RUNNING_STATUS, STOPPING_AFTER_CURRENT_STATUS}
+    ]
+    if active:
+        return max(active, key=lambda item: (item.created_at, item.run_id)).run_id
+    dated = [entry for entry in entries if str(entry.created_at).strip()]
+    if dated:
+        return max(dated, key=lambda item: (item.created_at, item.run_id)).run_id
+    production = [
+        entry for entry in entries if entry.run_kind == PRODUCTION_RUN_KIND
+    ]
+    if production:
+        return sorted(production, key=lambda item: item.run_id)[0].run_id
+    return entries[0].run_id if entries else None
 
 
 def _identity_lookup() -> pd.DataFrame:
@@ -1182,12 +1265,14 @@ __all__ = [
     "calculate_training_progress",
     "classify_run",
     "controller_status",
+    "default_run_selection",
     "latest_job_diagnostics",
     "job_training_progress",
     "launch_production_controller",
     "list_run_catalog",
     "load_run_snapshot",
     "load_validation_metrics",
+    "normalize_run_status",
     "prepare_production_run",
     "production_config",
     "production_plan",
