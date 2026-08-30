@@ -30,10 +30,34 @@ from reinforcement_learning.training.selective_training import (
     UNTRAINED,
     SelectiveTrainingError,
     build_global_model_coverage,
+    canonical_symbol_selection,
+    clear_visible_symbols,
     filter_symbol_coverage,
     load_selected_run_metadata,
     prepare_selected_run,
+    reconcile_visible_symbol_selection,
+    select_visible_symbols,
     selected_membership_hash,
+)
+
+
+SELECTOR_STATE_KEY = "selective_training_symbols"
+SELECTOR_EDITOR_KEY = "selective_symbol_checkbox_editor"
+SELECTOR_COLUMNS = (
+    "selected",
+    "symbol",
+    "company_name",
+    "sector",
+    "coverage_status",
+    "latest_progress_percent",
+    "model_status",
+    "validation_status",
+    "latest_run_kind",
+    "latest_run_id",
+    "latest_attempt",
+)
+SELECTOR_READ_ONLY_COLUMNS = tuple(
+    column for column in SELECTOR_COLUMNS if column != "selected"
 )
 
 
@@ -85,16 +109,39 @@ def _filtered_jobs(
     return filtered.reset_index(drop=True)
 
 
-def _set_visible_selection(symbols: tuple[str, ...]) -> None:
-    selected = set(st.session_state.get("selective_training_symbols", ()))
-    selected.update(symbols)
-    st.session_state["selective_training_symbols"] = sorted(selected)
-    st.session_state["selective_visible_symbols"] = list(symbols)
+def _reset_selector_editor() -> None:
+    st.session_state.pop(SELECTOR_EDITOR_KEY, None)
 
 
-def _clear_symbol_selection() -> None:
-    st.session_state["selective_training_symbols"] = []
-    st.session_state["selective_visible_symbols"] = []
+def _set_visible_selection(
+    visible_symbols: tuple[str, ...], eligible_symbols: tuple[str, ...]
+) -> None:
+    st.session_state[SELECTOR_STATE_KEY] = list(
+        select_visible_symbols(
+            st.session_state.get(SELECTOR_STATE_KEY, ()),
+            visible_symbols=visible_symbols,
+            eligible_symbols=eligible_symbols,
+        )
+    )
+    _reset_selector_editor()
+
+
+def _clear_visible_selection(
+    visible_symbols: tuple[str, ...], eligible_symbols: tuple[str, ...]
+) -> None:
+    st.session_state[SELECTOR_STATE_KEY] = list(
+        clear_visible_symbols(
+            st.session_state.get(SELECTOR_STATE_KEY, ()),
+            visible_symbols=visible_symbols,
+            eligible_symbols=eligible_symbols,
+        )
+    )
+    _reset_selector_editor()
+
+
+def _clear_all_selection() -> None:
+    st.session_state[SELECTOR_STATE_KEY] = []
+    _reset_selector_editor()
 
 
 st.space("medium")
@@ -233,76 +280,76 @@ if coverage_summary is not None:
             sectors=coverage_sectors,
             search=coverage_search,
         )
+        eligible_symbols = tuple(coverage["symbol"].astype(str))
         visible_symbols = tuple(filtered_coverage["symbol"].astype(str))
-        selected_symbols = set(
-            str(value)
-            for value in st.session_state.get("selective_training_symbols", ())
+        selected_symbols = canonical_symbol_selection(
+            st.session_state.get(SELECTOR_STATE_KEY, ()),
+            eligible_symbols=eligible_symbols,
         )
-        visible_default = sorted(selected_symbols.intersection(visible_symbols))
-        previous_visible = tuple(
-            st.session_state.get("selective_visible_options", ())
-        )
-        if previous_visible != visible_symbols:
-            st.session_state["selective_visible_options"] = list(visible_symbols)
-            st.session_state["selective_visible_symbols"] = visible_default
-        chosen_visible = st.multiselect(
-            "Selected symbols in this filtered view",
-            list(visible_symbols),
-            key="selective_visible_symbols",
-            placeholder="Choose symbols; no symbol is selected by default",
-        )
-        selected_symbols.difference_update(visible_symbols)
-        selected_symbols.update(chosen_visible)
-        selected_symbols.intersection_update(set(coverage["symbol"].astype(str)))
-        st.session_state["selective_training_symbols"] = sorted(selected_symbols)
-        with st.container(horizontal=True):
-            st.button(
-                f"Select visible ({len(visible_symbols)})",
-                icon=":material/select_all:",
-                on_click=_set_visible_selection,
-                args=(visible_symbols,),
-                disabled=not visible_symbols,
-            )
-            st.button(
-                "Clear selection",
-                icon=":material/deselect:",
-                on_click=_clear_symbol_selection,
-                disabled=not selected_symbols,
-            )
-            st.caption(
-                f"{len(selected_symbols)} selected · {len(filtered_coverage)} visible"
-            )
+        st.session_state[SELECTOR_STATE_KEY] = list(selected_symbols)
         shown_coverage = filtered_coverage.copy(deep=True)
         shown_coverage.insert(
             0, "selected", shown_coverage["symbol"].isin(selected_symbols)
         )
-        st.dataframe(
-            shown_coverage.loc[
-                :,
-                [
-                    "selected",
-                    "symbol",
-                    "company_name",
-                    "sector",
-                    "coverage_status",
-                    "latest_progress_percent",
-                    "model_status",
-                    "validation_status",
-                    "latest_run_kind",
-                    "latest_run_id",
-                    "latest_attempt",
-                ],
-            ],
+        editor_input = shown_coverage.loc[:, list(SELECTOR_COLUMNS)].set_index(
+            "symbol", drop=False
+        )
+        edited_coverage = st.data_editor(
+            editor_input,
             hide_index=True,
+            num_rows="fixed",
+            disabled=SELECTOR_READ_ONLY_COLUMNS,
             column_config={
-                "selected": st.column_config.CheckboxColumn("Selected"),
+                "selected": st.column_config.CheckboxColumn(
+                    "Selected",
+                    help="Select this eligible symbol for a SELECTED training run.",
+                ),
                 "symbol": st.column_config.TextColumn("Symbol", pinned=True),
                 "latest_progress_percent": st.column_config.ProgressColumn(
                     "Latest progress", min_value=0, max_value=100, format="%.1f%%"
                 ),
             },
-            key="selective_symbol_coverage_table",
+            key=SELECTOR_EDITOR_KEY,
         )
+        checked_visible = tuple(
+            edited_coverage.loc[
+                edited_coverage["selected"].astype(bool), "symbol"
+            ].astype(str)
+        )
+        selected_symbols = reconcile_visible_symbol_selection(
+            selected_symbols,
+            visible_symbols=visible_symbols,
+            checked_visible_symbols=checked_visible,
+            eligible_symbols=eligible_symbols,
+        )
+        st.session_state[SELECTOR_STATE_KEY] = list(selected_symbols)
+        selected_in_view = len(set(selected_symbols).intersection(visible_symbols))
+        with st.container(horizontal=True):
+            st.button(
+                f"Select visible ({len(visible_symbols)})",
+                icon=":material/select_all:",
+                on_click=_set_visible_selection,
+                args=(visible_symbols, eligible_symbols),
+                disabled=not visible_symbols,
+            )
+            st.button(
+                "Clear visible",
+                icon=":material/deselect:",
+                on_click=_clear_visible_selection,
+                args=(visible_symbols, eligible_symbols),
+                disabled=selected_in_view == 0,
+            )
+            st.button(
+                "Clear all selection",
+                icon=":material/delete_sweep:",
+                on_click=_clear_all_selection,
+                disabled=not selected_symbols,
+            )
+            st.caption(
+                f"Selected: {len(selected_symbols)} total · "
+                f"Visible: {len(filtered_coverage)} · "
+                f"Selected in current view: {selected_in_view}"
+            )
 
         confirmed_symbols = tuple(sorted(selected_symbols))
         selected_rows = coverage.loc[coverage["symbol"].isin(confirmed_symbols)]

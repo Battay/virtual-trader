@@ -720,6 +720,74 @@ def filter_symbol_coverage(
     return filtered.sort_values("symbol", kind="mergesort").reset_index(drop=True)
 
 
+def canonical_symbol_selection(
+    symbols: Sequence[str], *, eligible_symbols: Sequence[str]
+) -> tuple[str, ...]:
+    """Normalize transient UI selection and discard stale noneligible members."""
+
+    eligible = {str(symbol).strip().upper() for symbol in eligible_symbols}
+    if any(not symbol for symbol in eligible):
+        raise SelectiveTrainingError("eligible symbol membership is malformed")
+    requested = {str(symbol).strip().upper() for symbol in symbols}
+    return tuple(sorted(symbol for symbol in requested if symbol and symbol in eligible))
+
+
+def reconcile_visible_symbol_selection(
+    selected_symbols: Sequence[str],
+    *,
+    visible_symbols: Sequence[str],
+    checked_visible_symbols: Sequence[str],
+    eligible_symbols: Sequence[str],
+) -> tuple[str, ...]:
+    """Replace only the visible selection slice while preserving hidden rows."""
+
+    eligible = set(
+        canonical_symbol_selection(eligible_symbols, eligible_symbols=eligible_symbols)
+    )
+    current = set(
+        canonical_symbol_selection(selected_symbols, eligible_symbols=eligible)
+    )
+    visible = {str(symbol).strip().upper() for symbol in visible_symbols}
+    checked = {str(symbol).strip().upper() for symbol in checked_visible_symbols}
+    if not visible.issubset(eligible):
+        raise SelectiveTrainingError("visible selector rows escaped eligible membership")
+    if not checked.issubset(visible):
+        raise SelectiveTrainingError("checked symbols escaped the visible selector rows")
+    return tuple(sorted(current.difference(visible).union(checked)))
+
+
+def select_visible_symbols(
+    selected_symbols: Sequence[str],
+    *,
+    visible_symbols: Sequence[str],
+    eligible_symbols: Sequence[str],
+) -> tuple[str, ...]:
+    """Add all currently visible eligible rows to canonical selection."""
+
+    return reconcile_visible_symbol_selection(
+        selected_symbols,
+        visible_symbols=visible_symbols,
+        checked_visible_symbols=visible_symbols,
+        eligible_symbols=eligible_symbols,
+    )
+
+
+def clear_visible_symbols(
+    selected_symbols: Sequence[str],
+    *,
+    visible_symbols: Sequence[str],
+    eligible_symbols: Sequence[str],
+) -> tuple[str, ...]:
+    """Remove only currently visible rows from canonical selection."""
+
+    return reconcile_visible_symbol_selection(
+        selected_symbols,
+        visible_symbols=visible_symbols,
+        checked_visible_symbols=(),
+        eligible_symbols=eligible_symbols,
+    )
+
+
 __all__ = [
     "CoverageSummary",
     "GLOBAL_COVERAGE_STATUSES",
@@ -731,10 +799,14 @@ __all__ = [
     "TRAINED",
     "UNTRAINED",
     "build_global_model_coverage",
+    "canonical_symbol_selection",
+    "clear_visible_symbols",
     "completed_job_is_trained",
     "filter_symbol_coverage",
     "load_selected_run_metadata",
     "prepare_selected_run",
+    "reconcile_visible_symbol_selection",
+    "select_visible_symbols",
     "selected_membership_hash",
     "validate_selected_run",
 ]

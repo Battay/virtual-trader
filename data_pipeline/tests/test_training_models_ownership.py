@@ -30,6 +30,10 @@ def test_training_page_uses_frozen_recurrent_production_authority() -> None:
     assert "prepare_selected_run(confirmed_symbols)" in source
     assert "build_global_model_coverage()" in source
     assert "SELECTED" in source
+    assert "st.data_editor(" in source
+    assert "disabled=SELECTOR_READ_ONLY_COLUMNS" in source
+    assert 'key=SELECTOR_EDITOR_KEY' in source
+    assert '"Selected symbols in this filtered view"' not in source
 
 
 def test_training_page_has_native_top_spacing_and_unambiguous_frozen_labels() -> None:

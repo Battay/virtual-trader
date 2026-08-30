@@ -78,3 +78,19 @@ available.
 - The full frozen 508/435 identity contract and both frozen hashes are unchanged.
 - Browser/session state is used only for transient selection; coverage and
   progress always come from persisted run state and artifacts.
+
+## 7C.3j.1 interactive selector correction
+
+The original coverage table used `st.dataframe` with a `CheckboxColumn`.
+`CheckboxColumn` configured its appearance but `st.dataframe` remained
+read-only, so clicks could not change membership. The selector now uses a
+fixed-row `st.data_editor` with a stable symbol index. Only `selected` is
+editable; every market, coverage, model, validation, and run column is disabled.
+
+One session-scoped canonical symbol set owns selection. Each editor result
+replaces only the currently visible slice, preserving selections hidden by a
+status, sector, or search filter. **Select visible**, **Clear visible**, and
+**Clear all selection** update that same set and clear stale editor deltas before
+rerendering. No redundant multiselect remains. Selected-run preparation still
+uses the canonical set, skips verified trained symbols by default, and requires
+the separate explicit retraining path for completed symbols.

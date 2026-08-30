@@ -35,10 +35,14 @@ from reinforcement_learning.training.selective_training import (
     UNTRAINED,
     SelectiveTrainingError,
     build_global_model_coverage,
+    canonical_symbol_selection,
+    clear_visible_symbols,
     completed_job_is_trained,
     filter_symbol_coverage,
     load_selected_run_metadata,
     prepare_selected_run,
+    reconcile_visible_symbol_selection,
+    select_visible_symbols,
     selected_membership_hash,
     validate_selected_run,
 )
@@ -330,6 +334,74 @@ def test_coverage_filters_are_deterministic_and_untrained_is_semantic() -> None:
     assert selected_membership_hash(["BBB", "AAA"]) == selected_membership_hash(
         ["AAA", "BBB", "AAA"]
     )
+
+
+def test_checkbox_selection_accumulates_across_filtered_views() -> None:
+    eligible = ("MARI", "SYS", "UBL")
+    selected = reconcile_visible_symbol_selection(
+        (),
+        visible_symbols=("MARI",),
+        checked_visible_symbols=("MARI",),
+        eligible_symbols=eligible,
+    )
+    selected = reconcile_visible_symbol_selection(
+        selected,
+        visible_symbols=("SYS",),
+        checked_visible_symbols=("SYS",),
+        eligible_symbols=eligible,
+    )
+
+    assert selected == ("MARI", "SYS")
+    assert canonical_symbol_selection(
+        (*selected, "STALE"), eligible_symbols=eligible
+    ) == selected
+
+
+def test_select_visible_clear_visible_and_clear_all_are_global_safe() -> None:
+    eligible = ("AAA", "BBB", "CCC")
+    selected = select_visible_symbols(
+        (), visible_symbols=("AAA", "BBB"), eligible_symbols=eligible
+    )
+    selected = select_visible_symbols(
+        selected, visible_symbols=("CCC",), eligible_symbols=eligible
+    )
+    after_visible_clear = clear_visible_symbols(
+        selected, visible_symbols=("BBB", "CCC"), eligible_symbols=eligible
+    )
+
+    assert selected == eligible
+    assert after_visible_clear == ("AAA",)
+    assert canonical_symbol_selection((), eligible_symbols=eligible) == ()
+    with pytest.raises(SelectiveTrainingError, match="escaped the visible"):
+        reconcile_visible_symbol_selection(
+            (),
+            visible_symbols=("AAA",),
+            checked_visible_symbols=("BBB",),
+            eligible_symbols=eligible,
+        )
+
+
+def test_checkbox_derived_membership_drives_selected_run_and_trained_is_skipped(
+    tmp_path: Path,
+) -> None:
+    canonical = reconcile_visible_symbol_selection(
+        (),
+        visible_symbols=("AAA", "BBB"),
+        checked_visible_symbols=("AAA", "BBB"),
+        eligible_symbols=("AAA", "BBB"),
+    )
+    store, metadata, _ = prepare_selected_run(
+        canonical,
+        runs_root=tmp_path,
+        coverage=_coverage(aaa_trained=True),
+        frozen_discovery=_discovery(),
+        created_at=NOW,
+    )
+
+    assert metadata.requested_symbols == ("AAA", "BBB")
+    assert metadata.skipped_trained_symbols == ("AAA",)
+    assert metadata.selected_symbols == ("BBB",)
+    assert tuple(job.symbol for job in store.list_jobs()) == ("BBB",)
 
 
 def test_full_production_contract_is_unchanged_and_distinct() -> None:

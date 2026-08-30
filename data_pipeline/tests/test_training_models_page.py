@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -250,16 +251,86 @@ def test_selective_ui_has_persistent_coverage_and_no_default_selection(
     assert metrics["Eligible symbols"] == "2"
     assert metrics["Trained"] == "1"
     assert metrics["Untrained"] == "1"
-    selector = next(
+    editor = next(
         item
-        for item in app.multiselect
-        if item.label == "Selected symbols in this filtered view"
+        for item in app.dataframe
+        if item.key == "selective_symbol_checkbox_editor"
     )
-    assert selector.value == []
+    assert not editor.value["selected"].any()
+    assert app.session_state["selective_training_symbols"] == []
+    column_contract = json.loads(editor.proto.columns)
+    assert column_contract["selected"]["type_config"]["type"] == "checkbox"
+    assert not column_contract["selected"].get("disabled", False)
+    read_only = set(editor.value.columns).difference({"selected"})
+    assert all(column_contract[column]["disabled"] for column in read_only)
     train_button = next(
         item for item in app.button if item.label == "Train selected symbols"
     )
     assert train_button.disabled
+
+
+def test_checkbox_edits_accumulate_across_filter_reruns(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _patch_page_backend(monkeypatch, tmp_path, None)
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    app.text_input(key="selective_symbol_search").set_value("AAA").run()
+    app.session_state["selective_symbol_checkbox_editor"] = {
+        "edited_rows": {0: {"selected": True}},
+        "added_rows": [],
+        "deleted_rows": [],
+    }
+    app.run()
+    assert app.session_state["selective_training_symbols"] == ["AAA"]
+
+    app.text_input(key="selective_symbol_search").set_value("BBB").run()
+    app.session_state["selective_symbol_checkbox_editor"] = {
+        "edited_rows": {0: {"selected": True}},
+        "added_rows": [],
+        "deleted_rows": [],
+    }
+    app.run()
+    assert app.session_state["selective_training_symbols"] == ["AAA", "BBB"]
+
+    app.text_input(key="selective_symbol_search").set_value("").run().run()
+    editor = next(
+        item
+        for item in app.dataframe
+        if item.key == "selective_symbol_checkbox_editor"
+    )
+    assert editor.value.set_index("symbol")["selected"].to_dict() == {
+        "AAA": True,
+        "BBB": True,
+    }
+
+
+def test_select_visible_clear_visible_and_clear_all_buttons(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _patch_page_backend(monkeypatch, tmp_path, None)
+    launched: list[object] = []
+    monkeypatch.setattr(
+        "reinforcement_learning.training.production_control.launch_production_controller",
+        lambda store: launched.append(store),
+    )
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    app.text_input(key="selective_symbol_search").set_value("AAA").run()
+    next(button for button in app.button if button.label.startswith("Select visible")).click().run()
+    assert app.session_state["selective_training_symbols"] == ["AAA"]
+
+    app.text_input(key="selective_symbol_search").set_value("BBB").run()
+    next(button for button in app.button if button.label.startswith("Select visible")).click().run()
+    assert app.session_state["selective_training_symbols"] == ["AAA", "BBB"]
+
+    next(button for button in app.button if button.label == "Clear visible").click().run()
+    assert app.session_state["selective_training_symbols"] == ["AAA"]
+    next(
+        button for button in app.button if button.label == "Clear all selection"
+    ).click().run()
+    assert app.session_state["selective_training_symbols"] == []
+    assert launched == []
 
 
 @pytest.mark.parametrize(
