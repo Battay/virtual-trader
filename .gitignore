@@ -26,6 +26,7 @@ reinforcement_learning/saved_models/master_models/*
 !data/master/.gitkeep
 !data/rejected/.gitkeep
 !data/metadata/.gitkeep
+!data/metadata/trading_date_evidence.json
 !data_pipeline/logs/.gitkeep
 !data/processed/.gitkeep
 !data/parquet/.gitkeep

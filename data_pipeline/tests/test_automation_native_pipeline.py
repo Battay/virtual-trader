@@ -18,12 +18,14 @@ from data_pipeline.src.automation import (
     AutomationRunResult,
     SourceDateDisposition,
     load_automation_config,
+    rebuild_canonical_market_artifacts,
     reconcile_native_source_csvs,
     recover_stale_automation_state,
     run_manual_update,
     run_scheduled_update,
     save_automation_config,
 )
+from data_pipeline.src.maintenance_history import load_maintenance_history
 from data_pipeline.src.company_registry import RegistryBuildResult
 from data_pipeline.src.csv_store import MasterBuildResult
 from data_pipeline.src.main import CollectionResult
@@ -240,6 +242,33 @@ def test_no_update_needed_is_fast_and_does_not_refresh_or_rebuild(tmp_path: Path
     saved = load_automation_config(tmp_path / "automation.json")
     assert saved.last_status == "no_update_needed"
     assert saved.last_run is not None and saved.last_run.finished_at is not None
+    history = load_maintenance_history(tmp_path / "data_maintenance_history.json")
+    assert len(history.entries) == 1
+    assert history.entries[0].operation_type == "AUTOMATION_UPDATE"
+    assert history.entries[0].artifact_status["logical_parity"] == "PASS"
+
+
+def test_explicit_full_rebuild_records_persistent_maintenance_history(
+    tmp_path: Path,
+) -> None:
+    result = _native_result(tmp_path / "native", rows_added=0, daily=2)
+    history_path = tmp_path / "history.json"
+
+    returned = rebuild_canonical_market_artifacts(
+        lock_path=tmp_path / "rebuild.lock",
+        listings_path=tmp_path / "listings.csv",
+        native_rebuilder=lambda **kwargs: result,
+        history_path=history_path,
+    )
+
+    assert returned is result
+    history = load_maintenance_history(history_path)
+    assert len(history.entries) == 1
+    operation = history.entries[0]
+    assert operation.operation_type == "FULL_REBUILD"
+    assert operation.executed_dates == result.source_dates
+    assert operation.source_set_hash == result.source_set_hash
+    assert operation.content_hash == result.content_hash
 
 
 @pytest.mark.parametrize(

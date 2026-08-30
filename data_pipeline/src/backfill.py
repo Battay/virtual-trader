@@ -812,6 +812,79 @@ def _collect_with_empty_retries(
     return final_outcome
 
 
+def collect_date_with_backfill_retries(
+    trading_date: date,
+    *,
+    client: MarketClient | None = None,
+    client_factory: Callable[[], MarketClient] | None = None,
+    date_processor: DateProcessor = process_date,
+    daily_csv_validator: Callable[[Path, date], bool] = is_valid_daily_csv,
+    csv_dir: Path = RAW_CSV_DIR,
+    today: date | None = None,
+    empty_max_attempts: int = DEFAULT_EMPTY_MAX_ATTEMPTS,
+    empty_retry_delays: Sequence[float] = DEFAULT_EMPTY_RETRY_DELAYS,
+    retry_jitter_seconds: float = 0.75,
+    jitter_fn: Callable[[float, float], float] = random.uniform,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    attempt_html_dir: Path | None = None,
+) -> BackfillDateResult:
+    """Run the canonical bounded empty-response retry policy for one date.
+
+    This public boundary lets selective maintenance reuse the proven retry and
+    attempt-audit behavior without changing the resumable range state file.
+    """
+
+    current_date = today or date.today()
+    expected_path = Path(csv_dir) / f"market_{trading_date.isoformat()}.csv"
+    if daily_csv_validator(expected_path, trading_date):
+        valid_rows = valid_daily_csv_row_count(expected_path, trading_date)
+        return BackfillDateResult(
+            trading_date,
+            "already_downloaded",
+            "Valid daily CSV already exists",
+            expected_path,
+            valid_rows=valid_rows,
+        )
+    return _collect_with_empty_retries(
+        trading_date,
+        client=client,
+        client_factory=client_factory,
+        date_processor=date_processor,
+        csv_validator=daily_csv_validator,
+        today=current_date,
+        max_attempts=empty_max_attempts,
+        retry_delays=empty_retry_delays,
+        retry_jitter_seconds=retry_jitter_seconds,
+        jitter_fn=jitter_fn,
+        sleep_fn=sleep_fn,
+        attempt_html_dir=Path(attempt_html_dir or main_pipeline.RAW_HTML_DIR),
+    )
+
+
+def source_health_pause_required(
+    outcomes: Sequence[BackfillDateResult],
+    *,
+    window_size: int = DEFAULT_CIRCUIT_WINDOW,
+    unhealthy_ratio: float = DEFAULT_CIRCUIT_EMPTY_RATIO,
+) -> bool:
+    """Evaluate final weekday outcomes using the canonical circuit policy."""
+
+    if window_size < 1:
+        raise ValueError("circuit window must be at least 1")
+    if not 0 < unhealthy_ratio <= 1:
+        raise ValueError("circuit empty ratio must be within (0, 1]")
+    weekday_outcomes = [
+        item for item in outcomes if item.trading_date.weekday() < 5
+    ][-window_size:]
+    if len(weekday_outcomes) < window_size:
+        return False
+    unhealthy = sum(
+        item.status in {"temporary_unavailable", "failed"}
+        for item in weekday_outcomes
+    )
+    return unhealthy / window_size >= unhealthy_ratio
+
+
 def _short_reason(exc: BaseException) -> str:
     message = str(exc).strip()
     return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
@@ -957,7 +1030,7 @@ def run_backfill(
     interrupted = False
     stopped = False
     circuit_breaker_triggered = False
-    final_unhealthy_window: list[bool] = []
+    source_health_outcomes: list[BackfillDateResult] = []
     raw_attempt_directory = Path(attempt_html_dir or main_pipeline.RAW_HTML_DIR)
 
     for index, trading_date in enumerate(scheduled):
@@ -1032,6 +1105,7 @@ def run_backfill(
             )
 
         outcomes.append(outcome)
+        source_health_outcomes.append(outcome)
         state = _record_outcome(state, outcome, clock)
         write_backfill_state(state, state_path)
         LOGGER.info(
@@ -1055,18 +1129,13 @@ def run_backfill(
                 )
                 write_backfill_state(state, state_path)
                 break
-        if trading_date.weekday() < 5:
-            final_unhealthy_window.append(
-                outcome.status in {"temporary_unavailable", "failed"}
-            )
-            final_unhealthy_window = final_unhealthy_window[-circuit_window:]
-            if (
-                len(final_unhealthy_window) == circuit_window
-                and sum(final_unhealthy_window) / circuit_window
-                >= circuit_empty_ratio
-            ):
-                circuit_breaker_triggered = True
-                break
+        if source_health_pause_required(
+            source_health_outcomes,
+            window_size=circuit_window,
+            unhealthy_ratio=circuit_empty_ratio,
+        ):
+            circuit_breaker_triggered = True
+            break
         if should_stop is not None and should_stop():
             stopped = True
             break

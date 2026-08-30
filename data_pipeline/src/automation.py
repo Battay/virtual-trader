@@ -16,6 +16,7 @@ from .config import (
     AUTO_UPDATE_LOG_PATH,
     BACKFILL_STATE_PATH,
     CURRENT_LISTINGS_PATH,
+    DATA_MAINTENANCE_HISTORY_PATH,
     NATIVE_MARKET_PIPELINE_STATE_PATH,
     LOCAL_PSX_MARKET_PARQUET_PATH,
     PROJECT_TIMEZONE,
@@ -29,6 +30,12 @@ from .native_market_pipeline import (
     NativeMarketBuildResult,
     incremental_update as run_native_incremental_update,
     rebuild_generated_artifacts,
+)
+from .maintenance_history import (
+    MaintenanceDateResult,
+    MaintenanceOperation,
+    append_maintenance_operation,
+    new_operation,
 )
 from .updater import (
     IncrementalUpdateResult,
@@ -64,6 +71,28 @@ NativeUpdater = Callable[..., NativeMarketBuildResult]
 NativeRebuilder = Callable[..., NativeMarketBuildResult]
 EvidenceDiscoverer = Callable[..., SourceEvidenceInventory]
 ProgressCallback = Callable[["AutomationProgress"], None]
+
+
+def _resolved_history_path(
+    explicit: Path | None,
+    *,
+    sibling_of: Path,
+) -> Path:
+    if explicit is not None:
+        return Path(explicit)
+    if Path(sibling_of) == AUTOMATION_CONFIG_PATH or Path(sibling_of) == AUTOMATION_LOCK_PATH:
+        return DATA_MAINTENANCE_HISTORY_PATH
+    return Path(sibling_of).parent / DATA_MAINTENANCE_HISTORY_PATH.name
+
+
+def _append_history_safely(
+    operation: MaintenanceOperation,
+    path: Path,
+) -> None:
+    try:
+        append_maintenance_operation(operation, path)
+    except Exception:
+        LOGGER.exception("Could not append market-data maintenance history")
 
 
 @dataclass(frozen=True)
@@ -644,6 +673,7 @@ def rebuild_canonical_market_artifacts(
     native_rebuilder: NativeRebuilder = rebuild_generated_artifacts,
     progress_callback: ProgressCallback | None = None,
     now: datetime | None = None,
+    history_path: Path | None = None,
 ) -> NativeMarketBuildResult:
     """Explicitly regenerate the canonical native artifacts without fetching."""
 
@@ -656,7 +686,7 @@ def rebuild_canonical_market_artifacts(
             "validating_native_source_state",
             "Validating native Parquet and source-manifest provenance",
         )
-        return native_rebuilder(
+        result = native_rebuilder(
             listings_path=Path(listings_path),
             progress_callback=(
                 lambda stage, message: _emit_progress(
@@ -664,6 +694,24 @@ def rebuild_canonical_market_artifacts(
                 )
             ),
         )
+        _append_history_safely(
+            new_operation(
+                "FULL_REBUILD",
+                executed_dates=result.source_dates,
+                artifact_status={
+                    "canonical_master_csv": "UPDATED",
+                    "consolidated_parquet": "UPDATED",
+                    "daily_partitions_affected": result.daily_parquets_written,
+                    "symbol_artifacts_affected": result.symbol_csvs_written,
+                    "logical_parity": "PASS",
+                },
+                master_latest_date=result.latest_date,
+                source_set_hash=result.source_set_hash,
+                content_hash=result.content_hash,
+            ),
+            _resolved_history_path(history_path, sibling_of=Path(lock_path)),
+        )
+        return result
     finally:
         lock.release()
 
@@ -689,6 +737,7 @@ def run_update_orchestration(
     native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
     native_parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
     backfill_state_path: Path = BACKFILL_STATE_PATH,
+    history_path: Path | None = None,
 ) -> AutomationRunResult:
     """Run the one canonical manual/scheduled/CLI market update workflow."""
 
@@ -886,6 +935,45 @@ def run_update_orchestration(
             last_run=final_audit,
         )
         save_automation_config(final_config, config_path)
+        _append_history_safely(
+            new_operation(
+                "AUTOMATION_UPDATE",
+                requested_dates=final_audit.missing_dates_discovered,
+                executed_dates=final_audit.dates_attempted,
+                skipped_dates=final_audit.dates_skipped,
+                per_date_results=(
+                    *(
+                        MaintenanceDateResult(value, "downloaded")
+                        for value in final_audit.dates_downloaded
+                    ),
+                    *(
+                        MaintenanceDateResult(value, "skipped")
+                        for value in final_audit.dates_skipped
+                    ),
+                    *(
+                        MaintenanceDateResult(value, "failed", message=reason)
+                        for value, reason in final_audit.dates_failed
+                    ),
+                ),
+                artifact_status={
+                    "canonical_master_csv": (
+                        "UPDATED" if native_result is not None else "CURRENT"
+                    ),
+                    "consolidated_parquet": (
+                        "UPDATED" if native_result is not None else "CURRENT"
+                    ),
+                    "daily_partitions_affected": final_audit.daily_parquets_created,
+                    "symbol_artifacts_affected": (
+                        native_result.symbol_csvs_written if native_result else 0
+                    ),
+                    "logical_parity": "PASS",
+                },
+                master_latest_date=final_audit.consolidated_parquet_latest_date,
+                source_set_hash=(native_result.source_set_hash if native_result else None),
+                content_hash=(native_result.content_hash if native_result else None),
+            ),
+            _resolved_history_path(history_path, sibling_of=Path(config_path)),
+        )
         _emit_progress(progress_callback, "complete", message)
         return AutomationRunResult(
             status=status,
@@ -959,6 +1047,34 @@ def run_update_orchestration(
         except OSError:
             LOGGER.exception("Could not persist automation failure status")
         LOGGER.exception(message)
+        _append_history_safely(
+            new_operation(
+                "AUTOMATION_UPDATE",
+                requested_dates=failed_audit.missing_dates_discovered,
+                executed_dates=failed_audit.dates_attempted,
+                skipped_dates=failed_audit.dates_skipped,
+                per_date_results=tuple(
+                    MaintenanceDateResult(value, "failed", message=reason)
+                    for value, reason in failed_audit.dates_failed
+                ),
+                artifact_status={
+                    "canonical_master_csv": "FAILED",
+                    "consolidated_parquet": (
+                        "UPDATED" if native_result is not None else "FAILED"
+                    ),
+                    "daily_partitions_affected": failed_audit.daily_parquets_created,
+                    "symbol_artifacts_affected": (
+                        native_result.symbol_csvs_written if native_result else 0
+                    ),
+                    "logical_parity": "FAIL",
+                },
+                errors=(message,),
+                master_latest_date=failed_audit.consolidated_parquet_latest_date,
+                source_set_hash=(native_result.source_set_hash if native_result else None),
+                content_hash=(native_result.content_hash if native_result else None),
+            ),
+            _resolved_history_path(history_path, sibling_of=Path(config_path)),
+        )
         return AutomationRunResult(
             status="failed",
             message=message,
@@ -1005,6 +1121,7 @@ def run_scheduled_update(
     native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
     native_parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
     backfill_state_path: Path = BACKFILL_STATE_PATH,
+    history_path: Path | None = None,
     now: datetime | None = None,
 ) -> AutomationRunResult:
     """Run the configured scheduled update, or exit cleanly when disabled."""
@@ -1036,6 +1153,7 @@ def run_scheduled_update(
         native_state_path=native_state_path,
         native_parquet_path=native_parquet_path,
         backfill_state_path=backfill_state_path,
+        history_path=history_path,
         now=now,
     )
 
@@ -1060,6 +1178,7 @@ def run_manual_update(
     native_state_path: Path = NATIVE_MARKET_PIPELINE_STATE_PATH,
     native_parquet_path: Path = LOCAL_PSX_MARKET_PARQUET_PATH,
     backfill_state_path: Path = BACKFILL_STATE_PATH,
+    history_path: Path | None = None,
     now: datetime | None = None,
 ) -> AutomationRunResult:
     """Run one explicit update cycle regardless of the enabled setting."""
@@ -1088,5 +1207,6 @@ def run_manual_update(
         native_state_path=native_state_path,
         native_parquet_path=native_parquet_path,
         backfill_state_path=backfill_state_path,
+        history_path=history_path,
         now=now,
     )

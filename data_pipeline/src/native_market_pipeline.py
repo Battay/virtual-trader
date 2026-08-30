@@ -163,6 +163,24 @@ class NativeMarketBuildResult:
     idempotent_noop: bool = False
 
 
+@dataclass(frozen=True)
+class DailyParquetRepairResult:
+    """Result of an isolated, atomic daily-partition repair operation."""
+
+    requested_dates: tuple[str, ...]
+    repaired_dates: tuple[str, ...]
+    already_current_dates: tuple[str, ...]
+    daily_parquets_written: int
+    master_csv_status: str
+    consolidated_parquet_status: str
+    logical_parity: bool
+    source_set_hash: str
+    content_hash: str
+    latest_date: str | None
+    idempotent_noop: bool
+    paths: NativeMarketPaths = field(repr=False, compare=False)
+
+
 def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
     """Return a streaming SHA-256 without changing source metadata or content."""
 
@@ -222,9 +240,9 @@ def source_set_hash(sources: Sequence[SourceEvidence]) -> str:
     return _canonical_json_hash(payload)
 
 
-def canonical_content_hash(records: pd.DataFrame, *, core_only: bool = False) -> str:
-    """Hash normalized values independently of Parquet/CSV physical encoding."""
-
+def _normalized_content_hash_frame(
+    records: pd.DataFrame, *, core_only: bool
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
     columns = CORE_MARKET_COLUMNS if core_only else CANONICAL_MARKET_COLUMNS
     ordered = records.loc[:, list(columns)].copy()
     ordered["market_date"] = pd.to_datetime(ordered["market_date"]).dt.strftime(
@@ -246,14 +264,56 @@ def canonical_content_hash(records: pd.DataFrame, *, core_only: bool = False) ->
         ).astype("int64")
     for column in set(columns).intersection(SECTOR_PROVENANCE_COLUMNS):
         ordered[column] = ordered[column].astype("string").fillna("<NULL>")
-    row_hashes = pd.util.hash_pandas_object(
-        ordered, index=False, categorize=False
-    ).to_numpy(dtype="uint64", copy=False)
+    return ordered, columns
+
+
+def _digest_content_row_hashes(
+    row_hashes: np.ndarray, *, columns: Sequence[str], core_only: bool
+) -> str:
     digest = hashlib.sha256()
     digest.update(("core" if core_only else NATIVE_MARKET_SCHEMA_VERSION).encode())
     digest.update("|".join(columns).encode())
     digest.update(row_hashes.tobytes())
     return digest.hexdigest()
+
+
+def canonical_content_hash(records: pd.DataFrame, *, core_only: bool = False) -> str:
+    """Hash normalized values independently of Parquet/CSV physical encoding."""
+
+    ordered, columns = _normalized_content_hash_frame(
+        records, core_only=core_only
+    )
+    row_hashes = pd.util.hash_pandas_object(
+        ordered, index=False, categorize=False
+    ).to_numpy(dtype="uint64", copy=False)
+    return _digest_content_row_hashes(
+        row_hashes, columns=columns, core_only=core_only
+    )
+
+
+def canonical_content_hashes_by_date(
+    records: pd.DataFrame,
+) -> dict[date, str]:
+    """Hash all canonical date slices after one vectorized normalization pass."""
+
+    if records.empty:
+        return {}
+    market_dates = pd.to_datetime(records["market_date"]).dt.date.reset_index(drop=True)
+    ordered, columns = _normalized_content_hash_frame(records, core_only=False)
+    row_hashes = pd.util.hash_pandas_object(
+        ordered, index=False, categorize=False
+    ).to_numpy(dtype="uint64", copy=False)
+    hashes: dict[date, str] = {}
+    positions = pd.Series(range(len(market_dates))).groupby(
+        market_dates, sort=True
+    )
+    for trading_date, indices in positions:
+        hashes[trading_date] = _digest_content_row_hashes(
+            row_hashes[indices.to_numpy(dtype="int64")],
+            columns=columns,
+            core_only=False,
+        )
+    return hashes
 
 
 def _source_csv_paths(source_dir: Path) -> tuple[Path, ...]:
@@ -1002,6 +1062,215 @@ def _existing_canonical_records(path: Path) -> pd.DataFrame:
     for column in SECTOR_PROVENANCE_COLUMNS:
         records[column] = records[column].astype("string")
     return records.sort_values(list(BUSINESS_KEY), kind="mergesort").reset_index(drop=True)
+
+
+def _daily_partition_matches(
+    path: Path,
+    expected: pd.DataFrame,
+) -> bool:
+    """Return whether one readable daily partition equals its canonical slice."""
+
+    candidate = Path(path)
+    if not candidate.is_file():
+        return False
+    try:
+        parquet_file = pq.ParquetFile(candidate)
+        if parquet_file.schema_arrow.remove_metadata() != CANONICAL_ARROW_SCHEMA:
+            return False
+        actual = pq.read_table(candidate).to_pandas()
+        actual["market_date"] = pd.to_datetime(actual["market_date"])
+        actual["symbol"] = actual["symbol"].astype("string")
+        for column in SECTOR_PROVENANCE_COLUMNS:
+            actual[column] = actual[column].astype("string")
+        actual = actual.loc[:, list(CANONICAL_MARKET_COLUMNS)]
+        if actual.duplicated(list(BUSINESS_KEY)).any():
+            return False
+        ordered = actual.sort_values(
+            list(BUSINESS_KEY), kind="mergesort"
+        ).reset_index(drop=True)
+        if not actual.reset_index(drop=True).equals(ordered):
+            return False
+        return canonical_content_hash(actual) == canonical_content_hash(expected)
+    except (OSError, ValueError, KeyError, pa.ArrowException):
+        return False
+
+
+def _promote_selected_files(
+    pairs: Sequence[tuple[Path, Path]],
+    *,
+    backup_parent: Path,
+    before_promote: Callable[[Path, Path], None] | None = None,
+) -> None:
+    """Atomically promote selected files and restore every target on failure."""
+
+    backup_parent.mkdir(parents=True, exist_ok=True)
+    backup_root = Path(
+        tempfile.mkdtemp(prefix=".daily-repair-backup-", dir=backup_parent)
+    )
+    backups: dict[Path, Path] = {}
+    promoted: list[Path] = []
+    try:
+        for index, (source, target) in enumerate(pairs):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            backup = backup_root / str(index)
+            if target.exists() or target.is_symlink():
+                os.replace(target, backup)
+                backups[target] = backup
+            if before_promote is not None:
+                before_promote(source, target)
+            os.replace(source, target)
+            promoted.append(target)
+    except Exception:
+        for target in reversed(promoted):
+            _remove_path(target)
+        for target, backup in reversed(tuple(backups.items())):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(backup, target)
+        raise
+    finally:
+        shutil.rmtree(backup_root, ignore_errors=True)
+
+
+def repair_daily_parquet_partitions(
+    selected_dates: Sequence[date],
+    *,
+    paths: NativeMarketPaths = NativeMarketPaths(),
+    before_promote: Callable[[Path, Path], None] | None = None,
+    now: datetime | None = None,
+) -> DailyParquetRepairResult:
+    """Repair only exact canonical daily partitions without rewriting masters.
+
+    The consolidated Parquet and its state manifest are validated before any
+    staging.  Every selected partition is derived from that canonical dataset,
+    verified independently, and promoted together with a state audit update.
+    """
+
+    requested = tuple(sorted(set(selected_dates)))
+    if not requested:
+        raise ValueError("At least one daily Parquet date must be selected")
+    if not paths.consolidated_parquet.is_file() or not paths.state_json.is_file():
+        raise NativeMarketPipelineError(
+            "Daily repair requires an existing consolidated Parquet and state"
+        )
+    state = _load_existing_state(paths.state_json)
+    parquet_file = pq.ParquetFile(paths.consolidated_parquet)
+    metadata = parquet_file.schema_arrow.metadata or {}
+    source_hash = str(state.get("source_set_hash") or "")
+    content_hash = str(state.get("canonical_content_hash") or "")
+    if (
+        metadata.get(b"source_set_hash", b"").decode() != source_hash
+        or metadata.get(b"canonical_content_hash", b"").decode() != content_hash
+        or sha256_file(paths.consolidated_parquet)
+        != str(state.get("consolidated_sha256") or "")
+    ):
+        raise NativeMarketPipelineError(
+            "Native state and consolidated Parquet provenance are not aligned"
+        )
+    canonical = _existing_canonical_records(paths.consolidated_parquet)
+    if canonical_content_hash(canonical) != content_hash:
+        raise NativeMarketPipelineError(
+            "Consolidated Parquet content does not match persisted state"
+        )
+    available_dates = set(pd.to_datetime(canonical["market_date"]).dt.date.unique())
+    absent = [value for value in requested if value not in available_dates]
+    if absent:
+        raise NativeMarketPipelineError(
+            "Selected date is absent from canonical market data: "
+            + ", ".join(value.isoformat() for value in absent)
+        )
+
+    slices = {
+        value: canonical.loc[
+            pd.to_datetime(canonical["market_date"]).dt.date == value
+        ].reset_index(drop=True)
+        for value in requested
+    }
+    current = tuple(
+        value
+        for value in requested
+        if _daily_partition_matches(
+            paths.daily_parquet_dir / f"market_{value.isoformat()}.parquet",
+            slices[value],
+        )
+    )
+    repair_dates = tuple(value for value in requested if value not in set(current))
+    latest = state.get("latest_date") and str(state["latest_date"])
+    if not repair_dates:
+        return DailyParquetRepairResult(
+            requested_dates=tuple(value.isoformat() for value in requested),
+            repaired_dates=(),
+            already_current_dates=tuple(value.isoformat() for value in current),
+            daily_parquets_written=0,
+            master_csv_status="CURRENT",
+            consolidated_parquet_status="CURRENT",
+            logical_parity=True,
+            source_set_hash=source_hash,
+            content_hash=content_hash,
+            latest_date=latest,
+            idempotent_noop=True,
+            paths=paths,
+        )
+
+    staging_parent = paths.daily_parquet_dir.parent
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=".daily-repair-stage-", dir=staging_parent)
+    )
+    try:
+        pairs: list[tuple[Path, Path]] = []
+        for value in repair_dates:
+            name = f"market_{value.isoformat()}.parquet"
+            staged = staging_root / name
+            expected = slices[value]
+            _write_parquet(
+                expected,
+                staged,
+                source_hash=source_hash,
+                content_hash=canonical_content_hash(expected),
+            )
+            if not _daily_partition_matches(staged, expected):
+                raise NativeMarketPipelineError(
+                    f"Staged daily Parquet failed validation: {value.isoformat()}"
+                )
+            pairs.append((staged, paths.daily_parquet_dir / name))
+
+        repaired_at = (now or datetime.now(timezone.utc)).isoformat()
+        updated_state = dict(state)
+        updated_state["last_daily_repair"] = {
+            "version": "selective_daily_parquet_repair_v1",
+            "repaired_at": repaired_at,
+            "requested_dates": [value.isoformat() for value in requested],
+            "repaired_dates": [value.isoformat() for value in repair_dates],
+            "already_current_dates": [value.isoformat() for value in current],
+        }
+        staged_state = staging_root / paths.state_json.name
+        staged_state.write_text(
+            json.dumps(updated_state, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        pairs.append((staged_state, paths.state_json))
+        _promote_selected_files(
+            pairs,
+            backup_parent=staging_parent,
+            before_promote=before_promote,
+        )
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
+
+    return DailyParquetRepairResult(
+        requested_dates=tuple(value.isoformat() for value in requested),
+        repaired_dates=tuple(value.isoformat() for value in repair_dates),
+        already_current_dates=tuple(value.isoformat() for value in current),
+        daily_parquets_written=len(repair_dates),
+        master_csv_status="CURRENT",
+        consolidated_parquet_status="CURRENT",
+        logical_parity=True,
+        source_set_hash=source_hash,
+        content_hash=content_hash,
+        latest_date=latest,
+        idempotent_noop=False,
+        paths=paths,
+    )
 
 
 def _rebuild_generated_artifacts_impl(
