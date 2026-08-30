@@ -21,6 +21,7 @@ from data_pipeline.src.data_completeness import (
     ParquetDateRecord,
     ParquetDateState,
     build_data_completeness_inventory,
+    _classify_parquet_date,
     clear_visible_selection,
     fetch_selected_dates,
     load_trading_date_evidence,
@@ -411,6 +412,59 @@ def test_parquet_inventory_detects_missing_stale_corrupt_and_orphan(tmp_path: Pa
     assert by_date[date(2024, 1, 4)] == ParquetDateState.CORRUPT
     assert by_date[date(2024, 1, 5)] == ParquetDateState.CURRENT
     assert by_date[date(2024, 1, 6)] == ParquetDateState.ORPHAN
+
+
+def test_daily_health_ignores_only_current_sector_snapshot_provenance(
+    tmp_path: Path,
+) -> None:
+    trading_date = date(2024, 1, 2)
+    paths, _ = _build(tmp_path)
+    daily_path = paths.daily_parquet_dir / "market_2024-01-02.parquet"
+    expected = pq.read_table(daily_path).to_pandas()
+    expected["market_date"] = pd.to_datetime(expected["market_date"])
+    expected["symbol"] = expected["symbol"].astype("string")
+    for column in ("sector_current", "sector_source", "sector_snapshot_date"):
+        expected[column] = expected[column].astype("string")
+    expected = expected.loc[:, list(CANONICAL_MARKET_COLUMNS)]
+    before = hashlib.sha256(daily_path.read_bytes()).hexdigest()
+
+    newer_snapshot = expected.copy()
+    newer_snapshot.loc[
+        newer_snapshot["sector_snapshot_date"].notna(),
+        "sector_snapshot_date",
+    ] = "2026-08-31"
+    current = _classify_parquet_date(
+        trading_date,
+        newer_snapshot,
+        daily_path,
+        canonical_content_hash(newer_snapshot),
+    )
+
+    assert current.state == ParquetDateState.CURRENT
+    assert current.canonical_hash != current.partition_hash
+    assert "snapshot provenance is older" in current.reason
+    assert hashlib.sha256(daily_path.read_bytes()).hexdigest() == before
+
+    changed_price = newer_snapshot.copy()
+    changed_price.loc[0, "close"] += 1.0
+    stale_price = _classify_parquet_date(
+        trading_date,
+        changed_price,
+        daily_path,
+        canonical_content_hash(changed_price),
+    )
+    assert stale_price.state == ParquetDateState.STALE
+
+    changed_sector = newer_snapshot.copy()
+    changed_sector.loc[0, "sector_current"] = "DIFFERENT SECTOR"
+    stale_sector = _classify_parquet_date(
+        trading_date,
+        changed_sector,
+        daily_path,
+        canonical_content_hash(changed_sector),
+    )
+    assert stale_sector.state == ParquetDateState.STALE
+    assert hashlib.sha256(daily_path.read_bytes()).hexdigest() == before
 
 
 def test_selective_daily_repair_touches_only_selected_partition(tmp_path: Path) -> None:

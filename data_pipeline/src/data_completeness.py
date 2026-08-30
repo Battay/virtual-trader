@@ -548,6 +548,71 @@ def _read_daily_partition(path: Path) -> pd.DataFrame:
     return frame.loc[:, list(CANONICAL_MARKET_COLUMNS)]
 
 
+def _partition_sector_snapshot_date(
+    parquet_file: pq.ParquetFile,
+) -> str | None:
+    """Read one uniform sector snapshot value from Parquet footer statistics."""
+
+    try:
+        column_index = parquet_file.schema_arrow.names.index("sector_snapshot_date")
+        values: set[str] = set()
+        for index in range(parquet_file.metadata.num_row_groups):
+            statistics = parquet_file.metadata.row_group(index).column(
+                column_index
+            ).statistics
+            if (
+                statistics is None
+                or not statistics.has_min_max
+                or statistics.min != statistics.max
+            ):
+                return None
+            values.add(str(statistics.min))
+        return next(iter(values)) if len(values) == 1 else None
+    except (AttributeError, ValueError):
+        return None
+
+
+def _matches_except_sector_snapshot_date(
+    actual: pd.DataFrame,
+    expected: pd.DataFrame,
+) -> bool:
+    """Compare stable market and sector assignment semantics.
+
+    ``sector_snapshot_date`` records when current listing context was attached;
+    it is not an effective-dated market observation. A newer listing refresh
+    must not make otherwise identical historical market partitions repairable.
+    """
+
+    if canonical_content_hash(actual, core_only=True) != canonical_content_hash(
+        expected, core_only=True
+    ):
+        return False
+    for column in ("sector_current", "sector_source"):
+        equal = (
+            actual[column].eq(expected[column])
+            | (actual[column].isna() & expected[column].isna())
+        ).fillna(False)
+        if not bool(equal.all()):
+            return False
+    return True
+
+
+def _embedded_hash_matches_prior_sector_snapshot(
+    parquet_file: pq.ParquetFile,
+    expected: pd.DataFrame,
+    embedded_hash: str,
+) -> bool:
+    """Use verified footer provenance to avoid reading unchanged data pages."""
+
+    prior_snapshot = _partition_sector_snapshot_date(parquet_file)
+    if not prior_snapshot or not embedded_hash:
+        return False
+    expected_at_prior_snapshot = expected.copy()
+    available = expected_at_prior_snapshot["sector_snapshot_date"].notna()
+    expected_at_prior_snapshot.loc[available, "sector_snapshot_date"] = prior_snapshot
+    return canonical_content_hash(expected_at_prior_snapshot) == embedded_hash
+
+
 def _classify_parquet_date(
     trading_date: date,
     expected: pd.DataFrame | None,
@@ -593,6 +658,25 @@ def _classify_parquet_date(
                 embedded_hash,
                 "Readable canonical schema and persisted logical hash match",
             )
+        if (
+            parquet_file.metadata.num_rows == len(expected)
+            and _embedded_hash_matches_prior_sector_snapshot(
+                parquet_file,
+                expected,
+                embedded_hash,
+            )
+        ):
+            return ParquetDateRecord(
+                trading_date,
+                ParquetDateState.CURRENT,
+                path,
+                parquet_file.metadata.num_rows,
+                len(expected),
+                expected_hash,
+                embedded_hash,
+                "Market values and sector assignments match; only the current-sector "
+                "snapshot provenance is older",
+            )
         # Only suspicious partitions pay the full data-page read cost. The
         # native writer embeds the canonical slice hash after validation;
         # matching schema/footer/hash is the persisted verified fast path.
@@ -604,10 +688,16 @@ def _classify_parquet_date(
         state = (
             ParquetDateState.CURRENT
             if actual_hash == expected_hash
+            or _matches_except_sector_snapshot_date(actual, expected)
             else ParquetDateState.STALE
         )
         reason = (
-            "Readable partition matches the canonical date slice"
+            (
+                "Readable partition matches the canonical date slice"
+                if actual_hash == expected_hash
+                else "Market values and sector assignments match; only the "
+                "current-sector snapshot provenance is older"
+            )
             if state == ParquetDateState.CURRENT
             else "Readable partition differs from the canonical date slice"
         )
