@@ -247,8 +247,17 @@ def _patch_page_backend(
                 "artifact_verification": "verified",
                 "algorithm": "RecurrentPPO",
                 "policy": "MlpLstmPolicy",
+                "trainer_version": "recurrent_ppo_single_symbol_v1",
                 "partition_contract_version": "rl_partition_v1",
                 "recurrent_contract_version": "rl_recurrent_partition_v1",
+                "feature_version": "feature-v1",
+                "environment_version": "single_symbol_env_v1",
+                "split_policy_version": "split-v1",
+                "scaler_fit_partition": "train",
+                "source_contract_sha256": "c" * 64,
+                "hyperparameters_hash": "h" * 64,
+                "seed": 42,
+                "model_sha256": "m" * 64,
                 "requested_timesteps": 100_000,
                 "actual_timesteps": 100_352,
                 "effective_device": "cpu",
@@ -652,10 +661,10 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
     )
 
     rows = []
-    for symbol in all_symbols:
+    for index, symbol in enumerate(all_symbols):
         run_type = PRODUCTION_RUN_KIND if symbol in full_symbols else SELECTED_RUN_KIND
-        rows.append(
-            {
+        validation_reference = f"validation/{symbol}/attempt_000.json"
+        row = {
                 "symbol": symbol,
                 "company_name": f"{symbol} Limited",
                 "sector": "COMMERCIAL BANKS",
@@ -667,8 +676,17 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
                 "artifact_verification": "verified",
                 "algorithm": "RecurrentPPO",
                 "policy": "MlpLstmPolicy",
+                "trainer_version": "recurrent_ppo_single_symbol_v1",
                 "partition_contract_version": "rl_partition_v1",
                 "recurrent_contract_version": "rl_recurrent_partition_v1",
+                "feature_version": "feature-v1",
+                "environment_version": "single_symbol_env_v1",
+                "split_policy_version": "split-v1",
+                "scaler_fit_partition": "train",
+                "source_contract_sha256": "c" * 64,
+                "hyperparameters_hash": "h" * 64,
+                "seed": 42,
+                "model_sha256": "m" * 64,
                 "requested_timesteps": 100_000,
                 "actual_timesteps": 100_352,
                 "effective_device": "cpu",
@@ -689,10 +707,55 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
                 "test_end": "2026-08-05",
                 "test_rows": 366,
                 "validation_partition": "validation",
-                "validation_metrics_reference": f"validation/{symbol}/attempt_000.json",
+                "validation_metrics_reference": validation_reference,
                 "model_path": f"models/{symbol}/attempt_000/model.zip",
                 "run_directory": str(tmp_path),
             }
+        rows.append(row)
+        validation_path = tmp_path / validation_reference
+        validation_path.parent.mkdir(parents=True, exist_ok=True)
+        validation_path.write_text(
+            json.dumps(
+                {
+                    "symbol": symbol,
+                    "evaluation_partition": "validation",
+                    "validation_start": row["validation_start"],
+                    "validation_end": row["validation_end"],
+                    "validation_rows": row["validation_rows"],
+                    "recurrent_contract_version": row[
+                        "recurrent_contract_version"
+                    ],
+                    "feature_version": row["feature_version"],
+                    "environment_version": row["environment_version"],
+                    "model_parameters_unchanged": True,
+                    "parameter_hash_before": "p" * 64,
+                    "parameter_hash_after": "p" * 64,
+                    "model_timesteps_before": 100_352,
+                    "model_timesteps_after": 100_352,
+                    "strategy_result": {
+                        "strategy": "RecurrentPPO",
+                        "metrics": {
+                            "total_return": index / 100,
+                            "sharpe_ratio": index / 10,
+                            "sortino_ratio": index / 8,
+                            "maximum_drawdown": 0.05 + index / 100,
+                            "annualized_volatility": 0.20,
+                            "number_of_trades": 5,
+                            "completed_trade_win_rate": 0.60,
+                            "final_portfolio_value": 1_000_000 + index,
+                            "daily_returns": [0.0, index / 100],
+                            "metric_warnings": [],
+                        },
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        training_log = tmp_path / "logs" / symbol / "attempt_000.json"
+        training_log.parent.mkdir(parents=True, exist_ok=True)
+        training_log.write_text(
+            json.dumps({"training_diagnostics": {"approximate_kl": 0.01}}),
+            encoding="utf-8",
         )
     monkeypatch.setattr(
         "reinforcement_learning.training.model_details.build_global_verified_model_inventory",
@@ -734,6 +797,23 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
     assert "TEST status" in detail_json
     assert "test_start" not in detail_json
     assert "test_end" not in detail_json
+    assert not app.error, [item.value for item in app.error]
+    comparison = next(
+        item
+        for item in app.dataframe
+        if "validation_artifact_status" in item.value.columns
+        and "validation_total_return" in item.value.columns
+    )
+    assert len(comparison.value) == 16
+    assert comparison.value["validation_artifact_status"].eq("VALID").all()
+    assert comparison.value.iloc[0]["symbol"] == "UNITY"
+    page_text = "\n".join(
+        str(item.value)
+        for kind in ("caption", "markdown", "info")
+        for item in app.get(kind)
+    )
+    assert "VALIDATION ONLY" in page_text
+    assert "TEST SEALED" in page_text
 
     app.selectbox(key="training_detail_symbol").set_value("ENGROH").run()
     metrics = [(item.label, item.value) for item in app.metric]

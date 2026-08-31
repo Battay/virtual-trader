@@ -519,6 +519,7 @@ def build_global_verified_model_inventory(
             "test_partition_loaded": False,
             "run_directory": str(store.run_directory.resolve()),
             "model_path": job.model_path,
+            "model_sha256": job.model_sha256,
             "validation_metrics_reference": job.validation_metrics_reference,
             "diagnostics_available": bool(training_log.get("training_diagnostics")),
         }

@@ -29,6 +29,15 @@ from reinforcement_learning.training.model_details import (
     build_global_verified_model_inventory,
     single_symbol_rl_partition_protocol,
 )
+from reinforcement_learning.training.global_validation import (
+    GlobalValidationError,
+    VALID,
+    build_global_validation_inventory,
+    build_sector_validation_summary,
+    load_persisted_validation_returns,
+    summarize_validation_inventory,
+    validation_export_csv,
+)
 from reinforcement_learning.training.recurrent_orchestrator import TrainingRunStore
 from reinforcement_learning.training.selective_training import (
     GLOBAL_COVERAGE_STATUSES,
@@ -83,6 +92,12 @@ def _duration(seconds: object) -> str:
     hours, remainder = divmod(value, 3600)
     minutes, secs = divmod(remainder, 60)
     return f"{hours:d}h {minutes:02d}m" if hours else f"{minutes:d}m {secs:02d}s"
+
+
+def _percentage(value: object) -> str:
+    if value is None or pd.isna(value):
+        return "Unavailable"
+    return f"{float(value):.2%}"
 
 
 def _status_callout(status: str, message: str) -> None:
@@ -1136,6 +1151,429 @@ if snapshot is not None:
                     "No TRAIN, VALIDATION, or TEST dataframe is opened by this "
                     "detail inventory. Only persisted manifests, hashes, and the "
                     "raw market-date column are inspected."
+                )
+
+    st.subheader("Global validation comparison")
+    st.caption(
+        "VALIDATION ONLY · TEST SEALED. Metrics are read from persisted, "
+        "verified validation artifacts across all valid run history. Missing or "
+        "invalid artifacts are reported and never silently recomputed."
+    )
+    try:
+        validation_inventory = build_global_validation_inventory(
+            verified_inventory=verified_inventory
+        )
+    except (OSError, ValueError, RuntimeError, GlobalValidationError) as exc:
+        validation_inventory = pd.DataFrame()
+        st.error(
+            "Global validation comparison failed closed: "
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    if validation_inventory.empty:
+        st.caption("No verified persisted validation artifacts are available.")
+    else:
+        validation_summary = summarize_validation_inventory(validation_inventory)
+        with st.container(horizontal=True):
+            st.metric(
+                "Verified models",
+                validation_summary.verified_models,
+                border=True,
+            )
+            st.metric(
+                "Validation complete",
+                validation_summary.validation_complete,
+                border=True,
+            )
+            st.metric(
+                "Missing / invalid",
+                validation_summary.validation_missing_or_invalid,
+                border=True,
+            )
+            st.metric(
+                "Positive return",
+                validation_summary.positive_validation_return,
+                border=True,
+            )
+            st.metric(
+                "Positive excess return",
+                (
+                    validation_summary.positive_excess_return
+                    if validation_summary.positive_excess_return is not None
+                    else "Unavailable"
+                ),
+                border=True,
+            )
+            st.metric(
+                "Median return",
+                _percentage(validation_summary.median_return),
+                border=True,
+            )
+            st.metric(
+                "Median Sharpe",
+                (
+                    f"{validation_summary.median_sharpe:.3f}"
+                    if validation_summary.median_sharpe is not None
+                    else "Unavailable"
+                ),
+                border=True,
+            )
+            st.metric(
+                "Median max drawdown",
+                _percentage(validation_summary.median_max_drawdown),
+                border=True,
+            )
+
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            validation_run_types = st.multiselect(
+                "Validation run type",
+                sorted(validation_inventory["run_type"].dropna().astype(str).unique()),
+                key="global_validation_run_type_filter",
+            )
+            validation_sectors = st.multiselect(
+                "Validation sector",
+                sorted(validation_inventory["sector"].dropna().astype(str).unique()),
+                key="global_validation_sector_filter",
+            )
+            validation_statuses = st.multiselect(
+                "Validation artifact status",
+                sorted(
+                    validation_inventory["validation_artifact_status"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                ),
+                key="global_validation_status_filter",
+            )
+            persisted_validation_statuses = st.multiselect(
+                "Persisted validation status",
+                sorted(
+                    validation_inventory["validation_status"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                ),
+                key="global_persisted_validation_status_filter",
+            )
+            validation_search = st.text_input(
+                "Search validation models",
+                key="global_validation_search",
+            )
+
+        filtered_validation = validation_inventory.copy(deep=True)
+        if validation_run_types:
+            filtered_validation = filtered_validation.loc[
+                filtered_validation["run_type"].isin(validation_run_types)
+            ]
+        if validation_sectors:
+            filtered_validation = filtered_validation.loc[
+                filtered_validation["sector"].isin(validation_sectors)
+            ]
+        if validation_statuses:
+            filtered_validation = filtered_validation.loc[
+                filtered_validation["validation_artifact_status"].isin(
+                    validation_statuses
+                )
+            ]
+        if persisted_validation_statuses:
+            filtered_validation = filtered_validation.loc[
+                filtered_validation["validation_status"].isin(
+                    persisted_validation_statuses
+                )
+            ]
+        if validation_search.strip():
+            validation_query = validation_search.strip().casefold()
+            filtered_validation = filtered_validation.loc[
+                filtered_validation["symbol"].str.casefold().str.contains(
+                    validation_query, regex=False
+                )
+                | filtered_validation["company_name"]
+                .fillna("")
+                .astype(str)
+                .str.casefold()
+                .str.contains(validation_query, regex=False)
+            ]
+        acceptance_values = sorted(
+            validation_inventory["acceptance_status"].dropna().astype(str).unique()
+        )
+        if acceptance_values:
+            validation_acceptance = st.multiselect(
+                "Persisted validation decision",
+                acceptance_values,
+                key="global_validation_acceptance_filter",
+            )
+            if validation_acceptance:
+                filtered_validation = filtered_validation.loc[
+                    filtered_validation["acceptance_status"].isin(
+                        validation_acceptance
+                    )
+                ]
+
+        st.caption(
+            f"Visible models: {len(filtered_validation):,} / "
+            f"{len(validation_inventory):,}. Default order is descending persisted "
+            "VALIDATION Sharpe, then symbol. Each ranking remains a separate, "
+            "transparent metric rank."
+        )
+        comparison_columns = [
+            "symbol",
+            "company_name",
+            "sector",
+            "run_type",
+            "validation_status",
+            "validation_artifact_status",
+            "validation_rows",
+            "validation_start",
+            "validation_end",
+            "validation_total_return",
+            "benchmark_total_return",
+            "excess_return",
+            "validation_sharpe",
+            "validation_sortino",
+            "validation_max_drawdown",
+            "validation_volatility",
+            "trade_count",
+            "turnover",
+            "win_rate",
+            "average_reward",
+            "final_portfolio_value",
+            "return_rank",
+            "sharpe_rank",
+            "sortino_rank",
+            "drawdown_rank",
+            "excess_return_rank",
+            "acceptance_status",
+            "comparability_warnings",
+        ]
+        st.dataframe(
+            filtered_validation.loc[:, comparison_columns],
+            hide_index=True,
+            key="global_validation_comparison_table",
+            column_config={
+                "symbol": st.column_config.TextColumn("Symbol", pinned=True),
+                "company_name": st.column_config.TextColumn("Company"),
+                "validation_total_return": st.column_config.NumberColumn(
+                    "Validation return", format="percent"
+                ),
+                "benchmark_total_return": st.column_config.NumberColumn(
+                    "Buy & Hold return", format="percent"
+                ),
+                "excess_return": st.column_config.NumberColumn(
+                    "Excess return", format="percent"
+                ),
+                "validation_sharpe": st.column_config.NumberColumn(
+                    "Sharpe", format="%.3f"
+                ),
+                "validation_sortino": st.column_config.NumberColumn(
+                    "Sortino", format="%.3f"
+                ),
+                "validation_max_drawdown": st.column_config.NumberColumn(
+                    "Max drawdown", format="percent"
+                ),
+                "validation_volatility": st.column_config.NumberColumn(
+                    "Volatility", format="percent"
+                ),
+                "win_rate": st.column_config.NumberColumn(
+                    "Win rate", format="percent"
+                ),
+                "final_portfolio_value": st.column_config.NumberColumn(
+                    "Final portfolio value", format="%.2f"
+                ),
+            },
+        )
+        st.download_button(
+            "Download validation comparison CSV",
+            data=validation_export_csv(validation_inventory),
+            file_name="global_recurrent_validation_comparison.csv",
+            mime="text/csv",
+            key="global_validation_export",
+            icon=":material/download:",
+        )
+
+        st.markdown("**Sector validation summary**")
+        st.caption(
+            "Descriptive VALIDATION-only medians across available models; no "
+            "statistical-significance or model-quality claim is implied."
+        )
+        sector_validation = build_sector_validation_summary(validation_inventory)
+        if sector_validation.empty:
+            st.caption("No valid sector-level validation summary is available.")
+        else:
+            st.dataframe(
+                sector_validation,
+                hide_index=True,
+                key="global_validation_sector_summary",
+                column_config={
+                    "median_validation_return": st.column_config.NumberColumn(
+                        "Median validation return", format="percent"
+                    ),
+                    "median_sharpe": st.column_config.NumberColumn(
+                        "Median Sharpe", format="%.3f"
+                    ),
+                    "median_max_drawdown": st.column_config.NumberColumn(
+                        "Median max drawdown", format="percent"
+                    ),
+                },
+            )
+
+        warning_rows = validation_inventory.loc[
+            validation_inventory["comparability_warnings"].astype(str).ne(""),
+            [
+                "symbol",
+                "validation_rows",
+                "validation_artifact_status",
+                "comparability_warnings",
+            ],
+        ]
+        if not warning_rows.empty:
+            with st.expander(
+                f"Comparability warnings ({len(warning_rows):,} models)",
+                icon=":material/warning:",
+            ):
+                st.dataframe(
+                    warning_rows,
+                    hide_index=True,
+                    key="global_validation_warnings",
+                )
+
+        if filtered_validation.empty:
+            st.info("No validation models match the current filters.")
+        else:
+            validation_symbol = st.selectbox(
+                "Validation model detail",
+                filtered_validation["symbol"].tolist(),
+                key="global_validation_detail_symbol",
+                persist_state="session",
+            )
+            validation_detail = filtered_validation.loc[
+                filtered_validation["symbol"].eq(validation_symbol)
+            ].iloc[0]
+            with st.container(border=True):
+                with st.container(horizontal=True):
+                    st.metric("Symbol", validation_symbol, border=True)
+                    st.metric(
+                        "Company",
+                        safe_display_value(validation_detail["company_name"]),
+                        border=True,
+                    )
+                    st.metric(
+                        "Sector",
+                        safe_display_value(validation_detail["sector"]),
+                        border=True,
+                    )
+                    st.metric(
+                        "Validation artifact",
+                        validation_detail["validation_artifact_status"],
+                        border=True,
+                    )
+                with st.container(horizontal=True):
+                    st.metric(
+                        "Validation return",
+                        _percentage(validation_detail["validation_total_return"]),
+                        border=True,
+                    )
+                    st.metric(
+                        "Sharpe",
+                        (
+                            f"{float(validation_detail['validation_sharpe']):.3f}"
+                            if pd.notna(validation_detail["validation_sharpe"])
+                            else "Unavailable"
+                        ),
+                        border=True,
+                    )
+                    st.metric(
+                        "Sortino",
+                        (
+                            f"{float(validation_detail['validation_sortino']):.3f}"
+                            if pd.notna(validation_detail["validation_sortino"])
+                            else "Unavailable"
+                        ),
+                        border=True,
+                    )
+                    st.metric(
+                        "Max drawdown",
+                        _percentage(validation_detail["validation_max_drawdown"]),
+                        border=True,
+                    )
+                st.write(
+                    {
+                        "Run type": validation_detail["run_type"],
+                        "Run ID": validation_detail["run_id"],
+                        "Attempt": int(validation_detail["attempt"]),
+                        "Artifact verification": validation_detail[
+                            "artifact_verification"
+                        ],
+                        "Model-observed TRAIN range": (
+                            f"{validation_detail['train_start']} through "
+                            f"{validation_detail['train_end']}"
+                        ),
+                        "TRAIN rows": int(validation_detail["train_rows"]),
+                        "Model-observed VALIDATION range": (
+                            f"{validation_detail['validation_start']} through "
+                            f"{validation_detail['validation_end']}"
+                        ),
+                        "VALIDATION rows": int(validation_detail["validation_rows"]),
+                        "TEST status": "SEALED",
+                        "Validation artifact SHA-256": validation_detail[
+                            "validation_artifact_sha256"
+                        ],
+                        "Model SHA-256": validation_detail["model_sha256"],
+                    }
+                )
+                if pd.isna(validation_detail["benchmark_total_return"]):
+                    st.info(
+                        "No Buy-and-Hold metric is persisted for this validation "
+                        "artifact, so benchmark return and excess return remain "
+                        "unavailable. They were not regenerated."
+                    )
+                if str(validation_detail["comparability_warnings"]):
+                    st.warning(str(validation_detail["comparability_warnings"]))
+                selected_validation_store = TrainingRunStore(
+                    Path(str(validation_detail["run_directory"]))
+                )
+                selected_diagnostics = latest_job_diagnostics(
+                    selected_validation_store, validation_symbol
+                )
+                if selected_diagnostics:
+                    st.markdown("**Persisted training diagnostics**")
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Metric": [
+                                    label for label, _ in TRAINING_DIAGNOSTIC_FIELDS
+                                ],
+                                "Value": [
+                                    selected_diagnostics.get(source_key)
+                                    for _, source_key in TRAINING_DIAGNOSTIC_FIELDS
+                                ],
+                            }
+                        ),
+                        hide_index=True,
+                        key="global_validation_training_diagnostics",
+                    )
+                try:
+                    validation_curve = load_persisted_validation_returns(
+                        validation_detail["run_directory"],
+                        validation_detail["validation_metrics_reference"],
+                    )
+                except (OSError, ValueError, RuntimeError, GlobalValidationError) as exc:
+                    st.caption(
+                        "Persisted validation return path unavailable: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                else:
+                    if not validation_curve.empty:
+                        st.markdown("**Persisted validation return path**")
+                        st.line_chart(
+                            validation_curve,
+                            x="validation_step",
+                            y="cumulative_return",
+                            x_label="Validation step",
+                            y_label="Cumulative return",
+                        )
+                st.caption(
+                    "VALIDATION ONLY. This view does not load a model, invoke an "
+                    "evaluator, promote an artifact, or open TEST observations."
                 )
 
     st.subheader("Logs and advanced state")
