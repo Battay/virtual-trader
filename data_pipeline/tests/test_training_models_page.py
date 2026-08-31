@@ -233,6 +233,50 @@ def _patch_page_backend(
             ),
         ),
     )
+    verified_inventory = pd.DataFrame(
+        [
+            {
+                "symbol": "AAA",
+                "company_name": "AAA Limited",
+                "sector": "COMMERCIAL BANKS",
+                "run_type": PRODUCTION_RUN_KIND,
+                "run_id": "run-production",
+                "attempt": 1,
+                "training_status": "COMPLETED",
+                "validation_status": "completed",
+                "artifact_verification": "verified",
+                "algorithm": "RecurrentPPO",
+                "policy": "MlpLstmPolicy",
+                "requested_timesteps": 100_000,
+                "actual_timesteps": 100_352,
+                "effective_device": "cpu",
+                "runtime_seconds": 240.0,
+                "raw_available_start": "2016-07-26",
+                "raw_available_end": "2026-08-28",
+                "raw_available_rows": 2_450,
+                "usable_feature_start": "2016-10-06",
+                "usable_feature_end": "2026-08-05",
+                "usable_feature_rows": 2_400,
+                "train_start": "2016-10-06",
+                "train_end": "2023-08-23",
+                "train_rows": 1_680,
+                "validation_start": "2023-08-24",
+                "validation_end": "2025-02-12",
+                "validation_rows": 360,
+                "test_start": "2025-02-13",
+                "test_end": "2026-08-05",
+                "test_rows": 360,
+                "validation_partition": "validation",
+                "validation_metrics_reference": "validation/AAA/attempt_000.json",
+                "model_path": "models/AAA/attempt_000/model.zip",
+                "run_directory": str(tmp_path),
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        "reinforcement_learning.training.model_details.build_global_verified_model_inventory",
+        lambda **_: verified_inventory,
+    )
 
 
 def test_page_loads_in_pre_run_state_without_creating_a_run(
@@ -570,3 +614,107 @@ def test_empty_promotion_registry_still_reports_run_isolated_model_inventory(
     captions = "\n".join(item.value for item in app.caption)
     assert "optional promoted model registry contains no rows" in captions
     assert "No model registry records exist" not in captions
+
+
+def test_symbol_details_uses_all_verified_models_across_run_history(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    selected_symbols = (
+        "ENGROH", "FFC", "HUBC", "LUCK", "MARI", "MCB", "OGDC", "PSO",
+        "SYS", "TRG", "UBL", "UNITY",
+    )
+    full_symbols = ("786", "AABS", "AATM", "ABL")
+    all_symbols = tuple(sorted((*full_symbols, *selected_symbols)))
+    snapshot = _snapshot(
+        tmp_path / "selected",
+        "COMPLETED",
+        "COMPLETED",
+        run_kind=SELECTED_RUN_KIND,
+        run_id="run-selected",
+        symbols=selected_symbols,
+        controller_state="COMPLETED",
+    )
+    _patch_page_backend(monkeypatch, tmp_path, snapshot)
+    monkeypatch.setattr(
+        "reinforcement_learning.training.selective_training.load_selected_run_metadata",
+        lambda _: SimpleNamespace(
+            selected_symbols=selected_symbols,
+            selected_symbol_hash="c" * 64,
+            attempt_version=0,
+        ),
+    )
+
+    rows = []
+    for symbol in all_symbols:
+        run_type = PRODUCTION_RUN_KIND if symbol in full_symbols else SELECTED_RUN_KIND
+        rows.append(
+            {
+                "symbol": symbol,
+                "company_name": f"{symbol} Limited",
+                "sector": "COMMERCIAL BANKS",
+                "run_type": run_type,
+                "run_id": "run-production" if run_type == PRODUCTION_RUN_KIND else "run-selected",
+                "attempt": 1,
+                "training_status": "COMPLETED",
+                "validation_status": "completed",
+                "artifact_verification": "verified",
+                "algorithm": "RecurrentPPO",
+                "policy": "MlpLstmPolicy",
+                "requested_timesteps": 100_000,
+                "actual_timesteps": 100_352,
+                "effective_device": "cpu",
+                "runtime_seconds": 300.0,
+                "raw_available_start": "2016-07-26",
+                "raw_available_end": "2026-08-28",
+                "raw_available_rows": 2_450,
+                "usable_feature_start": "2016-10-06",
+                "usable_feature_end": "2026-08-05",
+                "usable_feature_rows": 2_435,
+                "train_start": "2016-10-06",
+                "train_end": "2023-08-23",
+                "train_rows": 1_704,
+                "validation_start": "2023-08-24",
+                "validation_end": "2025-02-12",
+                "validation_rows": 365,
+                "test_start": "2025-02-13",
+                "test_end": "2026-08-05",
+                "test_rows": 366,
+                "validation_partition": "validation",
+                "validation_metrics_reference": f"validation/{symbol}/attempt_000.json",
+                "model_path": f"models/{symbol}/attempt_000/model.zip",
+                "run_directory": str(tmp_path),
+            }
+        )
+    monkeypatch.setattr(
+        "reinforcement_learning.training.model_details.build_global_verified_model_inventory",
+        lambda **_: pd.DataFrame(rows),
+    )
+
+    app = AppTest.from_file(str(PAGE_PATH), default_timeout=20).run()
+
+    assert not app.exception
+    selector = app.selectbox(key="training_detail_symbol")
+    assert tuple(selector.options) == all_symbols
+    rendered = "\n".join(
+        str(item.value)
+        for kind in ("caption", "markdown", "json")
+        for item in app.get(kind)
+    )
+    assert "Research partition policy" in rendered
+    assert "per symbol, not one global calendar cutoff" in rendered
+    ranges = next(
+        item
+        for item in app.dataframe
+        if "Range" in item.value.columns
+    )
+    assert ranges.value["Range"].tolist() == [
+        "Current raw availability (date column only)",
+        "Usable post-feature history",
+        "Model-observed TRAIN",
+        "Model-observed VALIDATION",
+        "SEALED TEST boundary metadata",
+    ]
+
+    app.selectbox(key="training_detail_symbol").set_value("ENGROH").run()
+    metrics = [(item.label, item.value) for item in app.metric]
+    assert ("Run type", SELECTED_RUN_KIND) in metrics

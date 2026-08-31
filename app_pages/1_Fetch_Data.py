@@ -26,6 +26,7 @@ from data_pipeline.src.main import CollectionResult, collect_date_range, collect
 
 CSV_SELECTION_KEY = "fetch_control_csv_selected_dates"
 CSV_TABLE_KEY = "fetch_control_csv_attention_table"
+CSV_REVIEW_TABLE_KEY = "fetch_control_csv_review_table"
 PARQUET_SELECTION_KEY = "fetch_control_parquet_selected_dates"
 PARQUET_TABLE_KEY = "fetch_control_parquet_attention_table"
 
@@ -212,6 +213,11 @@ def _render_csv_controls(inventory: DataCompletenessInventory) -> None:
     )
     selected = _selected_dates(CSV_SELECTION_KEY)
     visible_dates = tuple(item.trading_date for item in filtered)
+    actionable_filtered = tuple(item for item in filtered if item.actionable)
+    review_only_filtered = tuple(item for item in filtered if not item.actionable)
+    actionable_visible_dates = tuple(
+        item.trading_date for item in actionable_filtered
+    )
     with st.container(horizontal=True):
         st.button(
             "Select visible actionable", icon=":material/select_all:",
@@ -233,12 +239,13 @@ def _render_csv_controls(inventory: DataCompletenessInventory) -> None:
         f"Selected: {len(selected):,} total · Visible: {len(filtered):,} · "
         f"Selected in view: {len(set(selected).intersection(visible_dates)):,}"
     )
-    frame = _csv_attention_frame(filtered, selected)
-    if frame.empty:
+    if not filtered:
         st.info("No source dates match the current attention filters.")
-    else:
+    elif actionable_filtered:
+        st.markdown("**Actionable source dates**")
+        frame = _csv_attention_frame(actionable_filtered, selected)
         default_rows = [
-            index for index, item in enumerate(filtered)
+            index for index, item in enumerate(actionable_filtered)
             if item.trading_date in set(selected) and item.actionable
         ]
         event = st.dataframe(
@@ -251,12 +258,35 @@ def _render_csv_controls(inventory: DataCompletenessInventory) -> None:
             },
         )
         selected_visible = tuple(
-            filtered[index].trading_date for index in event.selection.rows
-            if 0 <= index < len(filtered) and filtered[index].actionable
+            actionable_filtered[index].trading_date for index in event.selection.rows
+            if 0 <= index < len(actionable_filtered)
         )
-        updated = update_visible_selection(selected, visible_dates, selected_visible)
+        updated = update_visible_selection(
+            selected, actionable_visible_dates, selected_visible
+        )
         if updated != selected:
             st.session_state[CSV_SELECTION_KEY] = updated
+    else:
+        st.caption("No actionable source dates match the current filters.")
+    if review_only_filtered:
+        st.markdown("**Review-only source evidence**")
+        st.caption(
+            "These rows are intentionally non-selectable. Native table focus is "
+            "disabled here so a highlighted row cannot imply a fetch selection."
+        )
+        review_frame = _csv_attention_frame(review_only_filtered, ()).drop(
+            columns=["Selected"]
+        )
+        st.dataframe(
+            review_frame,
+            key=CSV_REVIEW_TABLE_KEY,
+            hide_index=True,
+            width="stretch",
+            height=min(260, 36 * len(review_frame) + 38),
+            column_config={
+                "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
+            },
+        )
     selected = _selected_dates(CSV_SELECTION_KEY)
     if selected:
         st.write("Selected fetch dates: " + ", ".join(value.isoformat() for value in selected))

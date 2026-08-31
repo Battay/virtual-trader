@@ -1,9 +1,11 @@
 """Production control center for frozen-universe recurrent PPO training."""
 
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
-from dashboard.presentation import format_date, format_integer, safe_display_value
+from dashboard.presentation import format_integer, safe_display_value
 from reinforcement_learning.training.job_state import FAILED, INTERRUPTED
 from reinforcement_learning.training.production_control import (
     PRODUCTION_RUN_KIND,
@@ -14,7 +16,6 @@ from reinforcement_learning.training.production_control import (
     launch_production_controller,
     list_run_catalog,
     load_run_snapshot,
-    load_validation_metrics,
     prepare_production_run,
     production_plan,
     recent_orchestration_events,
@@ -22,8 +23,13 @@ from reinforcement_learning.training.production_control import (
     request_interrupt,
     request_stop_after_current,
     requeue_jobs,
-    symbol_contract_summary,
 )
+from reinforcement_learning.training.model_details import (
+    ModelDetailsAuditError,
+    build_global_verified_model_inventory,
+    research_partition_policy,
+)
+from reinforcement_learning.training.recurrent_orchestrator import TrainingRunStore
 from reinforcement_learning.training.selective_training import (
     GLOBAL_COVERAGE_STATUSES,
     SELECTED_RUN_KIND,
@@ -924,88 +930,202 @@ if snapshot is not None:
         )
         st.dataframe(shown_models, hide_index=True, key="training_model_registry")
 
-    st.subheader("Symbol details")
-    selected_symbol = st.selectbox(
-        "Symbol", snapshot.jobs["symbol"].tolist(), key="training_detail_symbol",
-        persist_state="session",
+    st.subheader("Global verified model details")
+    st.caption(
+        "This inventory spans every valid recurrent run, independent of the run "
+        "selected above. Only hash-verified models with compatible persisted "
+        "training and validation metadata are included."
     )
-    detail = snapshot.jobs.loc[snapshot.jobs["symbol"].eq(selected_symbol)].iloc[0]
-    with st.container(border=True):
-        with st.container(horizontal=True):
-            st.metric("Symbol", selected_symbol, border=True)
-            st.metric("Company", safe_display_value(detail["company_name"]), border=True)
-            st.metric("Sector", safe_display_value(detail["sector"]), border=True)
-            st.metric("State", detail["state"], border=True)
-        contract = symbol_contract_summary(selected_symbol)
-        if contract:
-            st.dataframe(
-                pd.DataFrame(
-                    {
-                        "Contract field": [
-                            "TRAIN range", "TRAIN rows", "Observation features",
-                            "Recurrent contract", "Feature version", "Environment version",
-                        ],
-                        "Value": [
-                            f"{format_date(contract['train_start'])} to {format_date(contract['train_end'])}",
-                            format_integer(contract["train_rows"]),
-                            format_integer(contract["observation_count"]),
-                            contract["recurrent_contract_version"],
-                            contract["feature_version"],
-                            contract["environment_version"],
-                        ],
-                    }
-                ),
-                hide_index=True,
+    try:
+        verified_inventory = build_global_verified_model_inventory(coverage=coverage)
+    except (OSError, ValueError, RuntimeError, ModelDetailsAuditError) as exc:
+        verified_inventory = pd.DataFrame()
+        st.error(
+            "Global verified model details failed closed: "
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    if verified_inventory.empty:
+        st.caption("No globally verified recurrent model details are available.")
+    else:
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            detail_run_types = st.multiselect(
+                "Training run type",
+                sorted(verified_inventory["run_type"].unique()),
+                key="training_detail_run_type_filter",
             )
+            detail_sectors = st.multiselect(
+                "Model sector",
+                sorted(verified_inventory["sector"].dropna().astype(str).unique()),
+                key="training_detail_sector_filter",
+            )
+            detail_search = st.text_input(
+                "Search verified model", key="training_detail_search"
+            )
+        filtered_inventory = verified_inventory.copy(deep=True)
+        if detail_run_types:
+            filtered_inventory = filtered_inventory.loc[
+                filtered_inventory["run_type"].isin(detail_run_types)
+            ]
+        if detail_sectors:
+            filtered_inventory = filtered_inventory.loc[
+                filtered_inventory["sector"].isin(detail_sectors)
+            ]
+        if detail_search.strip():
+            query = detail_search.strip().casefold()
+            filtered_inventory = filtered_inventory.loc[
+                filtered_inventory["symbol"].str.casefold().str.contains(
+                    query, regex=False
+                )
+                | filtered_inventory["company_name"].fillna("").str.casefold().str.contains(
+                    query, regex=False
+                )
+            ]
+        st.caption(
+            f"Verified models: {len(verified_inventory):,} · "
+            f"visible after filters: {len(filtered_inventory):,}"
+        )
+        if filtered_inventory.empty:
+            st.info("No verified models match these filters.")
         else:
-            st.caption("No compatible recurrent TRAIN contract is available.")
-        detail_progress = (
-            "Not applicable"
-            if pd.isna(detail["progress_percent"])
-            else f"{float(detail['progress_percent']):.1f}%"
-        )
-        with st.container(horizontal=True):
-            st.metric("Progress", detail_progress, border=True)
-            st.metric("Runtime", _duration(detail["runtime_seconds"]), border=True)
-            st.metric("Attempts", int(detail["attempts"]), border=True)
-            st.metric("Device", safe_display_value(detail["effective_device"]), border=True)
-        diagnostics = latest_job_diagnostics(snapshot.store, selected_symbol)
-        if diagnostics:
-            st.markdown("**Training diagnostics**")
-            st.dataframe(
-                pd.DataFrame(
-                    {
-                        "Metric": [
-                            label for label, _ in TRAINING_DIAGNOSTIC_FIELDS
-                        ],
-                        "Value": [
-                            diagnostics.get(source_key)
-                            for _, source_key in TRAINING_DIAGNOSTIC_FIELDS
-                        ],
-                    }
-                ),
-                hide_index=True,
+            selected_symbol = st.selectbox(
+                "Verified model symbol",
+                filtered_inventory["symbol"].tolist(),
+                key="training_detail_symbol",
+                persist_state="session",
             )
-        validation = load_validation_metrics(snapshot.store, selected_symbol)
-        st.markdown("**Validation and artifacts**")
-        st.write(
-            {
-                "validation_status": detail["validation_status"],
-                "validation_partition": validation.get("evaluation_partition"),
-                "validation_artifact": snapshot.store.read_job(
-                    selected_symbol
-                ).validation_metrics_reference,
-                "model_path": detail["model_path"],
-                "model_artifact_status": detail["model_artifact_status"],
-                "registry_entry": (
-                    "present"
-                    if "symbol" in models.columns
-                    and not models.loc[models["symbol"].eq(selected_symbol)].empty
-                    else "absent"
-                ),
-            }
-        )
-        st.caption("No TEST observations or returns are loaded by this detail view.")
+            detail = filtered_inventory.loc[
+                filtered_inventory["symbol"].eq(selected_symbol)
+            ].iloc[0]
+            policy = research_partition_policy()
+            with st.container(border=True):
+                st.markdown("**Research partition policy**")
+                st.write(
+                    {
+                        "policy_version": policy["version"],
+                        "TRAIN": policy["train"],
+                        "VALIDATION": policy["validation"],
+                        "TEST": policy["test"],
+                        "normalization": policy["normalization"],
+                    }
+                )
+                st.caption(
+                    "The policy is per symbol, not one global calendar cutoff. "
+                    "Feature warm-up, listing age, suspensions, and missing market "
+                    "dates can therefore produce different model-observed dates."
+                )
+            with st.container(border=True):
+                with st.container(horizontal=True):
+                    st.metric("Symbol", selected_symbol, border=True)
+                    st.metric(
+                        "Company", safe_display_value(detail["company_name"]), border=True
+                    )
+                    st.metric(
+                        "Sector", safe_display_value(detail["sector"]), border=True
+                    )
+                    st.metric("Run type", detail["run_type"], border=True)
+                with st.container(horizontal=True):
+                    st.metric("Training", detail["training_status"], border=True)
+                    st.metric("Validation", detail["validation_status"], border=True)
+                    st.metric(
+                        "Artifact", detail["artifact_verification"], border=True
+                    )
+                    st.metric("Attempt", int(detail["attempt"]), border=True)
+                st.write(
+                    {
+                        "run_id": detail["run_id"],
+                        "algorithm": detail["algorithm"],
+                        "policy": detail["policy"],
+                        "device": detail["effective_device"],
+                        "runtime": _duration(detail["runtime_seconds"]),
+                        "actual_timesteps": int(detail["actual_timesteps"]),
+                    }
+                )
+                st.markdown("**Model-specific partition ranges**")
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Range": [
+                                "Current raw availability (date column only)",
+                                "Usable post-feature history",
+                                "Model-observed TRAIN",
+                                "Model-observed VALIDATION",
+                                "SEALED TEST boundary metadata",
+                            ],
+                            "First date": [
+                                detail["raw_available_start"],
+                                detail["usable_feature_start"],
+                                detail["train_start"],
+                                detail["validation_start"],
+                                detail["test_start"],
+                            ],
+                            "Last date": [
+                                detail["raw_available_end"],
+                                detail["usable_feature_end"],
+                                detail["train_end"],
+                                detail["validation_end"],
+                                detail["test_end"],
+                            ],
+                            "Rows/dates": [
+                                int(detail["raw_available_rows"]),
+                                int(detail["usable_feature_rows"]),
+                                int(detail["train_rows"]),
+                                int(detail["validation_rows"]),
+                                int(detail["test_rows"]),
+                            ],
+                        }
+                    ),
+                    hide_index=True,
+                    key="training_model_partition_ranges",
+                )
+                st.caption(
+                    "Model-specific ranges are persisted contract metadata. TEST "
+                    "observations and returns are not opened by this view."
+                )
+                model_store = TrainingRunStore(Path(str(detail["run_directory"])))
+                diagnostics = latest_job_diagnostics(model_store, selected_symbol)
+                if diagnostics:
+                    st.markdown("**Training diagnostics**")
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Metric": [
+                                    label for label, _ in TRAINING_DIAGNOSTIC_FIELDS
+                                ],
+                                "Value": [
+                                    diagnostics.get(source_key)
+                                    for _, source_key in TRAINING_DIAGNOSTIC_FIELDS
+                                ],
+                            }
+                        ),
+                        hide_index=True,
+                        key="training_model_diagnostics",
+                    )
+                st.markdown("**Validation and artifacts**")
+                st.write(
+                    {
+                        "validation_status": detail["validation_status"],
+                        "validation_partition": detail["validation_partition"],
+                        "validation_artifact": detail[
+                            "validation_metrics_reference"
+                        ],
+                        "model_path": detail["model_path"],
+                        "artifact_verification": detail["artifact_verification"],
+                        "registry_entry": (
+                            "present"
+                            if "symbol" in models.columns
+                            and not models.loc[
+                                models["symbol"].eq(selected_symbol)
+                            ].empty
+                            else "absent"
+                        ),
+                    }
+                )
+                st.caption(
+                    "No TRAIN, VALIDATION, or TEST dataframe is opened by this "
+                    "detail inventory. Only persisted manifests, hashes, and the "
+                    "raw market-date column are inspected."
+                )
 
     st.subheader("Logs and advanced state")
     with st.expander("Latest orchestration events", icon=":material/history:"):

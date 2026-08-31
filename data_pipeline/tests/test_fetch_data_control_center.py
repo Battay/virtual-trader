@@ -117,7 +117,19 @@ def test_control_center_has_no_default_bulk_selection_and_requires_confirmation(
     assert fetch_button.disabled
     assert tuple(app.session_state["fetch_control_csv_selected_dates"]) == ()
     assert tuple(app.session_state["fetch_control_parquet_selected_dates"]) == ()
-    assert len(app.dataframe) == 2
+    assert len(app.dataframe) == 3
+    actionable = next(
+        item for item in app.dataframe
+        if item.key == "fetch_control_csv_attention_table"
+    )
+    review_only = next(
+        item for item in app.dataframe
+        if "Selected" not in item.value.columns and "Classification" in item.value.columns
+    )
+    assert actionable.value["Date"].tolist() == [date(2024, 1, 8)]
+    assert review_only.value["Date"].tolist() == [date(2024, 1, 9)]
+    assert "Selected" not in review_only.value.columns
+    assert tuple(app.session_state["fetch_control_csv_selected_dates"]) == ()
 
 
 def test_select_visible_adds_only_actionable_source_date(
@@ -148,3 +160,5 @@ def test_page_uses_read_only_row_selection_and_preserves_manual_fetch() -> None:
     assert "collect_single_date" in source
     assert "collect_date_range" in source
     assert "I confirm this will make bounded PSX network requests" in source
+    assert "CSV_REVIEW_TABLE_KEY" in source
+    assert "These rows are intentionally non-selectable" in source
