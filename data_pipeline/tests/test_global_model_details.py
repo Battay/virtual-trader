@@ -19,10 +19,12 @@ from reinforcement_learning.training.job_state import (
 from reinforcement_learning.training.model_details import (
     PartitionBoundary,
     RESEARCH_PARTITION_POLICY_VERSION,
+    SINGLE_SYMBOL_RL_PARTITION_CONTRACT,
     SymbolPartitionManifest,
     audit_model_contract_compatibility,
     build_global_verified_model_inventory,
     read_symbol_partition_manifest,
+    single_symbol_rl_partition_protocol,
 )
 from reinforcement_learning.training.production_control import production_plan
 from reinforcement_learning.training.recurrent_orchestrator import (
@@ -33,6 +35,36 @@ from reinforcement_learning.training.selective_training import prepare_selected_
 
 
 NOW = "2026-08-30T00:00:00+00:00"
+
+
+def test_single_symbol_partition_protocol_is_distinct_and_test_sealed() -> None:
+    protocol = single_symbol_rl_partition_protocol()
+
+    assert protocol["name"] == "Single-symbol RL partition protocol"
+    assert protocol["contract"] == SINGLE_SYMBOL_RL_PARTITION_CONTRACT
+    assert protocol["contract"] == "rl_partition_v1"
+    assert protocol["train"].startswith("first floor(70%)")
+    assert protocol["validation"].startswith("next floor(15%)")
+    assert "SEALED" in protocol["test"]
+    assert protocol["rule"].startswith("symbol-specific chronological 70% TRAIN")
+    assert "different common frozen temporal protocol" in protocol["clustering_note"]
+    assert "do not define rl_partition_v1" in protocol["clustering_note"]
+
+
+def test_fixed_window_reports_scope_cutoff_as_clustering_only() -> None:
+    reports = Path(__file__).resolve().parents[2] / "docs" / "report_logs"
+    reconciliation = (
+        reports / "milestone_7c3h_frozen_vs_current_identity_reconciliation.md"
+    ).read_text(encoding="utf-8")
+    relationship = (
+        reports / "milestone_7d_soft_relationship_representation_audit.md"
+    ).read_text(encoding="utf-8")
+
+    assert "The frozen TRAIN boundary ends" not in reconciliation
+    assert "clustering/relationship research" in reconciliation
+    assert "does not define the single-symbol `rl_partition_v1`" in reconciliation
+    assert "Clustering/relationship TRAIN interval" in relationship
+    assert "does not define the single-symbol `rl_partition_v1`" in relationship
 
 
 def _write_partition_manifest(root: Path, market_root: Path, symbol: str = "AAA") -> None:

@@ -247,6 +247,8 @@ def _patch_page_backend(
                 "artifact_verification": "verified",
                 "algorithm": "RecurrentPPO",
                 "policy": "MlpLstmPolicy",
+                "partition_contract_version": "rl_partition_v1",
+                "recurrent_contract_version": "rl_recurrent_partition_v1",
                 "requested_timesteps": 100_000,
                 "actual_timesteps": 100_352,
                 "effective_device": "cpu",
@@ -619,6 +621,7 @@ def test_empty_promotion_registry_still_reports_run_isolated_model_inventory(
 def test_symbol_details_uses_all_verified_models_across_run_history(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    launched: list[object] = []
     selected_symbols = (
         "ENGROH", "FFC", "HUBC", "LUCK", "MARI", "MCB", "OGDC", "PSO",
         "SYS", "TRG", "UBL", "UNITY",
@@ -635,6 +638,10 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
         controller_state="COMPLETED",
     )
     _patch_page_backend(monkeypatch, tmp_path, snapshot)
+    monkeypatch.setattr(
+        "reinforcement_learning.training.production_control.launch_production_controller",
+        lambda store: launched.append(store),
+    )
     monkeypatch.setattr(
         "reinforcement_learning.training.selective_training.load_selected_run_metadata",
         lambda _: SimpleNamespace(
@@ -660,6 +667,8 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
                 "artifact_verification": "verified",
                 "algorithm": "RecurrentPPO",
                 "policy": "MlpLstmPolicy",
+                "partition_contract_version": "rl_partition_v1",
+                "recurrent_contract_version": "rl_recurrent_partition_v1",
                 "requested_timesteps": 100_000,
                 "actual_timesteps": 100_352,
                 "effective_device": "cpu",
@@ -697,11 +706,16 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
     assert tuple(selector.options) == all_symbols
     rendered = "\n".join(
         str(item.value)
-        for kind in ("caption", "markdown", "json")
+        for kind in ("caption", "markdown", "json", "info")
         for item in app.get(kind)
     )
-    assert "Research partition policy" in rendered
-    assert "per symbol, not one global calendar cutoff" in rendered
+    assert "Single-symbol RL partition protocol" in rendered
+    assert "rl_partition_v1" in rendered
+    assert "first floor(70%)" in rendered
+    assert "next floor(15%)" in rendered
+    assert "SEALED" in rendered
+    assert "different common frozen temporal protocol" in rendered
+    assert "fixed research cutoffs do not define" in rendered
     ranges = next(
         item
         for item in app.dataframe
@@ -710,11 +724,22 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
     assert ranges.value["Range"].tolist() == [
         "Current raw availability (date column only)",
         "Usable post-feature history",
-        "Model-observed TRAIN",
-        "Model-observed VALIDATION",
-        "SEALED TEST boundary metadata",
+        "Model-observed TRAIN range",
+        "Model-observed VALIDATION range",
     ]
+    detail_json = "\n".join(str(item.value) for item in app.get("json"))
+    assert "Partition contract" in detail_json
+    assert "Partition rule" in detail_json
+    assert "TEST rows (metadata only)" in detail_json
+    assert "TEST status" in detail_json
+    assert "test_start" not in detail_json
+    assert "test_end" not in detail_json
 
     app.selectbox(key="training_detail_symbol").set_value("ENGROH").run()
     metrics = [(item.label, item.value) for item in app.metric]
     assert ("Run type", SELECTED_RUN_KIND) in metrics
+    assert launched == []
+    page_source = PAGE_PATH.read_text(encoding="utf-8")
+    assert "load_rl_partition" not in page_source
+    assert "load_recurrent_partition" not in page_source
+    assert "test_rl.csv" not in page_source

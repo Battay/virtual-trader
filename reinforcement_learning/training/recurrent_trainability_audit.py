@@ -44,6 +44,9 @@ from .recurrent_orchestrator import (
 
 
 TRAINABILITY_GAP_AUDIT_VERSION = "recurrent_trainability_gap_audit_v1"
+# Eligibility-audit cutoff for safely inspecting candidate TRAIN values. This
+# raw-date prefix does not redefine the persisted post-feature rl_partition_v1
+# boundaries used by trained models.
 TRAIN_PREFIX_POLICY = "symbol_raw_market_dates_first_70_percent_v1"
 
 INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"

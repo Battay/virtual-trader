@@ -34,19 +34,36 @@ from .selective_training import (
 )
 
 
+SINGLE_SYMBOL_RL_PARTITION_CONTRACT = "rl_partition_v1"
 RESEARCH_PARTITION_POLICY_VERSION = (
     "per_symbol_chronological_distinct_dates_70_15_15_v1"
 )
-RESEARCH_PARTITION_POLICY = {
+SINGLE_SYMBOL_RL_PARTITION_PROTOCOL = {
+    "name": "Single-symbol RL partition protocol",
+    "contract": SINGLE_SYMBOL_RL_PARTITION_CONTRACT,
     "version": RESEARCH_PARTITION_POLICY_VERSION,
     "scope": "symbol",
-    "train": "first floor(70%) of each symbol's usable distinct dates",
-    "validation": "next floor(15%) of each symbol's usable distinct dates",
-    "test": "remaining usable distinct dates; SEALED",
+    "train": (
+        "first floor(70%) of each symbol's usable chronological observations"
+    ),
+    "validation": "next floor(15%) of that symbol's usable observations",
+    "test": "remaining usable observations (approximately 15%); SEALED",
+    "rule": (
+        "symbol-specific chronological 70% TRAIN / 15% VALIDATION / "
+        "remaining TEST allocation"
+    ),
     "boundary_rule": "one market date cannot cross a partition",
     "feature_timing": "causal features are built before the split; warm-up rows are removed",
     "normalization": "scaler fit on TRAIN only; VALIDATION/TEST only transformed",
+    "clustering_note": (
+        "Clustering / relationship studies use a different common frozen "
+        "temporal protocol. Those fixed research cutoffs do not define "
+        "rl_partition_v1."
+    ),
 }
+# Backward-compatible name for callers written before the UI terminology was
+# clarified. The persisted split version and split algorithm are unchanged.
+RESEARCH_PARTITION_POLICY = SINGLE_SYMBOL_RL_PARTITION_PROTOCOL
 
 
 class ModelDetailsAuditError(RuntimeError):
@@ -101,10 +118,16 @@ class SymbolPartitionManifest:
         return payload
 
 
-def research_partition_policy() -> dict[str, str]:
-    """Return a copy of the exact persisted v1 split policy description."""
+def single_symbol_rl_partition_protocol() -> dict[str, str]:
+    """Return the exact persisted v1 single-symbol partition description."""
 
-    return dict(RESEARCH_PARTITION_POLICY)
+    return dict(SINGLE_SYMBOL_RL_PARTITION_PROTOCOL)
+
+
+def research_partition_policy() -> dict[str, str]:
+    """Compatibility alias for :func:`single_symbol_rl_partition_protocol`."""
+
+    return single_symbol_rl_partition_protocol()
 
 
 def _json_object(path: Path, *, label: str) -> dict[str, object]:
@@ -557,9 +580,12 @@ __all__ = [
     "PartitionBoundary",
     "RESEARCH_PARTITION_POLICY",
     "RESEARCH_PARTITION_POLICY_VERSION",
+    "SINGLE_SYMBOL_RL_PARTITION_CONTRACT",
+    "SINGLE_SYMBOL_RL_PARTITION_PROTOCOL",
     "SymbolPartitionManifest",
     "audit_model_contract_compatibility",
     "build_global_verified_model_inventory",
     "read_symbol_partition_manifest",
     "research_partition_policy",
+    "single_symbol_rl_partition_protocol",
 ]

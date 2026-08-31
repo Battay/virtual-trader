@@ -58,8 +58,11 @@ observations and official listing rows are both present.
 
 ## TRAIN-only contract evidence
 
-The frozen TRAIN boundary ends on **2023-08-03**. A predicate-pushed market
-read for only `GCWLPRS` and `TISL` through that date returned zero rows.
+The common frozen TRAIN window used by the clustering/relationship research
+protocol ends on **2023-08-03**. A predicate-pushed market read for only
+`GCWLPRS` and `TISL` through that research cutoff returned zero rows. This
+fixed cutoff does not define the single-symbol `rl_partition_v1` contract,
+which partitions each symbol's own usable chronological observations.
 
 | Symbol | TRAIN rows through cutoff | Recurrent contract | Feature/TRAIN RL artifact | Validation availability in recurrent discovery | Outcome |
 |---|---:|---|---|---|---|

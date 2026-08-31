@@ -20,7 +20,7 @@ method trial. A further attempt requires architecture review.
 
 - Identity universe: 508 authoritative current common equities.
 - Universe hash: `571f32af6de4d864ded90bbc06e814cf309fdffe4f61151102895a93ec588ef5`.
-- TRAIN interval: 2016-07-26 through 2023-08-03.
+- Clustering/relationship TRAIN interval: 2016-07-26 through 2023-08-03.
 - Source Parquet SHA-256: `45e3d396c3472fa53b20016c153fdd529308600274ecf77d0ef942417793d7d5`.
 - TRAIN-return-capable identities: 448.
 - Overlap-eligible identities at the frozen 120-observation floor: 336.
@@ -29,6 +29,11 @@ method trial. A further attempt requires architecture review.
 - VALIDATION values loaded: no.
 - TEST values loaded: no.
 - Sectors used during fitting: no.
+
+This fixed common-calendar interval belongs only to the clustering/relationship
+research protocol. It does not define the single-symbol `rl_partition_v1`
+contract, which assigns each symbol's own usable chronological observations to
+TRAIN, VALIDATION, and sealed TEST partitions.
 
 Loading used the existing predicate-pushed TRAIN-only boundary. Return
 construction preserved the existing no-forward-fill, no-zero-fill, and

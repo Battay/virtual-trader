@@ -27,7 +27,7 @@ from reinforcement_learning.training.production_control import (
 from reinforcement_learning.training.model_details import (
     ModelDetailsAuditError,
     build_global_verified_model_inventory,
-    research_partition_policy,
+    single_symbol_rl_partition_protocol,
 )
 from reinforcement_learning.training.recurrent_orchestrator import TrainingRunStore
 from reinforcement_learning.training.selective_training import (
@@ -997,22 +997,26 @@ if snapshot is not None:
             detail = filtered_inventory.loc[
                 filtered_inventory["symbol"].eq(selected_symbol)
             ].iloc[0]
-            policy = research_partition_policy()
+            policy = single_symbol_rl_partition_protocol()
             with st.container(border=True):
-                st.markdown("**Research partition policy**")
+                st.markdown("**Single-symbol RL partition protocol**")
                 st.write(
                     {
-                        "policy_version": policy["version"],
+                        "Partition contract": policy["contract"],
                         "TRAIN": policy["train"],
                         "VALIDATION": policy["validation"],
                         "TEST": policy["test"],
-                        "normalization": policy["normalization"],
+                        "Normalization": policy["normalization"],
                     }
                 )
                 st.caption(
-                    "The policy is per symbol, not one global calendar cutoff. "
+                    "Each split is calculated independently for one symbol. "
                     "Feature warm-up, listing age, suspensions, and missing market "
-                    "dates can therefore produce different model-observed dates."
+                    "dates can therefore produce different model-observed ranges."
+                )
+                st.info(
+                    policy["clustering_note"],
+                    icon=":material/info:",
                 )
             with st.container(border=True):
                 with st.container(horizontal=True):
@@ -1033,12 +1037,22 @@ if snapshot is not None:
                     st.metric("Attempt", int(detail["attempt"]), border=True)
                 st.write(
                     {
-                        "run_id": detail["run_id"],
-                        "algorithm": detail["algorithm"],
-                        "policy": detail["policy"],
-                        "device": detail["effective_device"],
-                        "runtime": _duration(detail["runtime_seconds"]),
-                        "actual_timesteps": int(detail["actual_timesteps"]),
+                        "Run ID": detail["run_id"],
+                        "Run type": detail["run_type"],
+                        "Attempt": int(detail["attempt"]),
+                        "Algorithm": detail["algorithm"],
+                        "Policy": detail["policy"],
+                        "Partition contract": detail["partition_contract_version"],
+                        "Partition rule": policy["rule"],
+                        "Partition policy version": policy["version"],
+                        "Recurrent partition contract": detail[
+                            "recurrent_contract_version"
+                        ],
+                        "Device": detail["effective_device"],
+                        "Runtime": _duration(detail["runtime_seconds"]),
+                        "Actual timesteps": int(detail["actual_timesteps"]),
+                        "TEST status": "SEALED",
+                        "TEST rows (metadata only)": int(detail["test_rows"]),
                     }
                 )
                 st.markdown("**Model-specific partition ranges**")
@@ -1048,30 +1062,26 @@ if snapshot is not None:
                             "Range": [
                                 "Current raw availability (date column only)",
                                 "Usable post-feature history",
-                                "Model-observed TRAIN",
-                                "Model-observed VALIDATION",
-                                "SEALED TEST boundary metadata",
+                                "Model-observed TRAIN range",
+                                "Model-observed VALIDATION range",
                             ],
                             "First date": [
                                 detail["raw_available_start"],
                                 detail["usable_feature_start"],
                                 detail["train_start"],
                                 detail["validation_start"],
-                                detail["test_start"],
                             ],
                             "Last date": [
                                 detail["raw_available_end"],
                                 detail["usable_feature_end"],
                                 detail["train_end"],
                                 detail["validation_end"],
-                                detail["test_end"],
                             ],
                             "Rows/dates": [
                                 int(detail["raw_available_rows"]),
                                 int(detail["usable_feature_rows"]),
                                 int(detail["train_rows"]),
                                 int(detail["validation_rows"]),
-                                int(detail["test_rows"]),
                             ],
                         }
                     ),
@@ -1079,8 +1089,9 @@ if snapshot is not None:
                     key="training_model_partition_ranges",
                 )
                 st.caption(
-                    "Model-specific ranges are persisted contract metadata. TEST "
-                    "observations and returns are not opened by this view."
+                    "Model-observed ranges are persisted contract metadata, not "
+                    "global research cutoffs. TEST is SEALED; only its already "
+                    "persisted row-count metadata is shown."
                 )
                 model_store = TrainingRunStore(Path(str(detail["run_directory"])))
                 diagnostics = latest_job_diagnostics(model_store, selected_symbol)
