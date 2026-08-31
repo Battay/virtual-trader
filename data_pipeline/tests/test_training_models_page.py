@@ -289,6 +289,92 @@ def _patch_page_backend(
         lambda **_: verified_inventory,
     )
 
+    def fixture_benchmarks(inventory: pd.DataFrame) -> pd.DataFrame:
+        enriched = inventory.copy(deep=True)
+        valid = enriched["validation_artifact_status"].eq("VALID")
+        defaults = {
+            "benchmark_contract_version": "validation_buy_and_hold_v1",
+            "benchmark_status": "INVALID",
+            "benchmark_error": None,
+            "benchmark_validation_start": None,
+            "benchmark_validation_end": None,
+            "benchmark_validation_rows": None,
+            "benchmark_validation_membership_sha256": None,
+            "benchmark_source_artifact_sha256": None,
+            "benchmark_total_return": None,
+            "benchmark_annualized_return": None,
+            "benchmark_sharpe": None,
+            "benchmark_sortino": None,
+            "benchmark_max_drawdown": None,
+            "benchmark_volatility": None,
+            "benchmark_final_portfolio_value": None,
+            "benchmark_transaction_costs": None,
+            "benchmark_metric_warnings": "",
+            "excess_return": None,
+            "sharpe_delta": None,
+            "sortino_delta": None,
+            "drawdown_improvement": None,
+            "volatility_difference": None,
+        }
+        for column, value in defaults.items():
+            enriched[column] = value
+        enriched.loc[valid, "benchmark_status"] = "VALID"
+        enriched.loc[valid, "benchmark_validation_start"] = enriched.loc[
+            valid, "validation_start"
+        ]
+        enriched.loc[valid, "benchmark_validation_end"] = enriched.loc[
+            valid, "validation_end"
+        ]
+        enriched.loc[valid, "benchmark_validation_rows"] = enriched.loc[
+            valid, "validation_rows"
+        ]
+        enriched.loc[valid, "benchmark_validation_membership_sha256"] = "b" * 64
+        enriched.loc[valid, "benchmark_source_artifact_sha256"] = "s" * 64
+        enriched.loc[valid, "benchmark_total_return"] = 0.0
+        enriched.loc[valid, "benchmark_annualized_return"] = 0.0
+        enriched.loc[valid, "benchmark_sharpe"] = 0.0
+        enriched.loc[valid, "benchmark_sortino"] = 0.0
+        enriched.loc[valid, "benchmark_max_drawdown"] = 0.20
+        enriched.loc[valid, "benchmark_volatility"] = 0.20
+        enriched.loc[valid, "benchmark_final_portfolio_value"] = 1_000_000.0
+        enriched.loc[valid, "benchmark_transaction_costs"] = 1_500.0
+        enriched.loc[valid, "excess_return"] = enriched.loc[
+            valid, "validation_total_return"
+        ]
+        enriched.loc[valid, "sharpe_delta"] = enriched.loc[
+            valid, "validation_sharpe"
+        ]
+        enriched.loc[valid, "sortino_delta"] = enriched.loc[
+            valid, "validation_sortino"
+        ]
+        enriched.loc[valid, "drawdown_improvement"] = 0.20 - enriched.loc[
+            valid, "validation_max_drawdown"
+        ]
+        enriched.loc[valid, "volatility_difference"] = enriched.loc[
+            valid, "validation_volatility"
+        ] - 0.20
+        return enriched
+
+    monkeypatch.setattr(
+        "reinforcement_learning.evaluation.validation_acceptance.attach_validation_benchmarks",
+        fixture_benchmarks,
+    )
+    monkeypatch.setattr(
+        "reinforcement_learning.evaluation.validation_acceptance.load_policy_freeze",
+        lambda: {
+            "policy_version": "recurrent_validation_acceptance_v1",
+            "source_criteria_version": "ppo_validation_criteria_v1",
+            "benchmark_contract_version": "validation_buy_and_hold_v1",
+            "frozen_at": "2026-08-31T00:00:00Z",
+            "model_inventory": {"count": 16, "hash": "f" * 64},
+            "test_status_at_freeze": "SEALED",
+        },
+    )
+    monkeypatch.setattr(
+        "reinforcement_learning.evaluation.validation_acceptance.validate_policy_freeze",
+        lambda payload, inventory: None,
+    )
+
 
 def test_page_loads_in_pre_run_state_without_creating_a_run(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -702,7 +788,7 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
                 "train_rows": 1_704,
                 "validation_start": "2023-08-24",
                 "validation_end": "2025-02-12",
-                "validation_rows": 365,
+                "validation_rows": 73 if symbol == "AATM" else 365,
                 "test_start": "2025-02-13",
                 "test_end": "2026-08-05",
                 "test_rows": 366,
@@ -807,19 +893,41 @@ def test_symbol_details_uses_all_verified_models_across_run_history(
     assert len(comparison.value) == 16
     assert comparison.value["validation_artifact_status"].eq("VALID").all()
     assert comparison.value.iloc[0]["symbol"] == "UNITY"
+    assert {
+        "benchmark_total_return",
+        "excess_return",
+        "benchmark_sharpe",
+        "sharpe_delta",
+        "benchmark_sortino",
+        "sortino_delta",
+        "benchmark_max_drawdown",
+        "drawdown_improvement",
+        "validation_sufficiency",
+        "acceptance_classification",
+    }.issubset(comparison.value.columns)
+    aatm = comparison.value.loc[comparison.value["symbol"].eq("AATM")].iloc[0]
+    assert aatm["validation_sufficiency"] == "INSUFFICIENT"
+    assert aatm["acceptance_classification"] == "INSUFFICIENT_VALIDATION_HISTORY"
     page_text = "\n".join(
         str(item.value)
-        for kind in ("caption", "markdown", "info")
+        for kind in ("caption", "markdown", "info", "success")
         for item in app.get(kind)
     )
     assert "VALIDATION ONLY" in page_text
     assert "TEST SEALED" in page_text
+    assert "Frozen before TEST" in page_text
+    summary_metrics = {item.label: item.value for item in app.metric}
+    assert summary_metrics["STRONG_VALIDATION"] == "14"
+    assert summary_metrics["WEAK_VALIDATION"] == "1"
+    assert summary_metrics["INSUFFICIENT_HISTORY"] == "1"
+    assert summary_metrics["INVALID"] == "0"
 
     app.selectbox(key="training_detail_symbol").set_value("ENGROH").run()
     metrics = [(item.label, item.value) for item in app.metric]
     assert ("Run type", SELECTED_RUN_KIND) in metrics
     assert launched == []
     page_source = PAGE_PATH.read_text(encoding="utf-8")
+    assert "Frozen VALIDATION acceptance policy" in page_source
     assert "load_rl_partition" not in page_source
     assert "load_recurrent_partition" not in page_source
     assert "test_rl.csv" not in page_source

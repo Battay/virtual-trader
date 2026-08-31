@@ -38,6 +38,15 @@ from reinforcement_learning.training.global_validation import (
     summarize_validation_inventory,
     validation_export_csv,
 )
+from reinforcement_learning.evaluation.validation_acceptance import (
+    FROZEN_POLICY_RULES,
+    ValidationAcceptanceError,
+    apply_frozen_acceptance_policy,
+    attach_validation_benchmarks,
+    load_policy_freeze,
+    summarize_acceptance,
+    validate_policy_freeze,
+)
 from reinforcement_learning.training.recurrent_orchestrator import TrainingRunStore
 from reinforcement_learning.training.selective_training import (
     GLOBAL_COVERAGE_STATUSES,
@@ -1155,16 +1164,28 @@ if snapshot is not None:
 
     st.subheader("Global validation comparison")
     st.caption(
-        "VALIDATION ONLY · TEST SEALED. Metrics are read from persisted, "
-        "verified validation artifacts across all valid run history. Missing or "
-        "invalid artifacts are reported and never silently recomputed."
+        "VALIDATION ONLY · TEST SEALED. RL metrics come from persisted, verified "
+        "validation artifacts. Buy-and-Hold is computed read-only on each "
+        "model's exact canonical VALIDATION membership; invalid evidence fails "
+        "closed."
     )
     try:
         validation_inventory = build_global_validation_inventory(
             verified_inventory=verified_inventory
         )
-    except (OSError, ValueError, RuntimeError, GlobalValidationError) as exc:
+        validation_inventory = attach_validation_benchmarks(validation_inventory)
+        validation_inventory = apply_frozen_acceptance_policy(validation_inventory)
+        validation_policy_freeze = load_policy_freeze()
+        validate_policy_freeze(validation_policy_freeze, validation_inventory)
+    except (
+        OSError,
+        ValueError,
+        RuntimeError,
+        GlobalValidationError,
+        ValidationAcceptanceError,
+    ) as exc:
         validation_inventory = pd.DataFrame()
+        validation_policy_freeze = {}
         st.error(
             "Global validation comparison failed closed: "
             f"{type(exc).__name__}: {exc}"
@@ -1174,6 +1195,7 @@ if snapshot is not None:
         st.caption("No verified persisted validation artifacts are available.")
     else:
         validation_summary = summarize_validation_inventory(validation_inventory)
+        acceptance_summary = summarize_acceptance(validation_inventory)
         with st.container(horizontal=True):
             st.metric(
                 "Verified models",
@@ -1222,6 +1244,96 @@ if snapshot is not None:
                 "Median max drawdown",
                 _percentage(validation_summary.median_max_drawdown),
                 border=True,
+            )
+
+        st.markdown("**Frozen pre-TEST acceptance summary**")
+        with st.container(horizontal=True):
+            st.metric(
+                "STRONG_VALIDATION",
+                acceptance_summary.strong_validation,
+                border=True,
+            )
+            st.metric(
+                "ACCEPTABLE_VALIDATION",
+                acceptance_summary.acceptable_validation,
+                border=True,
+            )
+            st.metric(
+                "WEAK_VALIDATION",
+                acceptance_summary.weak_validation,
+                border=True,
+            )
+            st.metric(
+                "INSUFFICIENT_HISTORY",
+                acceptance_summary.insufficient_history,
+                border=True,
+            )
+            st.metric("INVALID", acceptance_summary.invalid, border=True)
+        with st.container(horizontal=True):
+            st.metric(
+                "Outperforming Buy & Hold",
+                acceptance_summary.outperforming_buy_and_hold,
+                border=True,
+            )
+            st.metric(
+                "Sharpe improvement",
+                acceptance_summary.sharpe_improvement,
+                border=True,
+            )
+            st.metric(
+                "Median excess return",
+                _percentage(acceptance_summary.median_excess_return),
+                border=True,
+            )
+            st.metric(
+                "Median Sharpe delta",
+                (
+                    f"{acceptance_summary.median_sharpe_delta:.3f}"
+                    if acceptance_summary.median_sharpe_delta is not None
+                    else "Unavailable"
+                ),
+                border=True,
+            )
+
+        with st.expander(
+            "Frozen VALIDATION acceptance policy",
+            icon=":material/policy:",
+        ):
+            st.success(
+                "Frozen before TEST. TEST remains SEALED; these classifications "
+                "use TRAIN/VALIDATION evidence only."
+            )
+            st.write(
+                {
+                    "Policy version": validation_policy_freeze["policy_version"],
+                    "Source criteria version": validation_policy_freeze[
+                        "source_criteria_version"
+                    ],
+                    "Benchmark contract": validation_policy_freeze[
+                        "benchmark_contract_version"
+                    ],
+                    "Frozen at": validation_policy_freeze["frozen_at"],
+                    "Frozen model count": validation_policy_freeze[
+                        "model_inventory"
+                    ]["count"],
+                    "Frozen inventory hash": validation_policy_freeze[
+                        "model_inventory"
+                    ]["hash"],
+                    "TEST status at freeze": validation_policy_freeze[
+                        "test_status_at_freeze"
+                    ],
+                }
+            )
+            st.markdown("**Exact classification rules**")
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {"Category": name.upper(), "Rule": rule}
+                        for name, rule in FROZEN_POLICY_RULES.items()
+                    ]
+                ),
+                hide_index=True,
+                key="global_validation_policy_rules",
             )
 
         with st.container(horizontal=True, vertical_alignment="bottom"):
@@ -1294,17 +1406,20 @@ if snapshot is not None:
                 .str.contains(validation_query, regex=False)
             ]
         acceptance_values = sorted(
-            validation_inventory["acceptance_status"].dropna().astype(str).unique()
+            validation_inventory["acceptance_classification"]
+            .dropna()
+            .astype(str)
+            .unique()
         )
         if acceptance_values:
             validation_acceptance = st.multiselect(
-                "Persisted validation decision",
+                "Frozen acceptance classification",
                 acceptance_values,
                 key="global_validation_acceptance_filter",
             )
             if validation_acceptance:
                 filtered_validation = filtered_validation.loc[
-                    filtered_validation["acceptance_status"].isin(
+                    filtered_validation["acceptance_classification"].isin(
                         validation_acceptance
                     )
                 ]
@@ -1329,9 +1444,19 @@ if snapshot is not None:
             "benchmark_total_return",
             "excess_return",
             "validation_sharpe",
+            "benchmark_sharpe",
+            "sharpe_delta",
             "validation_sortino",
+            "benchmark_sortino",
+            "sortino_delta",
             "validation_max_drawdown",
+            "benchmark_max_drawdown",
+            "drawdown_improvement",
             "validation_volatility",
+            "benchmark_volatility",
+            "volatility_difference",
+            "validation_sufficiency",
+            "acceptance_classification",
             "trade_count",
             "turnover",
             "win_rate",
@@ -1342,7 +1467,7 @@ if snapshot is not None:
             "sortino_rank",
             "drawdown_rank",
             "excess_return_rank",
-            "acceptance_status",
+            "acceptance_reasons",
             "comparability_warnings",
         ]
         st.dataframe(
@@ -1362,16 +1487,40 @@ if snapshot is not None:
                     "Excess return", format="percent"
                 ),
                 "validation_sharpe": st.column_config.NumberColumn(
-                    "Sharpe", format="%.3f"
+                    "RL Sharpe", format="%.3f"
+                ),
+                "benchmark_sharpe": st.column_config.NumberColumn(
+                    "Buy & Hold Sharpe", format="%.3f"
+                ),
+                "sharpe_delta": st.column_config.NumberColumn(
+                    "Sharpe delta", format="%.3f"
                 ),
                 "validation_sortino": st.column_config.NumberColumn(
-                    "Sortino", format="%.3f"
+                    "RL Sortino", format="%.3f"
+                ),
+                "benchmark_sortino": st.column_config.NumberColumn(
+                    "Buy & Hold Sortino", format="%.3f"
+                ),
+                "sortino_delta": st.column_config.NumberColumn(
+                    "Sortino delta", format="%.3f"
                 ),
                 "validation_max_drawdown": st.column_config.NumberColumn(
-                    "Max drawdown", format="percent"
+                    "RL max drawdown", format="percent"
+                ),
+                "benchmark_max_drawdown": st.column_config.NumberColumn(
+                    "Buy & Hold max drawdown", format="percent"
+                ),
+                "drawdown_improvement": st.column_config.NumberColumn(
+                    "Drawdown improvement", format="percent"
                 ),
                 "validation_volatility": st.column_config.NumberColumn(
-                    "Volatility", format="percent"
+                    "RL volatility", format="percent"
+                ),
+                "benchmark_volatility": st.column_config.NumberColumn(
+                    "Buy & Hold volatility", format="percent"
+                ),
+                "volatility_difference": st.column_config.NumberColumn(
+                    "Volatility difference", format="percent"
                 ),
                 "win_rate": st.column_config.NumberColumn(
                     "Win rate", format="percent"
@@ -1495,6 +1644,31 @@ if snapshot is not None:
                         _percentage(validation_detail["validation_max_drawdown"]),
                         border=True,
                     )
+                with st.container(horizontal=True):
+                    st.metric(
+                        "Buy & Hold return",
+                        _percentage(validation_detail["benchmark_total_return"]),
+                        border=True,
+                    )
+                    st.metric(
+                        "Excess return",
+                        _percentage(validation_detail["excess_return"]),
+                        border=True,
+                    )
+                    st.metric(
+                        "Sharpe delta",
+                        (
+                            f"{float(validation_detail['sharpe_delta']):.3f}"
+                            if pd.notna(validation_detail["sharpe_delta"])
+                            else "Unavailable"
+                        ),
+                        border=True,
+                    )
+                    st.metric(
+                        "Drawdown improvement",
+                        _percentage(validation_detail["drawdown_improvement"]),
+                        border=True,
+                    )
                 st.write(
                     {
                         "Run type": validation_detail["run_type"],
@@ -1513,6 +1687,21 @@ if snapshot is not None:
                             f"{validation_detail['validation_end']}"
                         ),
                         "VALIDATION rows": int(validation_detail["validation_rows"]),
+                        "Validation sufficiency": validation_detail[
+                            "validation_sufficiency"
+                        ],
+                        "Frozen acceptance classification": validation_detail[
+                            "acceptance_classification"
+                        ],
+                        "Acceptance reasons": validation_detail[
+                            "acceptance_reasons"
+                        ],
+                        "Acceptance policy version": validation_detail[
+                            "acceptance_policy_version"
+                        ],
+                        "Benchmark contract version": validation_detail[
+                            "benchmark_contract_version"
+                        ],
                         "TEST status": "SEALED",
                         "Validation artifact SHA-256": validation_detail[
                             "validation_artifact_sha256"
@@ -1520,12 +1709,6 @@ if snapshot is not None:
                         "Model SHA-256": validation_detail["model_sha256"],
                     }
                 )
-                if pd.isna(validation_detail["benchmark_total_return"]):
-                    st.info(
-                        "No Buy-and-Hold metric is persisted for this validation "
-                        "artifact, so benchmark return and excess return remain "
-                        "unavailable. They were not regenerated."
-                    )
                 if str(validation_detail["comparability_warnings"]):
                     st.warning(str(validation_detail["comparability_warnings"]))
                 selected_validation_store = TrainingRunStore(
@@ -1572,8 +1755,10 @@ if snapshot is not None:
                             y_label="Cumulative return",
                         )
                 st.caption(
-                    "VALIDATION ONLY. This view does not load a model, invoke an "
-                    "evaluator, promote an artifact, or open TEST observations."
+                    "VALIDATION ONLY. This view does not load or retrain a model, "
+                    "promote an artifact, or open TEST observations. Only the "
+                    "canonical VALIDATION partition is opened for the deterministic "
+                    "Buy-and-Hold benchmark."
                 )
 
     st.subheader("Logs and advanced state")

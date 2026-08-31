@@ -1,0 +1,75 @@
+{
+  "artifact_schema_version": "recurrent_validation_acceptance_freeze_v1",
+  "benchmark_contract_version": "validation_buy_and_hold_v1",
+  "benchmark_methodology": {
+    "annualization": "existing 252-trading-day episode-metrics methodology",
+    "contract_version": "validation_buy_and_hold_v1",
+    "determinism": "BuyAndHoldPolicy with fixed seed 42",
+    "entry": "observe the first VALIDATION row, then buy the maximum whole-share position at the next VALIDATION row open",
+    "exit": "no forced terminal sale; mark the open position at the final VALIDATION close",
+    "holding": "hold the position through the remaining VALIDATION observations",
+    "missing_dates": "use adjacent stored usable VALIDATION observations; do not fabricate, forward-fill, or interpolate market bars",
+    "scope": "one symbol's canonical rl_partition_v1 VALIDATION observations only",
+    "test_access": "prohibited; recurrent loader is called only for validation",
+    "transaction_costs": "use single_symbol_env_v1 defaults: 0.10% commission and 0.05% slippage"
+  },
+  "benchmark_result_hash": "d53379cba1a585912cf0d1dff94de19b110772939fa2f9f9a617725901105013",
+  "classification_counts": {
+    "acceptable_validation": 8,
+    "insufficient_history": 1,
+    "invalid": 0,
+    "median_excess_return": -0.4543844918745443,
+    "median_sharpe_delta": -0.125074894663099,
+    "outperforming_buy_and_hold": 6,
+    "sharpe_improvement": 6,
+    "strong_validation": 4,
+    "weak_validation": 3
+  },
+  "classification_result_hash": "bcc4ee0d9fa24c79bd0ac37451a6d6811a2a18700f539ba65b4b8f1ea9f88fb9",
+  "classification_rules": {
+    "acceptable_validation": "sufficient history; positive RL return, Sharpe, and Sortino; RL maximum drawdown <= 30%; one or more conservative relative Buy-and-Hold gates may remain unmet and are reported explicitly",
+    "insufficient_validation_history": "valid comparison with fewer than 126 VALIDATION observations",
+    "invalid_validation": "model/validation artifact or Buy-and-Hold benchmark is invalid, incompatible, contaminated, or missing a required comparison metric",
+    "strong_validation": "sufficient history; positive RL return, Sharpe, and Sortino; RL maximum drawdown <= 30%; RL return and Sharpe each meet or exceed Buy-and-Hold; RL drawdown is no more than 2 percentage points worse than Buy-and-Hold",
+    "weak_validation": "valid and sufficient comparison that meets neither stronger rule"
+  },
+  "frozen_at": "2026-08-31T16:24:43Z",
+  "frozen_before_test": true,
+  "model_inventory": {
+    "count": 16,
+    "hash": "9b35bd969491e6688509efc78affc1d8a89e8e30f4885c99f84e60fd5ad34241",
+    "symbols": [
+      "786",
+      "AABS",
+      "AATM",
+      "ABL",
+      "ENGROH",
+      "FFC",
+      "HUBC",
+      "LUCK",
+      "MARI",
+      "MCB",
+      "OGDC",
+      "PSO",
+      "SYS",
+      "TRG",
+      "UBL",
+      "UNITY"
+    ]
+  },
+  "policy_version": "recurrent_validation_acceptance_v1",
+  "source_criteria_version": "ppo_validation_criteria_v1",
+  "statement": "Policy and classifications were frozen from TRAIN/VALIDATION-only evidence before any TEST evaluation. No TEST-derived information is present in this artifact.",
+  "test_observations_accessed": false,
+  "test_status_at_freeze": "SEALED",
+  "thresholds": {
+    "maximum_rl_drawdown": 0.3,
+    "minimum_drawdown_improvement": -0.02,
+    "minimum_excess_return": 0.0,
+    "minimum_sharpe_delta": 0.0,
+    "minimum_validation_rows": 126,
+    "rl_return_strictly_greater_than": 0.0,
+    "rl_sharpe_strictly_greater_than": 0.0,
+    "rl_sortino_strictly_greater_than": 0.0
+  }
+}
