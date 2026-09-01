@@ -198,6 +198,7 @@ def build_raw_evidence_manifest(
     media_type: str,
     parse_status: str = "not_parsed",
     source_version: str = "not_stated",
+    series_owner: str | None = None,
 ) -> dict[str, Any]:
     """Describe an already-downloaded source file without altering it."""
 
@@ -210,7 +211,7 @@ def build_raw_evidence_manifest(
     if pd.isna(timestamp):
         raise Phase2DataContractError("Raw macro retrieval timestamp is invalid")
     content = path.read_bytes()
-    return {
+    manifest = {
         "manifest_version": "macro_raw_evidence_manifest_v1",
         "source_identifier": str(source_identifier),
         "source_url": source_url,
@@ -222,6 +223,14 @@ def build_raw_evidence_manifest(
         "parse_status": str(parse_status),
         "source_version": str(source_version),
     }
+    if series_owner is not None:
+        owner = str(series_owner).strip()
+        if owner not in REQUIRED_MACRO_SERIES:
+            raise Phase2DataContractError(
+                f"Unsupported macro evidence series owner: {owner}"
+            )
+        manifest["series_owner"] = owner
+    return manifest
 
 
 def _normalise_boolean(series: pd.Series, *, field: str) -> pd.Series:

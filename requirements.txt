@@ -5,6 +5,7 @@ matplotlib>=3.8,<4.0
 numpy
 pandas
 pyarrow>=24,<25
+pypdf==6.16.2
 requests
 # Persisted StandardScaler artifacts were serialized with this exact version.
 scikit-learn==1.9.0

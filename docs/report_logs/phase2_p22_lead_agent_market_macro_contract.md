@@ -4,7 +4,13 @@ Decision: **BLOCKED_PHASE2_DATA_CONTRACT**
 
 Contract artifact: `docs/config/phase2_lead_agent_data_contract_v1.json`
 
-Contract evidence hash: `15bf192ea590d4cc143ad322dcc01a779c7e497d83a398982bed5b0c0c740a9d`
+Current contract evidence hash after P2.2a: `d06c228a80918969a5d2786feaea6878897301becce930828c3f98f19687d7a5`
+
+> P2.2a update: PBS evidence is now preserved locally, while both required SBP
+> histories remain blocked behind official-server HTTP 403 responses. See
+> `docs/report_logs/phase2_p22a_authoritative_macro_evidence_acquisition.md` for
+> the current evidence inventory and manual-ingest procedure. The text below
+> preserves the original P2.2 contract findings.
 
 ## Objective and outcome
 

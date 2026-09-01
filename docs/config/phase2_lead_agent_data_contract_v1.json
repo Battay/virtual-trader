@@ -2,9 +2,10 @@
   "artifact_version": "lead_agent_market_macro_contract_v1",
   "phase": "PHASE_2",
   "milestone": "P2.2",
-  "generated_at": "2026-09-01T13:54:10Z",
+  "evidence_acquisition_milestone": "P2.2a",
+  "generated_at": "2026-09-01T14:30:02Z",
   "decision": "BLOCKED_PHASE2_DATA_CONTRACT",
-  "blocking_reason": "Authoritative source definitions and causal transformations are frozen, but no complete provenance-preserved SBP/PBS macro evidence set is locally available. Exact point-in-time macro coverage, the common calendar split, and a TRAIN-fitted scaler therefore cannot be created without fabricating evidence.",
+  "blocking_reason": "PBS CPI evidence is now locally preserved, but exact first-release vintages remain incomplete and both required SBP histories remain inaccessible from this environment (HTTP 403) and unpreserved. Exact point-in-time coverage, the common calendar split, and a TRAIN-fitted scaler cannot be created without fabricating evidence.",
   "phase1_inherited_constraint": {
     "decision": "REJECTED_CLUSTER_STRUCTURE",
     "artifact_version": "phase1_clustering_closure_v1",
@@ -37,7 +38,7 @@
       "secondary_official_mechanism": "https://easydata.sbp.org.pk/",
       "official_series_identifier": "TS_GP_IR_SIRPR_AH.SBPOL0030",
       "access_licensing": "Public first-party statistical publication; preserve source attribution and retrieval evidence.",
-      "retrieval_status": "BLOCKED_NOT_PRESERVED",
+      "retrieval_status": "HTTP_403_MANUAL_INGEST_REQUIRED",
       "raw_files_persisted": 0,
       "point_in_time_status": "BLOCKED_PENDING_RAW_EVIDENCE"
     },
@@ -48,8 +49,8 @@
       "exact_definition": "National Consumer Price Index year-over-year inflation rate, CPI base 2015-16=100",
       "unit": "percent_year_over_year",
       "native_frequency": "monthly",
-      "official_coverage_evidence": "PBS historical CPI publications cover the required index era, but a complete locally preserved first-release calendar was not acquired.",
-      "release_semantics": "A month-M observation is unavailable until its actual PBS publication. A date-only publication receives a conservative effective timestamp at the start of the following local calendar day; reference month alone never grants availability.",
+      "official_coverage_evidence": "The preserved PBS historical table contains 108 National CPI YoY reference months from 2017-07 through 2026-06. Preserved official CMS metadata supplies exact timestamps for 11 releases from 2025-10 through 2026-08, nine of which overlap the table.",
+      "release_semantics": "A month-M observation is unavailable until its actual PBS publication. Exact official CMS timestamps govern where preserved. A legacy observation with no exact timestamp may use only an explicitly labelled conservative availability bound, never the reference month; first-of-month M+2 is the candidate bound based on PBS's first/second-day schedule, but it cannot cure missing first-release vintage evidence.",
       "revision_behavior": "First-release values and later revisions must be separate vintages; a revised value may affect only decisions after that revision became available.",
       "vintage_timestamps_available": "PARTIAL: recent PBS publication posts expose timestamps; older linked reports do not provide a single complete machine-readable first-release timestamp history.",
       "machine_readable_history": "LIMITED: official historical tables and press releases are primarily PDF; recent post metadata is JSON through the official PBS site.",
@@ -57,27 +58,27 @@
       "secondary_official_mechanism": "https://www.pbs.gov.pk/faqs/",
       "official_series_identifier": "PBS_NATIONAL_CPI_YOY_2015_16_BASE",
       "access_licensing": "Public first-party statistical publication; preserve source attribution and retrieval evidence.",
-      "retrieval_status": "PARTIAL_TEMPORARY_RESEARCH_ONLY_NOT_PRESERVED",
-      "raw_files_persisted": 0,
-      "point_in_time_status": "BLOCKED_PENDING_COMPLETE_RELEASE_EVIDENCE"
+      "retrieval_status": "PARTIAL_FIRST_PARTY_EVIDENCE_PRESERVED",
+      "raw_files_persisted": 3,
+      "point_in_time_status": "BLOCKED_PENDING_HISTORICAL_FIRST_RELEASE_VINTAGES"
     },
     {
       "series": "sbp_usd_pkr_m2m",
       "institution": "State Bank of Pakistan",
       "authority": "FIRST_PARTY",
-      "exact_definition": "Daily USD Mark-to-Market revaluation/conversion rate expressed as Pakistani rupees per U.S. dollar; exact workbook field must be verified before parsing",
+      "exact_definition": "Daily SBP USD Mark-to-Market revaluation exchange rate expressed as Pakistani rupees per U.S. dollar; conversion-rate workbooks are not interchangeable unless SBP evidence proves identical semantics",
       "unit": "pkr_per_usd",
       "native_frequency": "business_day",
-      "official_coverage_evidence": "SBP publishes annual fiscal-year historical conversion-rate workbooks covering the official-index era; the files were not locally preserved or schema-verified.",
+      "official_coverage_evidence": "SBP's official M2M pages and monthly statistical bulletins identify a daily USD Mark-to-Market series. No complete local daily file covering the official-index era has been preserved or schema-verified.",
       "release_semantics": "Reference-date d is conservatively usable only at the first Phase-2 decision cutoff after the official daily value was published; absent an authoritative intraday timestamp, it cannot enter decision d.",
       "revision_behavior": "Downloaded annual files are archival snapshots. A changed historical value must be retained as a new source vintage rather than silently replacing the prior observation.",
       "vintage_timestamps_available": "LIMITED: annual workbook publication and file snapshots are available, but a historical per-row publication timestamp field has not been verified.",
-      "machine_readable_history": "YES_IN_PRINCIPLE: first-party annual XLSX files linked from the SBP historical conversion-rate page; exact schema remains to be inspected.",
-      "source_url": "https://archive.sbp.org.pk/ecodata/CRates/index.asp",
-      "secondary_official_mechanism": "https://www.sbp.org.pk/ecodata/CRates/index.asp",
-      "official_series_identifier": "SBP_USD_PKR_DAILY_M2M_PENDING_FIELD_VERIFICATION",
+      "machine_readable_history": "UNVERIFIED: the official M2M history interface and statistical-bulletin tables are authoritative, but no complete downloadable daily schema was acquired. Conversion-rate XLSX files must not be substituted without an identity proof.",
+      "source_url": "https://www.sbp.org.pk/ecodata/rates/m2m/M2M-History.asp",
+      "secondary_official_mechanism": "https://archive.sbp.org.pk/ecodata/index2.asp",
+      "official_series_identifier": "SBP_USD_PKR_DAILY_M2M",
       "access_licensing": "Public first-party statistical publication; preserve source attribution and retrieval evidence.",
-      "retrieval_status": "BLOCKED_NOT_PRESERVED",
+      "retrieval_status": "HTTP_403_MANUAL_INGEST_REQUIRED",
       "raw_files_persisted": 0,
       "point_in_time_status": "BLOCKED_PENDING_RAW_EVIDENCE_AND_FIELD_VERIFICATION"
     }
@@ -92,6 +93,7 @@
     },
     "required_manifest_fields": [
       "source_identifier",
+      "series_owner",
       "source_url",
       "retrieved_at",
       "filename",
@@ -102,8 +104,13 @@
       "source_version"
     ],
     "overwrite_policy": "NEVER_SILENTLY_OVERWRITE; unique retrieval-stamped evidence and manifests",
-    "persisted_evidence_files": 0,
-    "status": "EMPTY_FAIL_CLOSED"
+    "persisted_evidence_files": 3,
+    "valid_files_by_series": {
+      "sbp_policy_target_rate": 0,
+      "pbs_national_cpi_yoy": 3,
+      "sbp_usd_pkr_m2m": 0
+    },
+    "status": "PARTIAL_FAIL_CLOSED"
   },
   "canonical_macro_dataset": {
     "schema_version": "lead_agent_macro_observation_v1",
@@ -281,9 +288,9 @@
     "new_streamlit_page_required": false
   },
   "limitations": [
-    "No complete raw SBP policy-rate evidence is preserved locally.",
-    "No complete historical PBS first-release calendar is preserved locally.",
-    "No SBP USD/PKR workbook is preserved or exact field-schema verified locally.",
+    "No complete raw SBP policy-rate evidence is preserved locally; direct official-file requests returned HTTP 403 and require explicit manual ingest.",
+    "PBS CPI values and recent release timestamps are preserved, but historical first-release vintages are incomplete; the current history cannot be projected backward as if it were every original release.",
+    "No complete SBP USD/PKR M2M history is preserved or exact daily field schema verified locally; conversion-rate files are not assumed equivalent.",
     "Exact point-in-time macro coverage and therefore exact common split dates are unavailable.",
     "The local official index archive was fetched in 2026 and is not a vintage archive; returns are still causal because they are derived from levels, but historical source revisions cannot be reconstructed.",
     "The conservative start-of-session cutoff may delay same-day official releases until the next decision session."
@@ -298,8 +305,8 @@
     "source_data_modified": false,
     "model_artifacts_modified": false,
     "bounded_authoritative_network_research_performed": true,
-    "raw_downloads_persisted": false,
+    "raw_downloads_persisted": true,
     "commit_performed": false
   },
-  "contract_evidence_hash": "15bf192ea590d4cc143ad322dcc01a779c7e497d83a398982bed5b0c0c740a9d"
+  "contract_evidence_hash": "d06c228a80918969a5d2786feaea6878897301becce930828c3f98f19687d7a5"
 }
