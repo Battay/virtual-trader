@@ -1,0 +1,754 @@
+{
+  "artifact_version": "phase2_lead_agent_architecture_audit_v1",
+  "phase": "PHASE_2",
+  "milestone": "P2.1",
+  "generated_at": "2026-09-01T08:55:46Z",
+  "architecture_decision": "READY_PHASE2_ARCHITECTURE",
+  "training_readiness": "BLOCKED_PENDING_P2_2_DATA_CONTRACT",
+  "research_question": "On one common PSX market calendar, can a leakage-safe long-only market-level reinforcement-learning policy use only prior-session PSX index dynamics and point-in-time Pakistan macro releases to choose scalar equity-market exposure that improves validation-period net risk-adjusted performance and drawdown relative to predeclared cash, fixed-exposure, full-market, and rule-based baselines?",
+  "research_design": {
+    "primary_comparison": "Market-plus-macro Lead Agent versus predeclared non-RL baselines on one identical VALIDATION calendar",
+    "required_ablation": "Market-only policy versus otherwise identical market-plus-macro policy",
+    "unit_of_decision": "One market-level exposure decision per PSX trading session",
+    "phase3_execution_agents_used": false,
+    "profitability_claim_authorized": false
+  },
+  "phase1_inherited_constraint": {
+    "phase1_decision": "REJECTED_CLUSTER_STRUCTURE",
+    "source_artifact": "docs/config/phase1_clustering_closure_v1.json",
+    "source_artifact_version": "phase1_clustering_closure_v1",
+    "source_artifact_sha256": "675ebc606b041e0e356aae599ecf4162a196510c0c7c925b2ffdb8c09e169c00",
+    "source_decision_evidence_hash": "fb4c2a404c1ca8acb3a022283e6ace45519347c38ee9518d7453a45a4488b16e",
+    "requires_clusters": false,
+    "requires_soft_prototypes": false,
+    "sectors_relabelled_as_clusters": false,
+    "binding_consequence": "The Lead Agent must remain well-defined without discrete clusters, soft NMF memberships, or sector buckets masquerading as accepted relationship structure."
+  },
+  "existing_lead_agent_inventory": [
+    {
+      "capability": "Executable Lead Agent or top-level allocator",
+      "classification": "MISSING",
+      "evidence": [],
+      "assumption": "No existing module implements a market-level Lead-Agent observation, action, reward, or training loop."
+    },
+    {
+      "capability": "Legacy master AI dataset and chronological split",
+      "classification": "PARTIAL_OBSOLETE_FOR_LEAD_CONTRACT",
+      "evidence": [
+        "feature_engineering/dataset_builder.py",
+        "feature_engineering/splitting.py",
+        "data/processed/master/psx_ai_master.csv",
+        "data/processed/splits/master/metadata.json"
+      ],
+      "assumption": "A date-split all-symbol feature table and TRAIN-fitted scaler exist, but this is an equity-row legacy artifact with no macro release timing, Lead action, portfolio objective, or Lead RL contract. Its TEST data was not opened in P2.1."
+    },
+    {
+      "capability": "Legacy generalized master PPO foundation",
+      "classification": "PARTIAL",
+      "evidence": [
+        "reinforcement_learning/model_management/paths.py",
+        "reinforcement_learning/model_management/registry.py",
+        "reinforcement_learning/model_management/persistence.py",
+        "reinforcement_learning/saved_models/master_models/.gitkeep"
+      ],
+      "assumption": "The registry and path layer recognize a generic master scope, but persistence is PPO-specific, the registry contains no model row, and no Lead-Agent data/environment contract exists."
+    },
+    {
+      "capability": "Single-symbol PPO and recurrent execution infrastructure",
+      "classification": "COMPLETE_FOR_ITS_ORIGINAL_SCOPE",
+      "evidence": [
+        "reinforcement_learning/environments/single_symbol_env.py",
+        "reinforcement_learning/training/ppo_trainer.py",
+        "reinforcement_learning/training/recurrent_trainer.py",
+        "reinforcement_learning/evaluation/ppo_evaluator.py",
+        "reinforcement_learning/evaluation/recurrent_evaluator.py"
+      ],
+      "assumption": "Device, callback, seeding, validation-metric, and atomic-write patterns are reusable. The Discrete(3) single-stock action, per-symbol temporal contract, execution semantics, and trained agents are Phase-3 concerns and are not reusable as the Lead-Agent architecture."
+    },
+    {
+      "capability": "Sector recurrent pretraining and balanced-window prototype",
+      "classification": "EXPERIMENTAL_OBSOLETE_FOR_PHASE_2",
+      "evidence": [
+        "reinforcement_learning/environments/sector_training_env.py",
+        "reinforcement_learning/training/sector_balanced_trainer.py",
+        "docs/report_logs/milestone_6e1_sector_policy_collapse_audit.md",
+        "docs/report_logs/milestone_6e2_sector_training_methodology_repair.md"
+      ],
+      "assumption": "It is retained as research evidence, but sector pooling is not an accepted Phase-1 cluster basis and cannot define the Phase-2 allocator."
+    },
+    {
+      "capability": "Soft NMF relationship decoder",
+      "classification": "EXPERIMENTAL_BLOCKED",
+      "evidence": [
+        "data_pipeline/src/soft_relationship_representation.py",
+        "docs/report_logs/milestone_7d_soft_relationship_representation_audit.md"
+      ],
+      "assumption": "The mathematical decoder exists, but no representation passed the frozen Phase-1 gates and no prototype action basis may be consumed by Phase 2."
+    },
+    {
+      "capability": "PSX market-intelligence/index feature layer",
+      "classification": "PARTIAL",
+      "evidence": [
+        "market_intelligence/index_parser.py",
+        "market_intelligence/index_store.py",
+        "market_intelligence/refresh_indices.py",
+        "market_intelligence/feature_joiner.py",
+        "market_intelligence/index_metrics.py",
+        "market_intelligence/market_health.py"
+      ],
+      "assumption": "Official index storage and backward-looking feature helpers exist, but they are not a versioned point-in-time Lead-Agent dataset."
+    },
+    {
+      "capability": "SAC trainer, persistence, and evaluator",
+      "classification": "MISSING",
+      "evidence": [],
+      "assumption": "Stable-Baselines3 supplies SAC, but the project has no audited SAC configuration, trainer, replay-buffer policy, persistence contract, or evaluator."
+    }
+  ],
+  "market_level_data_inventory": {
+    "canonical_market_parquet": {
+      "path": "data/parquet/market.parquet",
+      "sha256": "8843f4573baf07a0c1e266efcb9ba37f96a839a42b41f75528d4f1c67b78fb34",
+      "rows": 1535391,
+      "symbols": 4681,
+      "market_dates": 2501,
+      "earliest_date": "2016-07-26",
+      "latest_date": "2026-08-28",
+      "duplicate_market_date_symbol_keys": 0,
+      "required_nulls": 0,
+      "frequency": "PSX trading session",
+      "update_path": "Native read-only consolidated Parquet producer",
+      "point_in_time_finding": "Price/volume observations are historical market outcomes, but the broad symbol set mixes instrument types. Any market breadth or aggregate-volume feature needs an independently frozen eligible-instrument/effective-date policy."
+    },
+    "official_index_master": {
+      "path": "data/indices/master/psx_indices_master.csv",
+      "sha256": "09244e0d3484276843b00159f76e69b2e782ce3f1256ae5b2b21512c1b51cb6d",
+      "source": "official_psx_timeseries_eod",
+      "source_endpoint_template": "https://dps.psx.com.pk/timeseries/eod/{index_code}",
+      "rows": 5012,
+      "index_codes": [
+        "ALLSHR",
+        "KMI30",
+        "KSE100",
+        "KSE30"
+      ],
+      "rows_per_index": 1253,
+      "unique_dates": 1253,
+      "earliest_date": "2021-08-06",
+      "latest_date": "2026-08-27",
+      "duplicate_index_date_keys": 0,
+      "required_level_volume_open_nulls": 0,
+      "daily_change_nulls_per_index": 2,
+      "daily_change_percent_nulls_per_index": 2,
+      "calendar_alignment": "All four index calendars are identical. Against canonical market sessions in the covered interval, 1,253 of 1,254 dates match; 2021-10-19 is absent from all four index series.",
+      "frequency": "PSX trading session",
+      "canonical_storage": true,
+      "update_path": "market_intelligence.refresh_indices.refresh_indices",
+      "point_in_time_finding": "Use only values from the previous completed session. Retained fetched_at values describe 2026 retrieval snapshots, not historical vintages, so final-level revision policy is undocumented.",
+      "stored_change_warning": "Recompute returns from sorted index levels. Stored daily_change resets at payload boundaries, including 2021-08-30, and is not the Lead-Agent return source.",
+      "stored_open_warning": "The fourth positional endpoint field is stored as open, but repository evidence does not establish execution-price semantics; it is excluded from the initial Lead-Agent contract."
+    },
+    "derived_feature_status": [
+      {
+        "feature_family": "Index returns, momentum, rolling volatility, moving-average distance, and drawdown",
+        "status": "AVAILABLE_DERIVABLE",
+        "canonical_storage": false,
+        "point_in_time_safe_if": "Recomputed from levels, strictly shifted to the previous completed session, with rolling windows fit backward only."
+      },
+      {
+        "feature_family": "Historical market breadth",
+        "status": "MISSING_CANONICAL_HISTORY",
+        "canonical_storage": false,
+        "point_in_time_safe_if": "A point-in-time eligible-equity universe and date-indexed breadth series are frozen; current-registry survivorship and non-equity contamination are prohibited."
+      },
+      {
+        "feature_family": "Aggregate market volume",
+        "status": "AVAILABLE_BUT_UNSAFE_WITHOUT_UNIVERSE_POLICY",
+        "canonical_storage": false,
+        "point_in_time_safe_if": "Use official index volume or an explicitly versioned point-in-time instrument universe; do not aggregate all 4,681 identifiers."
+      },
+      {
+        "feature_family": "Market Health score",
+        "status": "AVAILABLE_LATEST_ONLY_NOT_CANONICAL_HISTORY",
+        "canonical_storage": false,
+        "point_in_time_safe_if": "A historical series is recomputed causally from approved inputs under a frozen formula; current latest-only display state cannot be training input."
+      }
+    ]
+  },
+  "macro_data_inventory": {
+    "local_authoritative_macro_dataset": "MISSING",
+    "search_scope": "Tracked source, configuration, tests, and local data/artifact names and schemas; no network access",
+    "candidates": [
+      {
+        "category": "SBP policy rate",
+        "status": "MISSING_REQUIRED_CANDIDATE",
+        "frequency": "Event-driven",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Policy decisions are event releases; effective and announcement timestamps must be distinct.",
+        "leakage_finding": "Cannot be used until an authoritative release-time history exists."
+      },
+      {
+        "category": "Pakistan CPI/inflation",
+        "status": "MISSING_REQUIRED_CANDIDATE",
+        "frequency": "Monthly",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Period labels are not publication timestamps and revised values may differ from first releases.",
+        "leakage_finding": "A final revised monthly series forward-filled from its period date would leak."
+      },
+      {
+        "category": "PKR/USD exchange rate",
+        "status": "MISSING_REQUIRED_CANDIDATE",
+        "frequency": "Business day",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Rate type and publication cutoff must be explicit.",
+        "leakage_finding": "Same-session use is unsafe unless the selected authoritative rate was public before the decision cutoff."
+      },
+      {
+        "category": "Interest/yield and money-market variables",
+        "status": "MISSING_DEFERRED",
+        "frequency": "Daily, auction, or event-dependent",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Instrument and observation-time semantics vary.",
+        "leakage_finding": "Not needed for the minimal v1 contract; require authoritative timestamps before any later inclusion."
+      },
+      {
+        "category": "FX reserves and money supply",
+        "status": "MISSING_DEFERRED",
+        "frequency": "Weekly or monthly",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Publication lag and revisions are material.",
+        "leakage_finding": "Not needed for the minimal v1 contract."
+      },
+      {
+        "category": "Industrial/production, trade, and current-account variables",
+        "status": "MISSING_DEFERRED",
+        "frequency": "Monthly or quarterly",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Long publication lags and revisions are likely.",
+        "leakage_finding": "Not needed for the minimal v1 contract."
+      },
+      {
+        "category": "Commodity variables",
+        "status": "MISSING_NOT_NEEDED_V1",
+        "frequency": "Variable",
+        "coverage": null,
+        "release_timing_represented": false,
+        "revision_risk": "Vendor timestamp, timezone, and market-close alignment would need proof.",
+        "leakage_finding": "Exclude from v1 rather than expand scope without a predeclared economic rationale."
+      }
+    ],
+    "training_blocker": "At least the predeclared minimal macro candidate set needs authoritative values, release/effective timestamps, vintage policy, hashes, and coverage before a market-plus-macro Lead Agent may train. A market-only ablation can be built in P2.2 but must not be mislabeled as the roadmap macro Lead Agent."
+  },
+  "point_in_time_policy": {
+    "decision_time": "Before the abstract benchmark rebalance at session t close; session-t market outcomes are not observable",
+    "market_observation_rule": "Only information from completed trading sessions at or before t-1 is observable.",
+    "macro_observation_rule": "A value is observable only when release_timestamp is at or before the decision cutoff; reference_period and effective_date alone never establish availability.",
+    "revision_rule": "Use first-release vintages where revisions occur. If historical vintages cannot be established, exclude the series or explicitly lag to a demonstrably safe publication snapshot; never backfill revised values into earlier states.",
+    "daily_alignment_rule": "Backward as-of join from the decision timestamp; never nearest or forward join. Carry a low-frequency release only after publication, with value-age and missing/staleness metadata and a predeclared maximum staleness policy.",
+    "exchange_rate_rule": "Use the selected rate only from the first subsequent PSX decision cutoff after its authoritative publication timestamp; otherwise lag one additional session.",
+    "index_rule": "Derive returns and rolling features from sorted positive index levels and shift the completed result one PSX session before joining to decision t.",
+    "normalization_rule": "Fit every learned transformation and imputation statistic on TRAIN only; apply the frozen TRAIN transformer unchanged to VALIDATION and sealed TEST.",
+    "missing_data_rule": "No backward fill, no interpolation across future releases, no synthetic macro history, and no period-date forward fill before release. Missingness indicators and release age are allowed when predeclared.",
+    "validation_use_rule": "VALIDATION may compare already-predeclared candidates but may not choose the input universe, release policy, or fit scalers.",
+    "test_rule": "TEST values remain sealed and irrelevant to feature selection, algorithm selection, and hyperparameter selection."
+  },
+  "action_space_candidates": [
+    {
+      "candidate": "Scalar equity-market exposure",
+      "space": "Box([0,1], shape=(1,))",
+      "benefits": "Smallest continuous risk-control action; directly supports PPO and SAC; interpretable turnover and exposure.",
+      "weaknesses": "Needs an explicit benchmark-market proxy and cannot express cross-sectional choice.",
+      "decision": "RECOMMENDED"
+    },
+    {
+      "candidate": "Discrete defensive/neutral/aggressive regimes",
+      "space": "Discrete fixed exposure levels",
+      "benefits": "Highly interpretable and easy to baseline.",
+      "weaknesses": "Arbitrarily quantizes a naturally continuous exposure and makes SAC irrelevant.",
+      "decision": "BASELINE_ONLY"
+    },
+    {
+      "candidate": "Binary cash versus market",
+      "space": "Discrete(2)",
+      "benefits": "Minimal and transparent.",
+      "weaknesses": "Cannot express partial risk and may induce excessive switching.",
+      "decision": "BASELINE_ONLY"
+    },
+    {
+      "candidate": "Per-symbol, sector, cluster, or soft-prototype allocation vector",
+      "space": "High-dimensional allocation",
+      "benefits": "None compatible with the closed Phase-1 result and Phase-2 scope.",
+      "weaknesses": "Conflates Phase-2 risk allocation with Phase-3 execution or assumes rejected relationship structure.",
+      "decision": "REJECTED"
+    }
+  ],
+  "recommended_action_space": {
+    "contract_version": "lead_agent_scalar_market_exposure_v1",
+    "gymnasium_space": "Box",
+    "shape": [
+      1
+    ],
+    "dtype": "float32",
+    "low": 0.0,
+    "high": 1.0,
+    "meaning": "Target fraction of portfolio capital exposed to the designated PSX market benchmark for the next return interval; remainder stays in cash.",
+    "shorting_allowed": false,
+    "leverage_allowed": false,
+    "per_symbol_allocation": false,
+    "cluster_allocation": false
+  },
+  "reward_candidates": [
+    {
+      "candidate": "Net log portfolio growth",
+      "formula": "log(V_net,t+1 / V_net,t), where turnover costs are deducted once in V_net",
+      "attribution": "Direct and auditable",
+      "decision": "RECOMMENDED_PRIMARY"
+    },
+    {
+      "candidate": "Net growth minus drawdown-increment penalty",
+      "formula": "net_log_growth - lambda_dd * positive_drawdown_increment",
+      "attribution": "Understandable but coefficient-sensitive",
+      "decision": "PREDECLARED_SENSITIVITY_ONLY"
+    },
+    {
+      "candidate": "Rolling volatility/downside-risk penalty",
+      "formula": "net_growth minus rolling risk term",
+      "attribution": "Window and scale choices complicate credit assignment",
+      "decision": "NOT_INITIAL_BASELINE"
+    },
+    {
+      "candidate": "Episode Sharpe/Sortino reward",
+      "formula": "Terminal risk-adjusted metric",
+      "attribution": "Sparse and unstable as a step reward",
+      "decision": "EVALUATION_ONLY"
+    }
+  ],
+  "recommended_reward": {
+    "contract_version": "lead_agent_net_growth_reward_v1",
+    "primary_objective": "net_log_portfolio_growth",
+    "formula": "log(net_portfolio_value_after_costs_t_plus_1 / net_portfolio_value_t)",
+    "turnover_cost_model": "cost_rate * absolute_change_in_target_exposure, deducted exactly once before reward",
+    "cash_return_v1": 0.0,
+    "drawdown_penalty_weight_v1": 0.0,
+    "volatility_penalty_weight_v1": 0.0,
+    "rationale": "Risk-adjusted return and drawdown remain transparent evaluation outcomes; the first reward avoids coefficient-driven conclusions.",
+    "validation_tuning_used": false,
+    "coefficient_changes_require_predeclaration": true
+  },
+  "algorithm_recommendation": {
+    "recommendation": "BOUNDED_PPO_VS_SAC_COMPARISON",
+    "action_compatibility": "Both support the scalar continuous Box action.",
+    "ppo": {
+      "status": "PARTIAL_PROJECT_REUSE",
+      "strengths": "Audited SB3 configuration, device, callback, and deterministic-seed patterns already exist; on-policy behavior is operationally simple.",
+      "limitations": "Existing project trainers target single-symbol environments and require a new Lead-Agent contract."
+    },
+    "sac": {
+      "status": "MISSING_PROJECT_CONTRACT",
+      "strengths": "Naturally continuous and potentially more sample-efficient through replay.",
+      "limitations": "New trainer, replay-buffer leakage/resume policy, persistence, diagnostics, and reproducibility tests are required."
+    },
+    "comparison_protocol": "Same TRAIN environment transitions, common calendar, feature contract, cost model, seed set, and validation baselines; predeclare bounded defaults before evaluating VALIDATION.",
+    "experiment_seed_set": [
+      42,
+      43,
+      44
+    ],
+    "validation_hyperparameter_tuning": false,
+    "recurrent_initial_baseline": false,
+    "recurrent_rationale": "Begin with an MLP policy because lagged/rolling market-macro state already encodes history and recurrent memory adds an unproven variable.",
+    "device_policy": "CPU reference path; CUDA only when explicitly qualified; no automatic MPS selection for the initial benchmark.",
+    "selected_algorithm": null
+  },
+  "temporal_policy": {
+    "policy_version": "lead_agent_common_calendar_split_v1",
+    "calendar_scope": "COMMON_MARKET_MACRO_CALENDAR",
+    "construction": "After point-in-time alignment and backward-looking warm-up, freeze the ordered common decision-date list. Allocate first floor(70% of N) to TRAIN, next floor(15% of N) to VALIDATION, and the remainder to sealed TEST.",
+    "phase1_common_window_reused": false,
+    "phase1_nonreuse_reason": "Phase-1 addressed a different relationship question and starts before the local official index history; macro availability is not yet known.",
+    "rl_partition_v1_applies": false,
+    "rl_partition_distinction": "rl_partition_v1 splits each symbol's usable observations independently. The Lead Agent requires one shared index/macro calendar and a separately versioned split.",
+    "train_usage": "All feature fitting, normalization, optimizer updates, and replay-buffer entries",
+    "validation_usage": "Selection among predeclared candidates and baseline comparison only",
+    "test_status": "SEALED",
+    "test_observations_loaded": false,
+    "validation_observations_used_for_fitting": false,
+    "normalization_fit_partition": "TRAIN_ONLY",
+    "split_fractions": {
+      "train": 0.7,
+      "validation": 0.15,
+      "test": 0.15
+    },
+    "test_metadata_policy": "Only future row-count/date-bound/hash metadata may be persisted after P2.2 without opening observations.",
+    "exact_boundaries_frozen": false,
+    "boundary_owner": "P2.2 after authoritative macro coverage and release-aligned common dates are known"
+  },
+  "proposed_data_contract": {
+    "contract_version": "lead_agent_market_macro_contract_v1",
+    "contract_status": "SCHEMA_PROPOSAL_BLOCKED_ON_MACRO_DATA",
+    "feature_shape_frozen": false,
+    "normalization_fit_partition": "TRAIN_ONLY",
+    "validation_rows_used_for_fitting": false,
+    "test_rows_loaded": false,
+    "observation_dtype": "float32",
+    "ordering": "decision_date ascending, exactly one row per common PSX decision session",
+    "key": "decision_date",
+    "source_hashes_required": true,
+    "release_calendar_hash_required": true,
+    "decision_timing": {
+      "decision_cutoff": "before_abstract_session_t_close_rebalance_without_session_t_market_outcomes",
+      "market_information_latest_allowed": "previous_trading_session",
+      "macro_availability_rule": "release_timestamp_at_or_before_decision_cutoff",
+      "action_return_interval": "benchmark close t to close t+1 after decision, with predeclared turnover friction",
+      "same_session_close_visible": false
+    },
+    "features": [
+      {
+        "name": "kse100_return_1d_lag1",
+        "category": "market",
+        "source": "data/indices/master/psx_indices_master.csv:value",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "pct_change(1), then shift one decision session",
+        "normalization_scope": "TRAIN-only robust or standard scaler; choice frozen in P2.2",
+        "missing_data_treatment": "drop pre-lookback rows; no future fill",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_return_5d_lag1",
+        "category": "market",
+        "source": "data/indices/master/psx_indices_master.csv:value",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "pct_change(5), then shift one decision session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "drop pre-lookback rows; no future fill",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_return_21d_lag1",
+        "category": "market",
+        "source": "data/indices/master/psx_indices_master.csv:value",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "pct_change(21), then shift one decision session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "drop pre-lookback rows; no future fill",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_volatility_20d_lag1",
+        "category": "market",
+        "source": "KSE100 level-derived one-day returns",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "rolling 20-session standard deviation, then shift one session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "drop pre-lookback rows; no future fill",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_drawdown_expanding_lag1",
+        "category": "market",
+        "source": "KSE100 level",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "level divided by expanding prior peak minus one, shifted one session",
+        "normalization_scope": "TRAIN-only or bounded raw; choice frozen in P2.2",
+        "missing_data_treatment": "no imputation",
+        "causal_property": "strictly backward-looking expanding state",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_sma20_distance_lag1",
+        "category": "market",
+        "source": "KSE100 level",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "level / rolling_mean_20 - 1, shifted one session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "drop pre-lookback rows",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_sma50_distance_lag1",
+        "category": "market",
+        "source": "KSE100 level",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "level / rolling_mean_50 - 1, shifted one session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "drop pre-lookback rows",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "kse100_volume_ratio20_lag1",
+        "category": "market",
+        "source": "Official KSE100 index volume",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "volume / rolling_mean_20 - 1, shifted one session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "drop pre-lookback rows",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "cross_index_return_dispersion_1d_lag1",
+        "category": "market",
+        "source": "KSE100, KSE30, KMI30, and ALLSHR level-derived returns",
+        "frequency": "PSX session",
+        "availability_lag": "previous completed PSX session",
+        "transformation": "cross-sectional standard deviation of four one-day returns, shifted one session",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "row missing unless all four values are available",
+        "causal_property": "strictly backward-looking",
+        "status": "AVAILABLE_DERIVABLE"
+      },
+      {
+        "name": "sbp_policy_rate_available_asof",
+        "category": "macro",
+        "source": "Authoritative SBP release history to be approved in P2.2",
+        "frequency": "event-driven",
+        "availability_lag": "release timestamp through decision cutoff",
+        "transformation": "level and last announced change; exact schema frozen in P2.2",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "missing before first release; causal carry-forward with age after release",
+        "causal_property": "point-in-time release as-of",
+        "status": "MISSING_BLOCKER"
+      },
+      {
+        "name": "pbs_cpi_yoy_available_asof",
+        "category": "macro",
+        "source": "Authoritative PBS first-release history to be approved in P2.2",
+        "frequency": "monthly",
+        "availability_lag": "actual publication timestamp through decision cutoff",
+        "transformation": "reported YoY level and release-to-release change",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "missing before release; causal carry-forward with age; no period-date fill",
+        "causal_property": "first-release vintage as-of",
+        "status": "MISSING_BLOCKER"
+      },
+      {
+        "name": "sbp_usd_pkr_return_available_asof",
+        "category": "macro",
+        "source": "Authoritative SBP rate series with rate type and publication cutoff to be approved in P2.2",
+        "frequency": "business day",
+        "availability_lag": "first PSX decision cutoff after publication",
+        "transformation": "backward-looking one-day and 20-day changes/volatility; exact schema frozen in P2.2",
+        "normalization_scope": "TRAIN-only",
+        "missing_data_treatment": "backward as-of after publication only; no future fill",
+        "causal_property": "point-in-time publication as-of",
+        "status": "MISSING_BLOCKER"
+      },
+      {
+        "name": "prior_target_exposure",
+        "category": "portfolio_state",
+        "source": "Lead-Agent environment state",
+        "frequency": "decision step",
+        "availability_lag": "current pre-action state",
+        "transformation": "none",
+        "normalization_scope": "bounded raw [0,1]",
+        "missing_data_treatment": "episode initialization at zero exposure",
+        "causal_property": "current state only",
+        "status": "PROPOSED"
+      },
+      {
+        "name": "portfolio_drawdown",
+        "category": "portfolio_state",
+        "source": "Lead-Agent environment state",
+        "frequency": "decision step",
+        "availability_lag": "current pre-action state",
+        "transformation": "current net value versus prior running peak",
+        "normalization_scope": "bounded raw",
+        "missing_data_treatment": "episode initialization at zero",
+        "causal_property": "current and past portfolio state only",
+        "status": "PROPOSED"
+      }
+    ],
+    "excluded_initial_inputs": [
+      "Stored index daily_change fields",
+      "Ambiguous stored index open field",
+      "Current-only market breadth",
+      "All-identifier aggregate volume",
+      "Latest-only market_health_score",
+      "Revised macro values without vintages",
+      "Phase-1 cluster, soft-membership, or sector-allocation features",
+      "Per-symbol Phase-3 agent outputs"
+    ]
+  },
+  "environment_proposal": {
+    "environment_version": "lead_agent_market_risk_env_v1",
+    "implemented": false,
+    "gymnasium_api": "reset returns (observation, info); step returns (observation, reward, terminated, truncated, info)",
+    "observation": "One float32 vector from the frozen point-in-time market/macro contract plus causal portfolio state",
+    "action": "Scalar target market exposure in [0,1]",
+    "execution_proxy": "Choose exposure before the abstract session-t close rebalance using market observations only through t-1, then apply it to the predeclared benchmark close-t to close-t+1 return; the index is a research proxy, not a claim of directly tradable execution.",
+    "reward": "Net log portfolio growth after one explicit turnover charge",
+    "costs": "Nonnegative proportional turnover cost configured and reported; zero-cost remains a separately labelled sensitivity, never implicit",
+    "cash_leg": "Nominal zero return in v1 unless a point-in-time safe cash-yield series is later approved",
+    "episode": "One common chronological TRAIN episode or predeclared chronological TRAIN windows without date shuffling",
+    "state_carry": "Prior exposure, net portfolio value, running peak, and drawdown carry within an episode and reset at episode boundaries",
+    "recurrent_policy_required": false,
+    "phase3_communication": false,
+    "test_partition_accepted": false,
+    "invariants": [
+      "No same-session close in observation",
+      "No release before publication timestamp",
+      "No short or leverage",
+      "No duplicate decision date",
+      "Finite float32 observations and reward",
+      "Exactly one turnover charge",
+      "TRAIN-only fitting",
+      "Deterministic seed and chronology"
+    ]
+  },
+  "gap_matrix": [
+    {
+      "capability": "Official PSX index dataset",
+      "existing_status": "PARTIAL",
+      "evidence": "Four official index series, 5,012 rows, 2021-08-06..2026-08-27",
+      "missing_work": "Version a Lead-Agent source snapshot; recompute level returns; document revision/open semantics and one missing market date",
+      "owner": "P2.2"
+    },
+    {
+      "capability": "Pakistan macro dataset",
+      "existing_status": "MISSING",
+      "evidence": "No local authoritative macro values or release calendar",
+      "missing_work": "Acquire approved point-in-time policy-rate, CPI, and USD/PKR histories with releases/vintages and hashes",
+      "owner": "P2.2"
+    },
+    {
+      "capability": "Point-in-time alignment",
+      "existing_status": "MISSING",
+      "evidence": "Generic backward joins exist, but no market-macro release-as-of contract",
+      "missing_work": "Implement release-aware backward as-of alignment, staleness, and leakage assertions",
+      "owner": "P2.2"
+    },
+    {
+      "capability": "Lead-Agent feature engineering",
+      "existing_status": "PARTIAL",
+      "evidence": "Backward index feature helpers exist; no versioned Lead feature table",
+      "missing_work": "Build and hash the proposed market/macro features under the common calendar",
+      "owner": "P2.2"
+    },
+    {
+      "capability": "Normalization",
+      "existing_status": "PARTIAL",
+      "evidence": "TRAIN-only scaler patterns exist for symbol contracts",
+      "missing_work": "Define Lead feature columns and fit/freeze a common TRAIN-only transformer",
+      "owner": "P2.2"
+    },
+    {
+      "capability": "Lead-Agent environment",
+      "existing_status": "MISSING",
+      "evidence": "Only single-symbol and sector prototype environments exist",
+      "missing_work": "Implement lead_agent_market_risk_env_v1 and verify timing/cost/state invariants",
+      "owner": "P2.3"
+    },
+    {
+      "capability": "Reward",
+      "existing_status": "PROPOSED",
+      "evidence": "Auditable net-log-growth recommendation frozen by P2.1",
+      "missing_work": "Implement component accounting and deterministic counterfactual tests",
+      "owner": "P2.3"
+    },
+    {
+      "capability": "Action space",
+      "existing_status": "PROPOSED",
+      "evidence": "Scalar long-only market exposure selected by P2.1",
+      "missing_work": "Implement Box validation, turnover semantics, and deterministic baselines",
+      "owner": "P2.3"
+    },
+    {
+      "capability": "PPO",
+      "existing_status": "PARTIAL",
+      "evidence": "Stable-Baselines3 PPO configuration/device/callback patterns exist",
+      "missing_work": "Create nonrecurrent Lead PPO configuration/trainer using only the Lead TRAIN loader",
+      "owner": "P2.4"
+    },
+    {
+      "capability": "SAC",
+      "existing_status": "MISSING",
+      "evidence": "Library capability exists but no project contract",
+      "missing_work": "Add bounded config/trainer, replay-buffer leakage and resume rules, diagnostics, and tests",
+      "owner": "P2.4"
+    },
+    {
+      "capability": "Persistence/registry",
+      "existing_status": "PARTIAL",
+      "evidence": "Atomic PPO bundles and registry v2 support symbol/master only and require PPO",
+      "missing_work": "Version a Lead-Agent scope and algorithm-neutral provenance without migrating historical rows unsafely",
+      "owner": "P2.5"
+    },
+    {
+      "capability": "Validation and baselines",
+      "existing_status": "PARTIAL",
+      "evidence": "Generic portfolio metrics and single-symbol baseline patterns exist",
+      "missing_work": "Implement common-calendar cash, fixed 50%, full-market, and predeclared rule baselines plus multi-seed comparison",
+      "owner": "P2.4"
+    },
+    {
+      "capability": "Dashboard controls",
+      "existing_status": "MISSING",
+      "evidence": "No Lead-Agent training/control surface",
+      "missing_work": "Add only after training, persistence, and validation contracts are accepted; keep TEST inaccessible",
+      "owner": "P2.6"
+    }
+  ],
+  "phase2_milestones": [
+    {
+      "milestone": "P2.1",
+      "name": "Lead Agent data, objective, and architecture audit",
+      "deliverable": "This deterministic architecture decision; no training"
+    },
+    {
+      "milestone": "P2.2",
+      "name": "Leakage-safe market plus macro data contract",
+      "deliverable": "Authoritative releases/vintages, causal feature build, common-calendar split, TRAIN scaler, sealed TEST metadata, and source hashes"
+    },
+    {
+      "milestone": "P2.3",
+      "name": "Lead-Agent market-risk environment",
+      "deliverable": "Gymnasium environment, scalar exposure, cost/reward accounting, deterministic baselines, and timing invariants"
+    },
+    {
+      "milestone": "P2.4",
+      "name": "Bounded PPO versus SAC benchmark",
+      "deliverable": "Same-budget multi-seed TRAIN runs and VALIDATION-only comparison under one frozen protocol"
+    },
+    {
+      "milestone": "P2.5",
+      "name": "Lead-Agent candidate training and persistence",
+      "deliverable": "Selected predeclared candidate trained on TRAIN only with atomic algorithm-aware artifacts; no TEST"
+    },
+    {
+      "milestone": "P2.6",
+      "name": "VALIDATION acceptance and Phase-2 closure",
+      "deliverable": "Predeclared validation gates, baseline/ablation evidence, closure artifact, and limited dashboard controls; TEST remains sealed absent separate authorization"
+    }
+  ],
+  "safety": {
+    "lead_agent_training_performed": false,
+    "test_observations_loaded": false,
+    "phase3_agents_modified": false,
+    "joint_fine_tuning_started": false,
+    "phase4_integration_started": false,
+    "network_fetch_performed": false,
+    "model_artifacts_modified": false,
+    "training_authorized": false
+  },
+  "architecture_evidence_hash": "93cbbcab32be4f48a83833f9343cefdb1d06ef6352c964b97ee0a94430f725e5"
+}
