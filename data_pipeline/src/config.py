@@ -28,6 +28,10 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 RAW_HTML_DIR = RAW_DATA_DIR / "html"
 RAW_CSV_DIR = RAW_DATA_DIR / "csv"
+RAW_MACRO_DIR = RAW_DATA_DIR / "macro"
+RAW_SBP_POLICY_RATE_DIR = RAW_MACRO_DIR / "sbp_policy_rate"
+RAW_PBS_CPI_DIR = RAW_MACRO_DIR / "pbs_cpi"
+RAW_SBP_USDPKR_DIR = RAW_MACRO_DIR / "sbp_usdpkr"
 REJECTED_DATA_DIR = DATA_DIR / "rejected"
 MASTER_DATA_DIR = DATA_DIR / "master"
 # The sole human-facing canonical market master.  It uses the native normalized
@@ -35,6 +39,11 @@ MASTER_DATA_DIR = DATA_DIR / "master"
 MASTER_CSV_PATH = MASTER_DATA_DIR / "psx_master.csv"
 COMPANY_REGISTRY_PATH = MASTER_DATA_DIR / "company_registry.csv"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+PROCESSED_MACRO_DIR = PROCESSED_DATA_DIR / "macro"
+LEAD_AGENT_MACRO_PATH = PROCESSED_MACRO_DIR / "lead_agent_macro.parquet"
+LEAD_AGENT_MACRO_METADATA_PATH = (
+    PROCESSED_MACRO_DIR / "lead_agent_macro.metadata.json"
+)
 PROCESSED_UNIVERSES_DIR = PROCESSED_DATA_DIR / "universes"
 CURRENT_COMMON_EQUITY_UNIVERSE_PATH = (
     PROCESSED_UNIVERSES_DIR / "current_common_equity.csv"
