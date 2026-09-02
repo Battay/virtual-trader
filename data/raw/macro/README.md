@@ -28,6 +28,54 @@ The command refuses a checksum mismatch or existing destination. It never
 downloads, refits, revises, or converts evidence. Audit local manifests with
 `python -m data_pipeline.src.macro_evidence --audit`.
 
+Report scientific readiness without writing anything:
+
+```bash
+.venv/bin/python -m data_pipeline.src.macro_evidence --readiness
+```
+
+Exact SBP browser-download instructions and commands are documented in
+`docs/report_logs/phase2_p22b_manual_authoritative_macro_evidence_completion.md`.
+
+For the pre-2023 policy-rate bridge, save each required official DMMD circular
+page as the original HTML (not a copied text excerpt), calculate its SHA-256,
+and ingest it with its exact archive URL. The required pages are C15, C21 and
+C23 of 2021, followed by C6, C9, C13 and C20 of 2022. Example:
+
+```bash
+.venv/bin/python -m data_pipeline.src.macro_evidence \
+  --ingest-file /path/to/C15.htm \
+  --series sbp_policy_target_rate \
+  --source-url https://archive.sbp.org.pk/dmmd/2021/C15.htm \
+  --source-id sbp_dmmd_circular_15_2021 \
+  --retrieved-at RETRIEVAL_TIMESTAMP_UTC \
+  --media-type text/html \
+  --sha256 EXPECTED_SHA256 \
+  --source-version retrieved_YYYY-MM-DD \
+  --provenance-notes "Saved from the official SBP archive in a browser"
+```
+
+The readiness gate validates all seven pages as one rate-consistent chain and
+requires the modern checksum-preserved SIR PDF as its continuation. Search
+snippets, copied page text, and reconstructed HTML are never accepted as raw
+evidence.
+
+Original Safari-saved legacy pages are supported without conversion. The
+parser applies browser-compatible Windows-1252 semantics when an SBP page
+declares ISO-8859-1, ignores stale template titles/scripts, and extracts only
+the normalized visible body text. Do not re-save, transcode, or edit an
+ingested page to make it parse.
+
+C06 and C09 of 2022 are preserved as official image-only circular PDFs. They
+use the separate `sbp_policy_circular_pdf_v1` parser; they must never be sent
+to the `sbp_policy_target_rate_pdf_v2` SIR-table parser. On macOS, the PDF
+parser extracts the single preserved page image and uses native Vision OCR,
+then requires the explicit circular number, announcement date, previous/new
+Policy (Target) Rate, and effective date. Unsupported identities, media-type
+mismatches, missing OCR support, ambiguous page layouts, and Repo/Reverse Repo
+text without the target-rate statement all fail closed. The evidence PDF and
+its checksum are never changed.
+
 The canonical series directories are:
 
 - `sbp_policy_rate/`

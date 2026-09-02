@@ -2,10 +2,10 @@
   "artifact_version": "lead_agent_market_macro_contract_v1",
   "phase": "PHASE_2",
   "milestone": "P2.2",
-  "evidence_acquisition_milestone": "P2.2a",
-  "generated_at": "2026-09-01T14:30:02Z",
+  "evidence_acquisition_milestone": "P2.2f",
+  "generated_at": "2026-09-02T08:58:27Z",
   "decision": "BLOCKED_PHASE2_DATA_CONTRACT",
-  "blocking_reason": "PBS CPI evidence is now locally preserved, but exact first-release vintages remain incomplete and both required SBP histories remain inaccessible from this environment (HTTP 403) and unpreserved. Exact point-in-time coverage, the common calendar split, and a TRAIN-fitted scaler cannot be created without fabricating evidence.",
+  "blocking_reason": "The complete checksum-preserved official SBP policy chain is READY: five HTML circulars, two image-only circular PDFs, and the modern SIR PDF establish the 7.00% Phase-2 start state and 20 unique events through 2026-04-28. Canonical macro data remains blocked because daily SBP USD/PKR M2M evidence is absent and PBS CPI is missing one required value month plus exact first-release evidence for 51 required months.",
   "phase1_inherited_constraint": {
     "decision": "REJECTED_CLUSTER_STRUCTURE",
     "artifact_version": "phase1_clustering_closure_v1",
@@ -29,18 +29,18 @@
       "exact_definition": "State Bank of Pakistan Policy (Target) Rate",
       "unit": "percent_per_annum",
       "native_frequency": "event_driven",
-      "official_coverage_evidence": "SBP structure-of-interest-rates history identifies the target-rate regime from 2015-05-25; exact locally usable coverage remains unverified until the source file is preserved and parsed.",
-      "release_semantics": "A new setting is usable no earlier than both its official announcement and its documented w.e.f. effective timestamp. If only a w.e.f. date is authoritative, availability is conservatively no earlier than the start of that effective date.",
+      "official_coverage_evidence": "Five checksum-preserved official SBP HTML circulars and two checksum-preserved official circular PDFs establish the continuous 2021-2022 target-rate chain and the 7.00% rate effective at the 2021-08-06 Phase-2 start. The checksum-preserved SIR PDF contributes 13 explicit events from 2023-01-24 through 2026-04-28, for 20 unique events in the combined inventory.",
+      "release_semantics": "A new setting is usable no earlier than both its official announcement and documented w.e.f. date. If the announcement predates effectiveness, availability starts at the effective-date boundary. If announcement is same-day or unavailable, the parser conservatively delays availability to the next Lead-Agent decision boundary and does not invent an announcement date.",
       "revision_behavior": "Rate decisions are event observations; later corrections must be stored as separate vintages and must not rewrite prior availability.",
       "vintage_timestamps_available": "PARTIAL: MPC announcements are dated; the tabular history exposes w.e.f. dates but not a complete machine-readable announcement timestamp field.",
-      "machine_readable_history": "PARTIAL: SBP EasyData exposes a series identity, while the stable historical table is published as PDF.",
+      "machine_readable_history": "PARSED_FIRST_PARTY_EVIDENCE: identity-bound parsers handle legacy circular HTML, the two image-only official circular PDFs, and the explicitly labelled SIR target-rate table without conflating Repo/Reverse Repo concepts.",
       "source_url": "https://www.sbp.org.pk/ecodata/sir.pdf",
       "secondary_official_mechanism": "https://easydata.sbp.org.pk/",
       "official_series_identifier": "TS_GP_IR_SIRPR_AH.SBPOL0030",
       "access_licensing": "Public first-party statistical publication; preserve source attribution and retrieval evidence.",
-      "retrieval_status": "HTTP_403_MANUAL_INGEST_REQUIRED",
-      "raw_files_persisted": 0,
-      "point_in_time_status": "BLOCKED_PENDING_RAW_EVIDENCE"
+      "retrieval_status": "COMPLETE_FIRST_PARTY_POLICY_EVIDENCE_PRESERVED",
+      "raw_files_persisted": 8,
+      "point_in_time_status": "READY"
     },
     {
       "series": "pbs_national_cpi_yoy",
@@ -50,7 +50,7 @@
       "unit": "percent_year_over_year",
       "native_frequency": "monthly",
       "official_coverage_evidence": "The preserved PBS historical table contains 108 National CPI YoY reference months from 2017-07 through 2026-06. Preserved official CMS metadata supplies exact timestamps for 11 releases from 2025-10 through 2026-08, nine of which overlap the table.",
-      "release_semantics": "A month-M observation is unavailable until its actual PBS publication. Exact official CMS timestamps govern where preserved. A legacy observation with no exact timestamp may use only an explicitly labelled conservative availability bound, never the reference month; first-of-month M+2 is the candidate bound based on PBS's first/second-day schedule, but it cannot cure missing first-release vintage evidence.",
+      "release_semantics": "A month-M observation is unavailable until its actual PBS publication. Exact official CMS timestamps govern where preserved. The FAQ's normal first/second-day schedule is not treated as a guaranteed historical not-later-than bound because preserved evidence includes a third-day release and the FAQ does not establish first-release vintages. No synthetic release date is permitted.",
       "revision_behavior": "First-release values and later revisions must be separate vintages; a revised value may affect only decisions after that revision became available.",
       "vintage_timestamps_available": "PARTIAL: recent PBS publication posts expose timestamps; older linked reports do not provide a single complete machine-readable first-release timestamp history.",
       "machine_readable_history": "LIMITED: official historical tables and press releases are primarily PDF; recent post metadata is JSON through the official PBS site.",
@@ -104,13 +104,42 @@
       "source_version"
     ],
     "overwrite_policy": "NEVER_SILENTLY_OVERWRITE; unique retrieval-stamped evidence and manifests",
-    "persisted_evidence_files": 3,
+    "persisted_evidence_files": 11,
     "valid_files_by_series": {
-      "sbp_policy_target_rate": 0,
+      "sbp_policy_target_rate": 8,
       "pbs_national_cpi_yoy": 3,
       "sbp_usd_pkr_m2m": 0
     },
     "status": "PARTIAL_FAIL_CLOSED"
+  },
+  "manual_evidence_workflow": {
+    "version": "macro_evidence_ingest_v1",
+    "readiness_version": "macro_evidence_readiness_v1",
+    "authority_host_validation": true,
+    "checksum_required": true,
+    "atomic_write": true,
+    "overwrite_refused": true,
+    "policy_parser": "sbp_policy_target_rate_pdf_v2",
+    "policy_circular_parser": "sbp_policy_circular_html_v1",
+    "policy_circular_pdf_parser": "sbp_policy_circular_pdf_v1",
+    "policy_circular_chain": "sbp_policy_circular_chain_v1",
+    "usd_pkr_m2m_parser": "READY_FOR_MANUAL_EVIDENCE",
+    "conversion_rate_substitution_allowed": false,
+    "readiness_command": ".venv/bin/python -m data_pipeline.src.macro_evidence --readiness"
+  },
+  "evidence_readiness": {
+    "POLICY_RATE": "READY",
+    "CPI": "MISSING_RELEASE_EVIDENCE",
+    "USD_PKR": "MISSING",
+    "CANONICAL_MACRO": "BLOCKED",
+    "policy_event_count": 20,
+    "policy_first_effective_date": "2021-09-21",
+    "policy_last_effective_date": "2026-04-28",
+    "cpi_missing_value_months": [
+      "2026-07"
+    ],
+    "cpi_missing_exact_release_month_count": 51,
+    "test_observations_loaded": false
   },
   "canonical_macro_dataset": {
     "schema_version": "lead_agent_macro_observation_v1",
@@ -288,7 +317,7 @@
     "new_streamlit_page_required": false
   },
   "limitations": [
-    "No complete raw SBP policy-rate evidence is preserved locally; direct official-file requests returned HTTP 403 and require explicit manual ingest.",
+    "The SBP policy-rate series is READY from checksum-preserved first-party evidence. Its circular PDFs are image-only and require the fail-closed macOS Vision adapter unless an explicit embedded text layer is present.",
     "PBS CPI values and recent release timestamps are preserved, but historical first-release vintages are incomplete; the current history cannot be projected backward as if it were every original release.",
     "No complete SBP USD/PKR M2M history is preserved or exact daily field schema verified locally; conversion-rate files are not assumed equivalent.",
     "Exact point-in-time macro coverage and therefore exact common split dates are unavailable.",
@@ -308,5 +337,5 @@
     "raw_downloads_persisted": true,
     "commit_performed": false
   },
-  "contract_evidence_hash": "d06c228a80918969a5d2786feaea6878897301becce930828c3f98f19687d7a5"
+  "contract_evidence_hash": "bccf57cac11def80afe9891823b8b4f8b28c9f7f5c4f78dd1e47d9adbc769615"
 }

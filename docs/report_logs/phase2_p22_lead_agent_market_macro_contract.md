@@ -4,13 +4,40 @@ Decision: **BLOCKED_PHASE2_DATA_CONTRACT**
 
 Contract artifact: `docs/config/phase2_lead_agent_data_contract_v1.json`
 
-Current contract evidence hash after P2.2a: `d06c228a80918969a5d2786feaea6878897301becce930828c3f98f19687d7a5`
+Current contract evidence hash after P2.2f: `bccf57cac11def80afe9891823b8b4f8b28c9f7f5c4f78dd1e47d9adbc769615`
 
 > P2.2a update: PBS evidence is now preserved locally, while both required SBP
 > histories remain blocked behind official-server HTTP 403 responses. See
 > `docs/report_logs/phase2_p22a_authoritative_macro_evidence_acquisition.md` for
 > the current evidence inventory and manual-ingest procedure. The text below
 > preserves the original P2.2 contract findings.
+>
+> P2.2b adds strict policy/M2M parsers and a user-facing manual workflow. See
+> `docs/report_logs/phase2_p22b_manual_authoritative_macro_evidence_completion.md`.
+>
+> P2.2c preserves and correctly parses the official SIR PDF, while proving that
+> its target-rate history begins too late for Phase 2. P2.2d identifies the
+> required 2021–2022 official DMMD circular chain and adds write-once HTML
+> parsing and fail-closed chain validation. Direct page retrieval still returns
+> HTTP 403, so the original circular HTML must be saved through a normal browser
+> and checksum-ingested before policy readiness can become READY. See
+> `docs/report_logs/phase2_p22c_sbp_policy_rate_conflict_diagnosis.md` and
+> `docs/report_logs/phase2_p22d_official_sbp_circular_chain_policy_evidence.md`.
+>
+> P2.2e validates the first manually preserved circular, C15/2021. The parser
+> now follows browser-compatible Windows-1252 semantics for legacy pages that
+> declare ISO-8859-1 and binds circular identity to the same visible body
+> heading as its announcement date. C15 is READY as individual evidence; the
+> six later circular pages remain missing, so the overall policy chain and P2.2
+> remain blocked.
+>
+> P2.2f completes the first-party policy-rate chain. C06/2022 and C09/2022
+> are official image-only circular PDFs and now use the distinct, identity-bound
+> `sbp_policy_circular_pdf_v1` parser; the modern SIR PDF remains exclusively
+> under `sbp_policy_target_rate_pdf_v2`. The combined 20-event policy inventory
+> is READY. P2.2 itself remains blocked only by incomplete CPI release evidence
+> and missing daily SBP USD/PKR M2M evidence. See
+> `docs/report_logs/phase2_p22f_sbp_policy_circular_pdf_support.md`.
 
 ## Objective and outcome
 
